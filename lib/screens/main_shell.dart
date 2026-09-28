@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../models/profile.dart';
 import '../widgets/organisms/app_shell.dart';
-import 'coming_soon_screen.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
+import 'coming_soon_screen.dart';
 import 'timeline_screen.dart';
+import 'bucket_list_screen.dart';
 
 /// The signed-in, paired app: five tabs inside AppShell.
 /// IndexedStack keeps each tab's state when you switch away and back.
@@ -37,11 +38,7 @@ class _MainShellState extends State<MainShell> {
             message: 'Notes to each other, and Time Capsules sealed '
                 'until a date you choose.',
           ),
-          const ComingSoonScreen(
-            title: 'Bucket List',
-            icon: Icons.check_circle_outline,
-            message: 'Things you want to do together.',
-          ),
+          BucketListScreen(profile: widget.profile),
           ProfileScreen(profile: widget.profile),
         ],
       ),
