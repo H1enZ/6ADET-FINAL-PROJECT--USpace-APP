@@ -1,9 +1,9 @@
 # Security policy test
 
-`rls_test.py` runs 38 attack checks against `../schema.sql` with two couples
+`rls_test.py` runs 50 attack checks against `../schema.sql` with two couples
 and a fifth person: reading or changing the other couple's rows and photos,
 joining a full couple, faking an author, editing a profile to join a couple,
-opening a sealed Time Capsule early, and favouriting (either partner can, outsiders cannot, and the partner still cannot edit the caption).
+opening a sealed Time Capsule early, and favouriting (either partner can, outsiders cannot, and the partner still cannot edit the caption), and the bucket list savings log (both partners can log, nobody can log as someone else, entries cannot be edited, another couple sees nothing).
 
 It needs a local PostgreSQL. `supabase_mock.sql` stands in for the parts
 Supabase normally provides (`auth.users`, `auth.uid()`, the storage schema,
