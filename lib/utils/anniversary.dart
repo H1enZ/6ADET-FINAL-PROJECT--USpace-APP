@@ -85,3 +85,26 @@ String isoDate(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-'
     '${d.month.toString().padLeft(2, '0')}-'
     '${d.day.toString().padLeft(2, '0')}';
+
+/// "Your birthday is in 42 days (turning 24)", "Ana's birthday is tomorrow
+/// (turning 23)", or "Happy birthday! You're 24 today." Uses the same
+/// next-occurrence maths as the anniversary, including 29 February.
+String birthdayLine({
+  required DateTime birthday,
+  required bool isMe,
+  required String name,
+  DateTime? today,
+}) {
+  final info = AnniversaryInfo.from(birthday, today: today);
+  final age = info.yearsAtNext;
+  if (info.isToday) {
+    return isMe
+        ? 'Happy birthday! You\'re $age today.'
+        : 'It\'s $name\'s birthday today! $age years old.';
+  }
+  final whose = isMe ? 'Your birthday' : '$name\'s birthday';
+  final when = info.daysUntilNext == 1
+      ? 'tomorrow'
+      : 'in ${info.daysUntilNext} days';
+  return '$whose is $when (turning $age)';
+}
