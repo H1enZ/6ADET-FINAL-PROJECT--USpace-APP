@@ -101,4 +101,13 @@ as_user(cara); check("can upload into own folder", not isinstance(try_sql("inser
 as_user(None); cur.execute("reset role"); cur.execute("set role anon")
 check("signed-out visitor sees 0 memories", try_sql("select * from memories") == [])
 
+# --- favourites (migration 002)
+as_user(ana); mem = try_sql("insert into memories (couple_id, caption, memory_date) values (%s,'Fav me','2024-05-01') returning id", (couple_a,))[0][0]
+as_user(ben); check("partner can favourite author's memory", try_sql("select toggle_memory_favorite(%s)", (mem,)) == [(True,)])
+as_user(ana); check("favourite is shared by both", try_sql("select is_favorite from memories where id = %s", (mem,)) == [(True,)])
+as_user(ben); check("partner still can't edit the caption", (try_sql("update memories set caption='x' where id = %s", (mem,)) is True) and try_sql("select caption from memories where id = %s", (mem,)) == [("Fav me",)])
+as_user(cara); check("other couple can't favourite it", isinstance(try_sql("select toggle_memory_favorite(%s)", (mem,)), Exception))
+cur.execute("reset role"); cur.execute("set role anon")
+check("signed-out visitor can't call it", isinstance(try_sql("select toggle_memory_favorite(%s)", (mem,)), Exception))
+
 print(f"\n{sum(ok for _, ok in results)}/{len(results)} passed")

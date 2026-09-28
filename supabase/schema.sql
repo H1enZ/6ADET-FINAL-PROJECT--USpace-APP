@@ -295,3 +295,34 @@ create policy "photos: couple delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'memory-photos'
          and (storage.foldername(name))[1] = public.my_couple_id()::text);
+
+
+-- ---------------------------------------------------------------------------
+-- 8. Either partner can favourite a memory (also in migrations/002).
+--    Flips only is_favorite, only inside the caller's own couple.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.toggle_memory_favorite(memory_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_value boolean;
+begin
+  update memories
+     set is_favorite = not is_favorite
+   where id = memory_id
+     and couple_id = public.my_couple_id()
+  returning is_favorite into new_value;
+
+  if new_value is null then
+    raise exception 'Memory not found.';
+  end if;
+  return new_value;
+end;
+$$;
+
+revoke execute on function public.toggle_memory_favorite(uuid) from public, anon;
+grant execute on function public.toggle_memory_favorite(uuid) to authenticated;
