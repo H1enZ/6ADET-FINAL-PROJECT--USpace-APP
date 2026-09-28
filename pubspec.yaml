@@ -19,6 +19,8 @@ dependencies:
   supabase_flutter: ^2.9.0
   # Poppins and Inter, from docs/03-design-system.md.
   google_fonts: ^6.2.1
+  # Choosing a photo for a memory (works on web and phones).
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

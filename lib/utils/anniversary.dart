@@ -79,3 +79,9 @@ String shortDate(DateTime d) => '${d.day} ${_months[d.month - 1]}';
 
 /// 14 Feb 2024
 String longDate(DateTime d) => '${shortDate(d)} ${d.year}';
+
+/// 2024-02-14, the format the database uses for dates.
+String isoDate(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-'
+    '${d.month.toString().padLeft(2, '0')}-'
+    '${d.day.toString().padLeft(2, '0')}';

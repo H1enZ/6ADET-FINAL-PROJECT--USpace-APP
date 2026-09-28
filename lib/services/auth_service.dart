@@ -37,9 +37,20 @@ class AuthService {
   }
 }
 
+/// An error whose message is already written for the user.
+class AppException implements Exception {
+  const AppException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// Turns any error into a sentence the user can act on.
 String friendlyError(Object error) {
+  if (error is AppException) return error.message;
   if (error is AuthException) return error.message;
+  if (error is StorageException) return error.message;
   if (error is PostgrestException) return error.message;
   return 'Something went wrong. Check your connection and try again.';
 }
