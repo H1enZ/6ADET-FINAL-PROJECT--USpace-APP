@@ -7,8 +7,11 @@ import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
 import '../services/memory_service.dart';
+import '../services/profile_service.dart';
 import '../theme/app_spacing.dart';
+import '../utils/anniversary.dart';
 import '../widgets/atoms/app_button.dart';
+import '../widgets/atoms/avatar_circle.dart';
 import '../widgets/atoms/section_label.dart';
 import '../widgets/molecules/countdown_card.dart';
 import '../widgets/molecules/memory_card.dart';
@@ -42,7 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final coupleId = widget.profile.coupleId!;
       final couple = await CoupleService.couple(coupleId);
-      final members = await CoupleService.members(coupleId);
+      final members =
+          await ProfileService.withPhotos(await CoupleService.members(coupleId));
       final latest = await MemoryService.list(coupleId, limit: 1);
       if (!mounted) return;
       setState(() {
@@ -161,6 +165,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 anniversary: couple.anniversaryDate,
                 onTap: _setAnniversary,
               ),
+              if (_members.any((m) => m.birthday != null)) ...[
+                const SizedBox(height: AppSpacing.xxl),
+                const SectionLabel(text: 'Birthdays'),
+                for (final m in _members)
+                  if (m.birthday != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Row(
+                        children: [
+                          AvatarCircle(
+                            name: m.displayName,
+                            imageUrl: m.avatarUrl,
+                            size: 36,
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Text(
+                              birthdayLine(
+                                birthday: m.birthday!,
+                                isMe: m.userId == widget.profile.userId,
+                                name: m.displayName,
+                              ),
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+              ],
               const SizedBox(height: AppSpacing.xxl),
               const SectionLabel(text: 'Latest memory'),
               if (_latest == null)
