@@ -2,13 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/couple.dart';
+import '../models/memory.dart';
 import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
+import '../services/memory_service.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/section_label.dart';
 import '../widgets/molecules/countdown_card.dart';
+import '../widgets/molecules/memory_card.dart';
+import 'memory_detail_screen.dart';
 
 /// Home: who is in the space, the anniversary countdown, and (while waiting)
 /// the code to send your partner. Pull down to refresh.
@@ -24,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Couple? _couple;
   List<Profile> _members = [];
+  Memory? _latest;
   bool _loading = true;
   String? _error;
 
@@ -38,10 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final coupleId = widget.profile.coupleId!;
       final couple = await CoupleService.couple(coupleId);
       final members = await CoupleService.members(coupleId);
+      final latest = await MemoryService.list(coupleId, limit: 1);
       if (!mounted) return;
       setState(() {
         _couple = couple;
         _members = members;
+        _latest = latest.isEmpty ? null : latest.first;
         _error = null;
         _loading = false;
       });
@@ -59,6 +66,27 @@ class _HomeScreenState extends State<HomeScreen> {
       if (m.userId != widget.profile.userId) return m;
     }
     return null;
+  }
+
+  String _authorName(Memory m) {
+    if (m.authorId == widget.profile.userId) return 'you';
+    for (final p in _members) {
+      if (p.userId == m.authorId) return p.displayName;
+    }
+    return 'your partner';
+  }
+
+  Future<void> _openLatest(Memory memory) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => MemoryDetailScreen(
+          memory: memory,
+          authorName: _authorName(memory),
+          isMine: memory.authorId == widget.profile.userId,
+        ),
+      ),
+    );
+    if (changed == true) await _load();
   }
 
   Future<void> _setAnniversary() async {
@@ -134,10 +162,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: _setAnniversary,
               ),
               const SizedBox(height: AppSpacing.xxl),
-              const SectionLabel(text: 'Recent memories'),
-              Text('No memories yet.',
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: scheme.onSurfaceVariant)),
+              const SectionLabel(text: 'Latest memory'),
+              if (_latest == null)
+                Text('No memories yet. Add one from the Timeline tab.',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: scheme.onSurfaceVariant))
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: MemoryCard(
+                      memory: _latest!,
+                      authorName: _authorName(_latest!),
+                      onTap: () => _openLatest(_latest!),
+                    ),
+                  ),
+                ),
             ],
           ],
         ),
