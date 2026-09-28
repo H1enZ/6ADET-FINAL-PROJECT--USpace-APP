@@ -5,6 +5,7 @@ import '../widgets/organisms/app_shell.dart';
 import 'coming_soon_screen.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
+import 'timeline_screen.dart';
 
 /// The signed-in, paired app: five tabs inside AppShell.
 /// IndexedStack keeps each tab's state when you switch away and back.
@@ -29,11 +30,7 @@ class _MainShellState extends State<MainShell> {
         index: _index,
         children: [
           HomeScreen(profile: widget.profile),
-          const ComingSoonScreen(
-            title: 'Timeline',
-            icon: Icons.photo_library_outlined,
-            message: 'Your shared memories, with photos, newest first.',
-          ),
+          TimelineScreen(profile: widget.profile),
           const ComingSoonScreen(
             title: 'Love Notes',
             icon: Icons.favorite_border,
