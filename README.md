@@ -72,7 +72,7 @@ If your Flutter version does not accept `--dart-define-from-file`, pass the two 
 flutter run -d chrome --dart-define=SUPABASE_URL=https://your-project-id.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_your_key_here
 ```
 
-**When it works:** Chrome opens with the app inside a phone frame, shows "USpace" and "Checking your session…" for about a second, then the **Sign in** screen.
+**When it works:** Chrome opens with the app inside a phone frame and shows the splash: the wax seal, "USpace" and "Checking your session…". When it is ready it says **"Tap anywhere to continue"**. Tap to open the **Sign in** screen.
 
 **If you see "This build has no Supabase settings"**, the two values did not reach the app. Check that `.env` is in the project folder and that the names are spelled exactly as above.
 
@@ -84,7 +84,7 @@ The primary flow, screen by screen:
 
 | # | Screen | What you do there | Where it goes |
 |---|---|---|---|
-| 1 | **Splash** | Nothing. It checks for a saved session. | No session: Sign in. Signed in but not paired: Pair. Paired: Home. |
+| 1 | **Splash** | Shows the wax seal while it checks for a saved session. If you are not signed in, it waits for you to **tap anywhere to continue**. | Not signed in: tap to go to Sign in. Signed in but not paired: Pair, automatically. Paired: Home, automatically. |
 | 2 | **Sign in** | Sign in with email and password, or tap **Create an account** to add your name and sign up. Passwords need at least 8 characters. | Pair (new account) or Home (already paired) |
 | 3 | **Pair with your partner** | **Start our space** (optionally pick your anniversary date first) to get a 6-character invite code, or type your partner's code and tap **Join space**. | Home |
 | 4 | **Home** | See both names and the anniversary card: days until your next anniversary, total days together, and a ring that fills through the year. Tap the card to set or change the date. Until your partner joins, a pink box shows the invite code with a copy button. Pull down to refresh. | Any tab |
@@ -115,7 +115,7 @@ lib/
 │   ├── auth_service.dart   Sign up, sign in, sign out, readable error messages
 │   └── couple_service.dart Profile, couple, members, create/join couple, anniversary
 ├── screens/                One file per screen (state is setState inside each)
-│   ├── splash_screen.dart  Decides where to go; restartFlow() re-runs that decision
+│   ├── splash_screen.dart  Seal and session check, tap to continue; restartFlow() re-runs it
 │   ├── sign_in_screen.dart
 │   ├── pair_screen.dart
 │   ├── main_shell.dart     Holds the five tabs
@@ -131,7 +131,7 @@ lib/
 ├── utils/
 │   └── anniversary.dart    Countdown maths (pure Dart, unit tested)
 └── widgets/                Reusable pieces, named as in the design system
-    ├── atoms/              app_button, app_text_field, section_label, unlock_ring
+    ├── atoms/              app_button, app_text_field, section_label, unlock_ring, seal_badge
     ├── molecules/          countdown_card
     └── organisms/          app_shell (bottom bar or side rail)
 
@@ -172,6 +172,7 @@ Still to add, retaken with test accounts: Splash, Pair, Home (waiting and paired
 
 - **Partner joining does not update live.** The first partner has to pull down on Home to see that the second one has joined.
 - **Sign in and Pair are two screens**, where the mockup shows them as one. Splitting them made the flow simpler to build; merging them is still open.
+- **The setup steps have been tested through the automatic GitHub build, not yet on a fresh local machine.**
 - **After a new deploy, the live link can show the old version** because the browser caches the app. Press Ctrl + Shift + R, or open it in a private window.
 - **The Supabase free tier pauses a project after about a week without use.** If the live app cannot sign in, the project may need to be resumed from the Supabase dashboard.
 
