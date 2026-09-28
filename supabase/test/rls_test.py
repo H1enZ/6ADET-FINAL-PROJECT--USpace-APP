@@ -110,4 +110,22 @@ as_user(cara); check("other couple can't favourite it", isinstance(try_sql("sele
 cur.execute("reset role"); cur.execute("set role anon")
 check("signed-out visitor can't call it", isinstance(try_sql("select toggle_memory_favorite(%s)", (mem,)), Exception))
 
+# --- bucket details and savings (migration 003)
+as_user(ana); trip = try_sql("insert into bucket_items (couple_id, title, location_area, location_spot, budget) values (%s, 'See the bamboo forest', 'Kyoto, Japan', 'Arashiyama Bamboo Grove', 60000) returning id", (couple_a,))[0][0]
+check("item keeps location and budget", try_sql("select location_area, location_spot, budget from bucket_items where id = %s", (trip,)) == [("Kyoto, Japan", "Arashiyama Bamboo Grove", 60000)])
+check("budget must be positive", isinstance(try_sql("insert into bucket_items (couple_id, title, budget) values (%s, 'x', -5)", (couple_a,)), Exception))
+as_user(ana); check("can log savings for own item", not isinstance(try_sql("insert into bucket_contributions (item_id, couple_id, amount, note) values (%s, %s, 500, 'allowance')", (trip, couple_a)), Exception))
+as_user(ben); check("partner can log savings too", not isinstance(try_sql("insert into bucket_contributions (item_id, couple_id, amount) values (%s, %s, 1500)", (trip, couple_a)), Exception))
+as_user(ana); check("both entries add up", try_sql("select sum(amount) from bucket_contributions where item_id = %s", (trip,)) == [(2000,)])
+as_user(ana); check("amount must be positive", isinstance(try_sql("insert into bucket_contributions (item_id, couple_id, amount) values (%s, %s, 0)", (trip, couple_a)), Exception))
+as_user(ben); check("can't log savings as partner", isinstance(try_sql("insert into bucket_contributions (item_id, couple_id, author_id, amount) values (%s, %s, %s, 10)", (trip, couple_a, str(ana))), Exception))
+as_user(cara); check("other couple sees no savings", try_sql("select * from bucket_contributions") == [])
+as_user(cara); check("other couple can't log to our item", isinstance(try_sql("insert into bucket_contributions (item_id, couple_id, amount) values (%s, %s, 10)", (trip, couple_c)), Exception))
+as_user(ben); try_sql("delete from bucket_contributions where note = 'allowance'")
+as_user(ana); check("partner can't delete my entry", try_sql("select count(*) from bucket_contributions where note = 'allowance'") == [(1,)])
+as_user(ana); check("entries can't be edited", isinstance(try_sql("update bucket_contributions set amount = 99999"), Exception))
+as_user(ana); try_sql("delete from bucket_items where id = %s", (trip,))
+cur.execute("reset role"); cur.execute("select count(*) from bucket_contributions where item_id = %s", (trip,))
+check("deleting the item deletes its savings log", cur.fetchone()[0] == 0)
+
 print(f"\n{sum(ok for _, ok in results)}/{len(results)} passed")
