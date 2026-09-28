@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/couple_service.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/atoms/app_button.dart';
+import '../widgets/atoms/seal_badge.dart';
 import 'main_shell.dart';
 import 'pair_screen.dart';
 import 'sign_in_screen.dart';
@@ -55,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       // Hold the splash briefly so it doesn't flash.
       final waited = DateTime.now().difference(started);
-      const minimum = Duration(milliseconds: 700);
+      const minimum = Duration(milliseconds: 1400);
       if (waited < minimum) await Future<void>.delayed(minimum - waited);
 
       if (!mounted) return;
@@ -87,46 +88,85 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.screenMargin),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'USpace',
-                  style: theme.textTheme.displayLarge
-                      ?.copyWith(color: theme.colorScheme.primary),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.screenMargin),
+          child: Column(
+            children: [
+              const Spacer(flex: 3),
+              const SealBadge(size: 96),
+              const SizedBox(height: AppSpacing.xxl),
+              Text(
+                'USpace',
+                style: theme.textTheme.displayLarge?.copyWith(
+                  color: scheme.secondary,
+                  letterSpacing: 2,
                 ),
-                const SizedBox(height: AppSpacing.sm),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Container(width: 56, height: 2, color: scheme.primary),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                '\u201CThe diary of what\u2019s next\u201D',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const Spacer(flex: 3),
+              if (_error == null) ...[
+                const _LoadingDots(),
+                const SizedBox(height: AppSpacing.md),
                 Text(
-                  'A private space for the two of you.',
+                  'Checking your session\u2026',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.huge),
-                if (_error == null)
-                  Text('Checking your session…',
-                      style: theme.textTheme.labelSmall)
-                else ...[
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: theme.colorScheme.error),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  AppButton(label: 'Try again', onPressed: _retry),
-                  TextButton(onPressed: _signOut, child: const Text('Sign out')),
-                ],
+              ] else ...[
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: scheme.error),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppButton(label: 'Try again', onPressed: _retry),
+                TextButton(onPressed: _signOut, child: const Text('Sign out')),
               ],
-            ),
+              const SizedBox(height: AppSpacing.xxl),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Three dots fading from rose to blush, as in the mockup.
+class _LoadingDots extends StatelessWidget {
+  const _LoadingDots();
+
+  @override
+  Widget build(BuildContext context) {
+    final rose = Theme.of(context).colorScheme.primary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final alpha in const [1.0, 0.5, 0.25])
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(
+              color: rose.withValues(alpha: alpha),
+              shape: BoxShape.circle,
+            ),
+          ),
+      ],
     );
   }
 }
