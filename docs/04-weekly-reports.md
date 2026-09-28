@@ -1,4 +1,4 @@
-## Week 1 (28 Sep to 4 Oct 2026)
+## Week 1 (20 Sep to sep 23 2026)
 
 **Done this week**
 - Set up Supabase (Tokyo region) and ran `supabase/schema.sql`: five tables, row-level security on all of them, invite-code pairing functions, and a private photo bucket. The policies were checked with 33 automated attack tests before going live.
