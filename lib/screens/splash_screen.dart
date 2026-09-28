@@ -111,64 +111,68 @@ class _SplashScreenState extends State<SplashScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.screenMargin),
-            child: Column(
-              children: [
-                const Spacer(flex: 3),
-                const SealBadge(size: 96),
-                const SizedBox(height: AppSpacing.xxl),
-                Text(
-                  'USpace',
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    color: scheme.secondary,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Container(width: 56, height: 2, color: scheme.primary),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  '\u201CThe diary of what\u2019s next\u201D',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(flex: 3),
-                if (_error == null && waiting != null) ...[
-                  Semantics(
-                    button: true,
-                    label: 'Continue to sign in',
-                    child: Icon(Icons.touch_app_outlined,
-                        color: scheme.primary, size: 28),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
+            // Full width, so everything is centred like the mockup.
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                children: [
+                  const Spacer(flex: 3),
+                  const SealBadge(size: 96),
+                  const SizedBox(height: AppSpacing.xxl),
                   Text(
-                    'Tap anywhere to continue',
-                    style: theme.textTheme.labelLarge
-                        ?.copyWith(color: scheme.primary),
+                    'USpace',
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      color: scheme.secondary,
+                      letterSpacing: 2,
+                    ),
                   ),
-                ] else if (_error == null) ...[
-                  const _LoadingDots(),
+                  const SizedBox(height: AppSpacing.md),
+                  Container(width: 56, height: 2, color: scheme.primary),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'Checking your session\u2026',
+                    '\u201CThe diary of what\u2019s next\u201D',
                     style: theme.textTheme.bodyMedium?.copyWith(
+                      fontStyle: FontStyle.italic,
                       color: scheme.onSurfaceVariant,
                     ),
                   ),
-                ] else ...[
-                  Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: scheme.error),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  AppButton(label: 'Try again', onPressed: _retry),
-                  TextButton(onPressed: _signOut, child: const Text('Sign out')),
+                  const Spacer(flex: 3),
+                  if (_error == null && waiting != null) ...[
+                    Semantics(
+                      button: true,
+                      label: 'Continue to sign in',
+                      child: Icon(Icons.touch_app_outlined,
+                          color: scheme.primary, size: 28),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Tap anywhere to continue',
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(color: scheme.primary),
+                    ),
+                  ] else if (_error == null) ...[
+                    const _LoadingDots(),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Checking your session\u2026',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: scheme.error),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    AppButton(label: 'Try again', onPressed: _retry),
+                    TextButton(onPressed: _signOut, child: const Text('Sign out')),
+                  ],
+                  const SizedBox(height: AppSpacing.xxl),
                 ],
-                const SizedBox(height: AppSpacing.xxl),
-              ],
+              ),
             ),
           ),
         ),
