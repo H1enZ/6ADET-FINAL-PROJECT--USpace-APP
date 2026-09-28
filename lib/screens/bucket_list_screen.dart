@@ -4,11 +4,14 @@ import '../models/bucket_item.dart';
 import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/bucket_service.dart';
+import '../services/couple_service.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/atoms/app_button.dart';
-import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/filter_pill.dart';
 import '../utils/anniversary.dart';
+import '../utils/money.dart';
+import 'bucket_item_detail_screen.dart';
+import 'bucket_item_sheet.dart';
 
 /// Shared bucket list for the paired couple.
 class BucketListScreen extends StatefulWidget {
@@ -22,6 +25,7 @@ class BucketListScreen extends StatefulWidget {
 
 class _BucketListScreenState extends State<BucketListScreen> {
   List<BucketItem> _items = [];
+  Map<String, String> _names = {};
   String _filter = 'To do';
   bool _loading = true;
   String? _error;
@@ -37,9 +41,11 @@ class _BucketListScreenState extends State<BucketListScreen> {
   Future<void> _load() async {
     try {
       final items = await BucketService.list(_coupleId);
+      final members = await CoupleService.members(_coupleId);
       if (!mounted) return;
       setState(() {
         _items = items;
+        _names = {for (final m in members) m.userId: m.displayName};
         _error = null;
         _loading = false;
       });
@@ -73,25 +79,30 @@ class _BucketListScreenState extends State<BucketListScreen> {
   }
 
   Future<void> _add() async {
-    final result = await showDialog<({String title, DateTime? targetDate})>(
+    final saved = await showModalBottomSheet<bool>(
       context: context,
-      builder: (_) => const _AddBucketItemDialog(),
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => BucketItemSheet(coupleId: _coupleId),
     );
-    if (result == null) return;
+    if (saved != true) return;
+    await _load();
+    if (!mounted) return;
+    _showMessage('Added to your bucket list');
+  }
 
-    try {
-      await BucketService.add(
-        coupleId: _coupleId,
-        title: result.title,
-        targetDate: result.targetDate,
-      );
-      await _load();
-      if (!mounted) return;
-      _showMessage('Added to your bucket list');
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage(friendlyError(e));
-    }
+  Future<void> _open(BucketItem item) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => BucketItemDetailScreen(
+          item: item,
+          myUserId: widget.profile.userId,
+          names: _names,
+        ),
+      ),
+    );
+    if (changed == true) await _load();
   }
 
   Future<void> _toggle(BucketItem item) async {
@@ -125,7 +136,10 @@ class _BucketListScreenState extends State<BucketListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete item?'),
-        content: Text('"${item.title}" will be removed from the shared list.'),
+        content: Text(
+          '"${item.title}" will be removed from the shared list, '
+          'with its savings log.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -306,33 +320,10 @@ class _BucketListScreenState extends State<BucketListScreen> {
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: CheckboxListTile(
-                  value: item.isDone,
-                  onChanged: (_) => _toggle(item),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: Text(
-                    item.title,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          decoration:
-                              item.isDone ? TextDecoration.lineThrough : null,
-                          color: item.isDone
-                              ? Theme.of(context).colorScheme.tertiary
-                              : null,
-                        ),
-                  ),
-                  subtitle: item.targetDate == null
-                      ? null
-                      : Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            'Target: ${longDate(item.targetDate!)}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant,
-                                ),
-                          ),
-                        ),
+                child: _BucketRow(
+                  item: item,
+                  onToggle: () => _toggle(item),
+                  onOpen: () => _open(item),
                 ),
               ),
             ),
@@ -406,115 +397,112 @@ class _FilteredEmptyState extends StatelessWidget {
   }
 }
 
-/// The Add dialog. It is its own StatefulWidget so it owns the text
-/// controller and disposes it only when the dialog is really gone
-/// (not while it is still animating closed).
-class _AddBucketItemDialog extends StatefulWidget {
-  const _AddBucketItemDialog();
+/// One row: checkbox to tick it done, and tap anywhere else to open it.
+/// Shows where, when, and savings progress when there is a budget.
+class _BucketRow extends StatelessWidget {
+  const _BucketRow({
+    required this.item,
+    required this.onToggle,
+    required this.onOpen,
+  });
 
-  @override
-  State<_AddBucketItemDialog> createState() => _AddBucketItemDialogState();
-}
-
-class _AddBucketItemDialogState extends State<_AddBucketItemDialog> {
-  final _title = TextEditingController();
-  DateTime? _targetDate;
-  String? _error;
-
-  @override
-  void dispose() {
-    _title.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _targetDate ?? now,
-      firstDate: now,
-      lastDate: DateTime(2100),
-      helpText: 'When do you want to do it?',
-    );
-    if (!mounted || picked == null) return;
-    setState(() => _targetDate = picked);
-  }
-
-  /// Save is always tappable; an empty title shows a message instead.
-  void _save() {
-    final title = _title.text.trim();
-    if (title.isEmpty) {
-      setState(() => _error = 'Write what you want to do together.');
-      return;
-    }
-    Navigator.of(context).pop((title: title, targetDate: _targetDate));
-  }
+  final BucketItem item;
+  final VoidCallback onToggle;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted =
+        theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+    final progress = item.progress;
+    final location = item.locationLabel;
 
-    return AlertDialog(
-      title: const Text('Add to bucket list'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return InkWell(
+      onTap: onOpen,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xs,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.md,
+        ),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppTextField(
-              label: 'What do you want to do together?',
-              controller: _title,
-              hintText: 'e.g. Visit Japan',
-              prefixIcon: Icons.favorite_border,
-              maxLength: 120,
-              textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _save(),
+            Checkbox(
+              value: item.isDone,
+              onChanged: (_) => onToggle(),
+              activeColor: scheme.tertiary,
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'TARGET DATE',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs + 2),
-            OutlinedButton.icon(
-              onPressed: _pickDate,
-              icon: const Icon(Icons.calendar_today_outlined),
-              label: Text(
-                _targetDate == null
-                    ? 'Choose a date (optional)'
-                    : longDate(_targetDate!),
-              ),
-            ),
-            if (_targetDate != null)
-              TextButton(
-                onPressed: () => setState(() => _targetDate = null),
-                child: const Text('Remove date'),
-              ),
-            if (_error != null) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                _error!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        decoration:
+                            item.isDone ? TextDecoration.lineThrough : null,
+                        color: item.isDone ? scheme.tertiary : null,
+                      ),
+                    ),
+                    if (location != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Row(
+                        children: [
+                          Icon(Icons.place_outlined,
+                              size: 16, color: scheme.primary),
+                          const SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: Text(location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: muted),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (item.targetDate != null) ...[
+                      const SizedBox(height: 2),
+                      Text('Target: ${longDate(item.targetDate!)}',
+                          style: muted),
+                    ],
+                    if (progress != null) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.chipBar),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 6,
+                          color: item.isFunded
+                              ? scheme.tertiary
+                              : scheme.primary,
+                          backgroundColor: scheme.primaryContainer,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '${formatPeso(item.saved)} of '
+                        '${formatPeso(item.budget!)} saved',
+                        style: muted,
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.md),
+              child: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Save'),
-        ),
-      ],
     );
   }
 }
