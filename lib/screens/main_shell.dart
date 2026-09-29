@@ -30,7 +30,10 @@ class _MainShellState extends State<MainShell> {
       child: IndexedStack(
         index: _index,
         children: [
-          HomeScreen(profile: widget.profile),
+          HomeScreen(
+            profile: widget.profile,
+            onOpenTab: (i) => setState(() => _index = i),
+          ),
           TimelineScreen(profile: widget.profile),
           const ComingSoonScreen(
             title: 'Love Notes',
