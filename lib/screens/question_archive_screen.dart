@@ -1,0 +1,127 @@
+import 'package:flutter/material.dart';
+
+import '../models/question_answer.dart';
+import '../services/auth_service.dart';
+import '../services/question_service.dart';
+import '../theme/app_spacing.dart';
+import '../utils/anniversary.dart';
+
+/// Past daily questions with both answers, newest first. Your partner's
+/// answer only shows for days you answered too (the database enforces it).
+class QuestionArchiveScreen extends StatefulWidget {
+  const QuestionArchiveScreen({
+    super.key,
+    required this.coupleId,
+    required this.myUserId,
+    required this.partnerName,
+  });
+
+  final String coupleId;
+  final String myUserId;
+  final String partnerName;
+
+  @override
+  State<QuestionArchiveScreen> createState() => _QuestionArchiveScreenState();
+}
+
+class _QuestionArchiveScreenState extends State<QuestionArchiveScreen> {
+  List<QuestionAnswer> _answers = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final answers = await QuestionService.archive(widget.coupleId);
+      if (!mounted) return;
+      setState(() {
+        _answers = answers;
+        _error = null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = friendlyError(e);
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted =
+        theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+
+    // Group answers by day, keeping newest first.
+    final days = <DateTime, List<QuestionAnswer>>{};
+    for (final a in _answers) {
+      days.putIfAbsent(a.questionDate, () => []).add(a);
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Our questions')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(AppSpacing.screenMargin),
+                children: [
+                  if (_error != null)
+                    Text(_error!,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: scheme.error)),
+                  if (days.isEmpty && _error == null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.huge),
+                      child: Text(
+                        'Your answers will collect here, one question a day.',
+                        textAlign: TextAlign.center,
+                        style: muted,
+                      ),
+                    ),
+                  for (final entry in days.entries) ...[
+                    Text(longDate(entry.key),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(entry.value.first.question,
+                        style: theme.textTheme.titleMedium),
+                    const SizedBox(height: AppSpacing.sm),
+                    for (final a in entry.value)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: Text.rich(
+                          TextSpan(children: [
+                            TextSpan(
+                              text: a.userId == widget.myUserId
+                                  ? 'You: '
+                                  : '${widget.partnerName}: ',
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            TextSpan(text: a.answer),
+                          ]),
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                    if (entry.value.length == 1 &&
+                        entry.value.first.userId == widget.myUserId)
+                      Text('${widget.partnerName} didn\'t answer this one.',
+                          style: muted),
+                    const Divider(height: AppSpacing.xxxl),
+                  ],
+                ],
+              ),
+            ),
+    );
+  }
+}
