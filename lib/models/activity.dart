@@ -1,0 +1,74 @@
+import 'mood.dart';
+
+/// One entry in the couple's activity feed. Written only by the database.
+class Activity {
+  const Activity({
+    required this.id,
+    required this.actorId,
+    required this.kind,
+    required this.createdAt,
+    this.detail,
+  });
+
+  final String id;
+  final String actorId;
+  final String kind;
+  final String? detail;
+  final DateTime createdAt; // local time
+
+  factory Activity.fromMap(Map<String, dynamic> row) => Activity(
+        id: row['id'] as String,
+        actorId: row['actor_id'] as String,
+        kind: row['kind'] as String,
+        detail: row['detail'] as String?,
+        createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      );
+
+  /// A friendly sentence: "Ana added a memory: Beach day".
+  String describe({required String name, required bool isMe}) {
+    final who = isMe ? 'You' : name;
+    final d = detail;
+    switch (kind) {
+      case 'memory_added':
+        return d == null ? '$who added a memory' : '$who added a memory: $d';
+      case 'question_answered':
+        return "$who answered today's question";
+      case 'mood_updated':
+        final mood = Mood.fromName(d);
+        return mood == null
+            ? '$who updated ${isMe ? 'your' : 'their'} mood'
+            : '$who ${isMe ? 'are' : 'is'} feeling ${mood.label.toLowerCase()} ${mood.emoji}';
+      case 'note_sent':
+        return '$who sent a love note';
+      case 'affection_sent':
+        final gesture = switch (d) {
+          'hug' => 'a hug 🫂',
+          'kiss' => 'a kiss 💋',
+          'cuddle' => 'a cuddle 🤗',
+          'comfort' => 'some comfort 💗',
+          'listen' => 'something to listen to 👂',
+          _ => 'some love ❤️',
+        };
+        return '$who sent $gesture';
+      case 'date_added':
+        return d == null ? '$who saved a special date' : '$who saved a date: $d';
+      case 'bucket_added':
+        return d == null
+            ? '$who added to the bucket list'
+            : '$who added to the bucket list: $d';
+      default:
+        return '$who did something sweet';
+    }
+  }
+
+  String get emoji => switch (kind) {
+        'memory_added' => '📸',
+        'question_answered' => '💬',
+        'mood_updated' => Mood.fromName(detail)?.emoji ?? '🙂',
+        'note_sent' => '💌',
+        'affection_sent' => '💗',
+        'date_added' => '📅',
+        'bucket_added' => '✅',
+        _ => '✨',
+      };
+}
