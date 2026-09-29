@@ -421,3 +421,18 @@ create policy "avatars: own delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'avatars'
          and (storage.foldername(name))[1] = auth.uid()::text);
+
+
+-- ---------------------------------------------------------------------------
+-- 11. Photo upload limits enforced by Storage (also in migrations/005).
+-- ---------------------------------------------------------------------------
+
+update storage.buckets
+   set file_size_limit = 5242880,  -- 5 MB
+       allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+ where id = 'memory-photos';
+
+update storage.buckets
+   set file_size_limit = 5242880,
+       allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+ where id = 'avatars';
