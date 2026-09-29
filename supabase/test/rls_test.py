@@ -146,4 +146,122 @@ as_user(ana); try_sql("delete from storage.objects where bucket_id = 'avatars' a
 cur.execute("reset role"); cur.execute("select count(*) from storage.objects where name = %s", (f"{ana}/me.jpg",))
 check("I can delete my own photo", cur.fetchone()[0] == 0)
 
+# =================== Week 3 (migration 006) ===================
+def one(sql, params=None):
+    r = try_sql(sql, params)
+    return r[0][0] if isinstance(r, list) and r else r
+
+# --- richer memories
+as_user(ana); m3 = one("insert into memories (couple_id, caption, memory_date) values (%s,'Beach day','2025-07-01') returning id", (couple_a,))
+check("author can add description, location and tags", not isinstance(try_sql("update memories set description='Sunset swim', location='Zambales', tags=array['travel','special'] where id=%s", (m3,)), Exception))
+check("unknown tag rejected", isinstance(try_sql("update memories set tags=array['party'] where id=%s", (m3,)), Exception))
+as_user(ben); try_sql("update memories set description='hacked' where id=%s", (m3,))
+as_user(ana); check("partner can't edit my memory's story", one("select description from memories where id=%s", (m3,)) == "Sunset swim")
+
+# --- memory photos
+as_user(ana); check("author adds photos to own memory", not isinstance(try_sql("insert into memory_photos (memory_id, couple_id, path, position) values (%s,%s,%s,0)", (m3, couple_a, f"{couple_a}/m3-0.jpg")), Exception))
+check("photo path must be in own couple folder", isinstance(try_sql("insert into memory_photos (memory_id, couple_id, path, position) values (%s,%s,%s,1)", (m3, couple_a, f"{couple_c}/x.jpg")), Exception))
+check("max 10 photos (position 0-9)", isinstance(try_sql("insert into memory_photos (memory_id, couple_id, path, position) values (%s,%s,%s,10)", (m3, couple_a, f"{couple_a}/m3-10.jpg")), Exception))
+as_user(ben); check("partner can't add photos to my memory", isinstance(try_sql("insert into memory_photos (memory_id, couple_id, path, position) values (%s,%s,%s,2)", (m3, couple_a, f"{couple_a}/m3-2.jpg")), Exception))
+check("partner sees the photos", len(try_sql("select * from memory_photos where memory_id=%s", (m3,))) == 1)
+as_user(cara); check("other couple sees no memory photos", try_sql("select * from memory_photos") == [])
+
+# --- chat
+as_user(ana); msg1 = one("insert into messages (couple_id, body) values (%s,'Good morning ❤️') returning id", (couple_a,))
+check("can send a message", msg1 is not None and not isinstance(msg1, Exception))
+as_user(ben); check("partner receives it", one("select body from messages where id=%s", (msg1,)) == "Good morning ❤️")
+as_user(cara); check("other couple can't read our chat", try_sql("select * from messages") == [])
+as_user(ben); check("can't send as my partner", isinstance(try_sql("insert into messages (couple_id, sender_id, body) values (%s,%s,'fake')", (couple_a, str(ana))), Exception))
+as_user(cara); check("can't post into another couple's chat", isinstance(try_sql("insert into messages (couple_id, body) values (%s,'hi')", (couple_a,)), Exception))
+as_user(ana); check("new message can't arrive already read", isinstance(try_sql("insert into messages (couple_id, body, read_at) values (%s,'x', now())", (couple_a,)), Exception))
+check("empty message rejected", isinstance(try_sql("insert into messages (couple_id) values (%s)", (couple_a,)), Exception))
+old = one("insert into messages (couple_id, body, created_at) values (%s,'back-dated','2000-01-01') returning created_at::date > current_date - 1", (couple_a,))
+check("messages can't be back-dated", old is True)
+check("chat photo must be in own couple folder", isinstance(try_sql("insert into messages (couple_id, photo_path) values (%s,%s)", (couple_a, f"{couple_c}/chat/x.jpg")), Exception))
+as_user(ben); check("messages can't be changed directly", isinstance(try_sql("update messages set body='changed' where id=%s", (msg1,)), Exception))
+check("can't edit partner's message", isinstance(try_sql("select edit_message(%s, 'changed')", (msg1,)), Exception))
+as_user(ana); try_sql("select edit_message(%s, 'Good morning, love ❤️')", (msg1,))
+check("can edit my own message, marked edited", try_sql("select body, edited_at is not null from messages where id=%s", (msg1,)) == [("Good morning, love ❤️", True)])
+as_user(ben); check("can't delete partner's message", isinstance(try_sql("select delete_message(%s)", (msg1,)), Exception))
+as_user(ana); pmsg = one("insert into messages (couple_id, body, photo_path) values (%s,'pic',%s) returning id", (couple_a, f"{couple_a}/chat/p.jpg"))
+check("deleting returns the photo to remove", one("select delete_message(%s)", (pmsg,)) == f"{couple_a}/chat/p.jpg")
+check("deleted message keeps no text or photo", try_sql("select body, photo_path, deleted_at is not null from messages where id=%s", (pmsg,)) == [(None, None, True)])
+as_user(ben); try_sql("select mark_messages_read()")
+as_user(ana); check("partner reading marks my message read", one("select read_at is not null from messages where id=%s", (msg1,)) is True)
+mine = one("insert into messages (couple_id, body) values (%s,'unread') returning id", (couple_a,))
+try_sql("select mark_messages_read()")
+check("I can't mark my own sent messages read", one("select read_at is null from messages where id=%s", (mine,)) is True)
+as_user(cara); try_sql("select mark_messages_read()")
+as_user(ana); check("other couple can't mark our messages read", one("select read_at is null from messages where id=%s", (mine,)) is True)
+
+# --- reactions
+as_user(ben); check("partner can react", not isinstance(try_sql("insert into message_reactions (message_id, couple_id, emoji) values (%s,%s,'❤️')", (msg1, couple_a)), Exception))
+try_sql("update message_reactions set emoji='😂' where message_id=%s", (msg1,))
+check("can change my reaction", one("select emoji from message_reactions where message_id=%s", (msg1,)) == "😂")
+check("only the allowed emojis", isinstance(try_sql("insert into message_reactions (message_id, couple_id, emoji) values (%s,%s,'💩')", (mine, couple_a)), Exception))
+check("can't react as my partner", isinstance(try_sql("insert into message_reactions (message_id, couple_id, user_id, emoji) values (%s,%s,%s,'❤️')", (mine, couple_a, str(ana))), Exception))
+as_user(cara); check("other couple can't react to our messages", isinstance(try_sql("insert into message_reactions (message_id, couple_id, emoji) values (%s,%s,'❤️')", (msg1, couple_c)), Exception))
+check("other couple sees no reactions", try_sql("select * from message_reactions") == [])
+as_user(ana); try_sql("delete from message_reactions where message_id=%s", (msg1,))
+as_user(ben); check("can't remove partner's reaction", len(try_sql("select * from message_reactions where message_id=%s", (msg1,))) == 1)
+
+# --- moods
+as_user(ana); try_sql("insert into moods (couple_id, mood, note) values (%s,'happy','exam passed')", (couple_a,))
+try_sql("insert into moods (couple_id, mood, note, is_shared) values (%s,'sad','private thing',false)", (couple_a,))
+as_user(ben); check("partner sees my shared mood", [r[0] for r in try_sql("select mood from moods where user_id=%s", (str(ana),))] == ["happy"])
+as_user(ana); check("I see my private mood too", len(try_sql("select * from moods where user_id=auth.uid()")) == 2)
+as_user(cara); check("other couple sees no moods", try_sql("select * from moods") == [])
+as_user(ana); check("unknown mood rejected", isinstance(try_sql("insert into moods (couple_id, mood) values (%s,'hangry')", (couple_a,)), Exception))
+as_user(ben); check("can't check in as my partner", isinstance(try_sql("insert into moods (couple_id, user_id, mood) values (%s,%s,'happy')", (couple_a, str(ana))), Exception))
+
+# --- daily question
+q = "What made you smile today?"
+as_user(ben); try_sql("insert into question_answers (couple_id, question_date, question, answer) values (%s, current_date, %s, 'Your good-morning text')", (couple_a, q))
+as_user(ana); check("partner's answer hidden until I answer", try_sql("select answer from question_answers where user_id=%s", (str(ben),)) == [])
+try_sql("insert into question_answers (couple_id, question_date, question, answer) values (%s, current_date, %s, 'Passing my exam')", (couple_a, q))
+check("partner's answer visible after I answer", one("select answer from question_answers where user_id=%s", (str(ben),)) == "Your good-morning text")
+check("one answer per person per day", isinstance(try_sql("insert into question_answers (couple_id, question_date, question, answer) values (%s, current_date, %s, 'again')", (couple_a, q)), Exception))
+check("can edit my answer", not isinstance(try_sql("update question_answers set answer='Passing my exam (and you)' where user_id=auth.uid()"), Exception))
+as_user(ben); try_sql("update question_answers set answer='hacked' where user_id=%s", (str(ana),))
+as_user(ana); check("partner can't edit my answer", one("select answer from question_answers where user_id=auth.uid()") == "Passing my exam (and you)")
+as_user(cara); check("other couple sees no answers", try_sql("select * from question_answers") == [])
+
+# --- important dates
+as_user(ana); d1 = one("insert into important_dates (couple_id, title, event_date) values (%s,'First date','2023-06-19') returning id", (couple_a,))
+as_user(ben); try_sql("update important_dates set title='Our first date' where id=%s", (d1,))
+check("both partners can edit important dates", one("select title from important_dates where id=%s", (d1,)) == "Our first date")
+as_user(cara); check("other couple sees no dates", try_sql("select * from important_dates") == [])
+
+# --- affection
+as_user(ana); hug = one("insert into affections (couple_id, kind, message) values (%s,'hug','Big warm hug') returning id", (couple_a,))
+as_user(ben); check("partner receives the hug", one("select kind from affections where id=%s", (hug,)) == "hug")
+as_user(ana); check("can't send already seen", isinstance(try_sql("insert into affections (couple_id, kind, seen_at) values (%s,'kiss', now())", (couple_a,)), Exception))
+check("unknown affection rejected", isinstance(try_sql("insert into affections (couple_id, kind) values (%s,'slap')", (couple_a,)), Exception))
+try_sql("select mark_affections_seen()")
+check("I can't mark my own hug seen", one("select seen_at is null from affections where id=%s", (hug,)) is True)
+as_user(ben); try_sql("select mark_affections_seen()")
+check("receiver marks it seen", one("select seen_at is not null from affections where id=%s", (hug,)) is True)
+check("affections can't be changed directly", isinstance(try_sql("update affections set message='x' where id=%s", (hug,)), Exception))
+as_user(cara); check("other couple sees no affection", try_sql("select * from affections") == [])
+
+# --- resolution notes
+as_user(ana); try_sql("insert into resolution_notes (couple_id, need, what_happened, is_shared) values (%s,'listen','my private draft',false)", (couple_a,))
+shared_note = one("insert into resolution_notes (couple_id, need, what_happened) values (%s,'solution','we disagreed about plans') returning id", (couple_a,))
+as_user(ben); check("partner sees only my shared note", [r[0] for r in try_sql("select what_happened from resolution_notes where author_id=%s", (str(ana),))] == ["we disagreed about plans"])
+try_sql("update resolution_notes set what_happened='hacked' where id=%s", (shared_note,))
+as_user(ana); check("partner can't edit my note", one("select what_happened from resolution_notes where id=%s", (shared_note,)) == "we disagreed about plans")
+as_user(cara); check("other couple sees no notes", try_sql("select * from resolution_notes") == [])
+
+# --- activity feed
+as_user(ana); kinds = {r[0] for r in try_sql("select kind from activities")}
+check("feed logs memories, moods, answers, dates, affection", {"memory_added", "mood_updated", "question_answered", "date_added", "affection_sent"} <= kinds)
+check("private mood is not in the feed", one("select count(*) from activities where kind='mood_updated'") == 1)
+check("feed never contains mood notes", one("select count(*) from activities where detail ilike '%exam%' or detail ilike '%private%'") == 0)
+check("app can't write fake activity", isinstance(try_sql("insert into activities (couple_id, actor_id, kind) values (%s,%s,'memory_added')", (couple_a, str(ana))), Exception))
+as_user(cara); check("other couple sees no activity", try_sql("select * from activities where couple_id=%s", (couple_a,)) == [])
+as_user(None); cur.execute("reset role"); cur.execute("set role anon")
+check("signed-out visitor sees no chat", try_sql("select * from messages") == [] or isinstance(try_sql("select * from messages"), Exception))
+cur.execute("reset role"); cur.execute("select count(*) from pg_publication_tables where pubname='supabase_realtime' and tablename in ('messages','message_reactions','affections','activities')")
+check("chat, reactions, affection and feed are realtime", cur.fetchone()[0] == 4)
+
 print(f"\n{sum(ok for _, ok in results)}/{len(results)} passed")
