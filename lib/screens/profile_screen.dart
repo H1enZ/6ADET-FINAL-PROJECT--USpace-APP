@@ -5,6 +5,7 @@ import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
 import '../services/profile_service.dart';
+import '../services/theme_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
 import '../widgets/atoms/app_button.dart';
@@ -324,6 +325,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const SizedBox(height: AppSpacing.xxl),
                           ],
+
+                          // Appearance
+                          const SectionLabel(text: 'Appearance'),
+                          ValueListenableBuilder<ThemeMode>(
+                            valueListenable: ThemeService.mode,
+                            builder: (context, mode, _) =>
+                                SegmentedButton<ThemeMode>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: ThemeMode.light,
+                                  icon: Icon(Icons.light_mode_outlined),
+                                  label: Text('Light'),
+                                ),
+                                ButtonSegment(
+                                  value: ThemeMode.dark,
+                                  icon: Icon(Icons.dark_mode_outlined),
+                                  label: Text('Dark'),
+                                ),
+                                ButtonSegment(
+                                  value: ThemeMode.system,
+                                  icon: Icon(Icons.brightness_auto_outlined),
+                                  label: Text('System'),
+                                ),
+                              ],
+                              selected: {mode},
+                              showSelectedIcon: false,
+                              onSelectionChanged: (selection) =>
+                                  ThemeService.set(selection.first),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text('Saved on this device only.', style: muted),
+                          const SizedBox(height: AppSpacing.xxl),
 
                           // Account
                           const SectionLabel(text: 'Account'),
