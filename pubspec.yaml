@@ -21,6 +21,8 @@ dependencies:
   google_fonts: ^6.2.1
   # Choosing a photo for a memory (works on web and phones).
   image_picker: ^1.1.2
+  # Remembers the Light / Dark / System choice on this device.
+  shared_preferences: ^2.3.0
 
 dev_dependencies:
   flutter_test:
