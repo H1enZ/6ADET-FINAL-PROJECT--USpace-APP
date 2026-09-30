@@ -5,10 +5,13 @@ import '../services/auth_service.dart';
 import '../services/memory_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
+import '../widgets/effects/floating_hearts.dart';
 import '../widgets/molecules/memory_card.dart';
+import 'add_memory_sheet.dart';
 
-/// One memory, full size. Either partner can favourite it; only the author
-/// can delete it. Returns `true` when something changed so the list reloads.
+/// One memory, full size: swipe through its photos, read the story.
+/// Either partner can favourite it; only the author can edit or delete it.
+/// Returns `true` when something changed so the list reloads.
 class MemoryDetailScreen extends StatefulWidget {
   const MemoryDetailScreen({
     super.key,
@@ -27,12 +30,19 @@ class MemoryDetailScreen extends StatefulWidget {
 
 class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   late Memory _memory = widget.memory;
+  final _pages = PageController();
+  int _page = 0;
   bool _changed = false;
   bool _busy = false;
 
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
   }
+
+  void _showMessage(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _toggleFavourite() async {
     setState(() => _busy = true);
@@ -43,6 +53,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
         _memory = _memory.copyWith(isFavorite: value);
         _changed = true;
       });
+      if (value) showFloatingHearts(context);
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));
@@ -51,28 +62,49 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     }
   }
 
+  Future<void> _edit() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => AddMemorySheet(coupleId: _memory.coupleId, memory: _memory),
+    );
+    if (saved != true) return;
+    try {
+      final fresh = await MemoryService.get(_memory.id);
+      if (!mounted) return;
+      setState(() {
+        _memory = fresh;
+        _changed = true;
+        _page = 0;
+      });
+      if (_pages.hasClients) _pages.jumpToPage(0);
+      _showMessage('Changes saved');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(friendlyError(e));
+    }
+  }
+
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete this memory?'),
-        content: const Text(
-            'It will be removed for both of you, with its photo. '
-            'This cannot be undone.'),
+        content: const Text('It will be removed for both of you, with all its '
+            'photos. This cannot be undone.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete')),
         ],
       ),
     );
     if (confirmed != true) return;
-
     setState(() => _busy = true);
     try {
       await MemoryService.delete(_memory);
@@ -89,31 +121,36 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final fav = _memory.isFavorite;
+    final m = _memory;
+    final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
 
     return PopScope<Object?>(
       canPop: false,
-      // Back button and browser back both return whether anything changed.
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        Navigator.of(context).pop(_changed);
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop(_changed);
       },
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Memory'),
           actions: [
             IconButton(
-              tooltip: fav ? 'Remove from favourites' : 'Add to favourites',
+              tooltip: m.isFavorite ? 'Remove from favorites' : 'Add to favorites',
               onPressed: _busy ? null : _toggleFavourite,
-              icon: Icon(fav ? Icons.favorite : Icons.favorite_border,
-                  color: fav ? scheme.primary : null),
+              icon: Icon(m.isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: m.isFavorite ? scheme.primary : null),
             ),
-            if (widget.isMine)
+            if (widget.isMine) ...[
+              IconButton(
+                tooltip: 'Edit memory',
+                onPressed: _busy ? null : _edit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
               IconButton(
                 tooltip: 'Delete memory',
                 onPressed: _busy ? null : _delete,
                 icon: const Icon(Icons.delete_outline),
               ),
+            ],
           ],
         ),
         body: Center(
@@ -121,23 +158,79 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
               children: [
-                if (_memory.photoUrl != null)
+                if (m.photos.isNotEmpty) ...[
                   AspectRatio(
                     aspectRatio: 4 / 3,
-                    child: MemoryPhoto(url: _memory.photoUrl),
+                    child: PageView.builder(
+                      controller: _pages,
+                      itemCount: m.photos.length,
+                      onPageChanged: (i) => setState(() => _page = i),
+                      itemBuilder: (_, i) => MemoryPhoto(url: m.photos[i].url),
+                    ),
                   ),
+                  if (m.photos.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (var i = 0; i < m.photos.length; i++)
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                              width: i == _page ? 18 : 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: i == _page ? scheme.primary : scheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
                 Padding(
                   padding: const EdgeInsets.all(AppSpacing.screenMargin),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_memory.caption, style: theme.textTheme.titleLarge),
+                      Text(longDate(m.memoryDate).toUpperCase(),
+                          style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary)),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(m.title, style: theme.textTheme.titleLarge),
                       const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        '${longDate(_memory.memoryDate)} \u00B7 added by ${widget.authorName}',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
+                      if (m.location != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: Row(
+                            children: [
+                              Icon(Icons.place_outlined, size: 18, color: scheme.primary),
+                              const SizedBox(width: AppSpacing.xs),
+                              Expanded(child: Text(m.location!, style: muted)),
+                            ],
+                          ),
+                        ),
+                      if (m.tags.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: Wrap(
+                            spacing: AppSpacing.xs,
+                            runSpacing: AppSpacing.xs,
+                            children: [
+                              for (final t in m.tags)
+                                Chip(
+                                  label: Text('${t.emoji} ${t.label}'),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                            ],
+                          ),
+                        ),
+                      if (m.description != null)
+                        Text(m.description!, style: theme.textTheme.bodyLarge)
+                      else if (widget.isMine)
+                        Text('Tap ✏️ to add the story behind this memory.', style: muted),
+                      const SizedBox(height: AppSpacing.xl),
+                      Text('Added by ${widget.authorName}', style: muted),
                     ],
                   ),
                 ),
