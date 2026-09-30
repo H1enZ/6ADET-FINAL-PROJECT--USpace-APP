@@ -71,10 +71,18 @@ class WelcomeCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
-              AvatarCircle(name: me.displayName, imageUrl: me.avatarUrl, size: 40),
+              AvatarCircle(
+                  name: me.displayName,
+                  imageUrl: me.avatarUrl,
+                  size: 40,
+                  background: scheme.surfaceContainerHighest),
               const SizedBox(width: AppSpacing.xs),
               if (p != null)
-                AvatarCircle(name: p.displayName, imageUrl: p.avatarUrl, size: 40),
+                AvatarCircle(
+                    name: p.displayName,
+                    imageUrl: p.avatarUrl,
+                    size: 40,
+                    background: scheme.surfaceContainerHighest),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(

@@ -8,11 +8,16 @@ class AvatarCircle extends StatelessWidget {
     required this.name,
     this.imageUrl,
     this.size = 40,
+    this.background,
   });
 
   final String name;
   final String? imageUrl;
   final double size;
+
+  /// Circle colour behind the initials. Defaults to the blush container;
+  /// pass another when the avatar sits on a blush background.
+  final Color? background;
 
   /// "Ana Reyes" -> "AR", "mikko" -> "M".
   static String initialsOf(String name) {
@@ -26,7 +31,7 @@ class AvatarCircle extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     final initials = Container(
-      color: scheme.primaryContainer,
+      color: background ?? scheme.primaryContainer,
       alignment: Alignment.center,
       child: Text(
         initialsOf(name),

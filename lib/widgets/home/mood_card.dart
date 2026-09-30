@@ -41,8 +41,10 @@ class MoodCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(e?.mood.emoji ?? '\u2014',
-                  style: const TextStyle(fontSize: 26)),
+              e == null
+                  ? Icon(Icons.sentiment_neutral_outlined,
+                      size: 30, color: scheme.outline)
+                  : Text(e.mood.emoji, style: const TextStyle(fontSize: 26)),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(

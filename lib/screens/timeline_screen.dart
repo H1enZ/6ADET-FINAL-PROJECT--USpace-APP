@@ -6,14 +6,38 @@ import '../services/auth_service.dart';
 import '../services/couple_service.dart';
 import '../services/memory_service.dart';
 import '../theme/app_spacing.dart';
+import '../utils/anniversary.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/filter_pill.dart';
+import '../widgets/effects/floating_hearts.dart';
 import '../widgets/molecules/memory_card.dart';
 import 'add_memory_sheet.dart';
 import 'memory_detail_screen.dart';
 
-/// Shared memories, newest first, filtered by year.
-/// One column on a phone, two from 600 dp, three from 840 dp.
+enum _Filter { all, favorites, anniversaries, travel, special }
+
+extension on _Filter {
+  String get label => switch (this) {
+        _Filter.all => 'All memories',
+        _Filter.favorites => 'Favorites',
+        _Filter.anniversaries => 'Anniversaries',
+        _Filter.travel => 'Travel',
+        _Filter.special => 'Special moments',
+      };
+
+  bool matches(Memory m) => switch (this) {
+        _Filter.all => true,
+        _Filter.favorites => m.isFavorite,
+        _Filter.anniversaries => m.tags.contains(MemoryTag.anniversary),
+        _Filter.travel => m.tags.contains(MemoryTag.travel),
+        _Filter.special => m.tags.contains(MemoryTag.special) ||
+            m.tags.contains(MemoryTag.celebration) ||
+            m.tags.contains(MemoryTag.firstDate),
+      };
+}
+
+/// The couple's story as a vertical scrapbook, from the beginning to now
+/// (or newest first). Filter by favorites or tags; tap a memory to open it.
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key, required this.profile});
 
@@ -26,7 +50,8 @@ class TimelineScreen extends StatefulWidget {
 class _TimelineScreenState extends State<TimelineScreen> {
   List<Memory> _memories = [];
   Map<String, String> _names = {};
-  int? _year; // null means "All"
+  _Filter _filter = _Filter.all;
+  bool _oldestFirst = true;
   bool _loading = true;
   String? _error;
 
@@ -46,7 +71,6 @@ class _TimelineScreenState extends State<TimelineScreen> {
       setState(() {
         _names = {for (final m in members) m.userId: m.displayName};
         _memories = memories;
-        if (_year != null && !_years.contains(_year)) _year = null;
         _error = null;
         _loading = false;
       });
@@ -59,23 +83,20 @@ class _TimelineScreenState extends State<TimelineScreen> {
     }
   }
 
-  List<int> get _years {
-    final years = {for (final m in _memories) m.memoryDate.year}.toList();
-    years.sort((a, b) => b.compareTo(a));
-    return years;
+  List<Memory> get _visible {
+    final list = _memories.where(_filter.matches).toList();
+    list.sort((a, b) => _oldestFirst
+        ? a.memoryDate.compareTo(b.memoryDate)
+        : b.memoryDate.compareTo(a.memoryDate));
+    return list;
   }
-
-  List<Memory> get _visible => _year == null
-      ? _memories
-      : _memories.where((m) => m.memoryDate.year == _year).toList();
 
   String _authorName(Memory m) => m.authorId == widget.profile.userId
       ? 'you'
       : (_names[m.authorId] ?? 'your partner');
 
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
+  void _showMessage(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _add() async {
     final saved = await showModalBottomSheet<bool>(
@@ -88,18 +109,18 @@ class _TimelineScreenState extends State<TimelineScreen> {
     if (saved != true) return;
     await _load();
     if (!mounted) return;
+    showFloatingHearts(context);
     _showMessage('Memory saved');
   }
 
   void _replace(Memory updated) {
-    _memories = [
-      for (final m in _memories) m.id == updated.id ? updated : m,
-    ];
+    _memories = [for (final m in _memories) m.id == updated.id ? updated : m];
   }
 
   Future<void> _toggleFavourite(Memory memory) async {
-    // Update the heart straight away, then confirm with the database.
-    setState(() => _replace(memory.copyWith(isFavorite: !memory.isFavorite)));
+    final willLove = !memory.isFavorite;
+    setState(() => _replace(memory.copyWith(isFavorite: willLove)));
+    if (willLove) showFloatingHearts(context);
     try {
       final value = await MemoryService.toggleFavorite(memory.id);
       if (!mounted) return;
@@ -128,9 +149,38 @@ class _TimelineScreenState extends State<TimelineScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final visible = _visible;
+
+    // Build the rows: a year label whenever the year changes, then memories.
+    final rows = <Widget>[];
+    int? year;
+    for (var i = 0; i < visible.length; i++) {
+      final m = visible[i];
+      if (m.memoryDate.year != year) {
+        year = m.memoryDate.year;
+        rows.add(_YearMarker(year: year));
+      }
+      rows.add(_TimelineEntry(
+        memory: m,
+        authorName: _authorName(m),
+        tiltLeft: i.isEven,
+        isLast: i == visible.length - 1,
+        onTap: () => _open(m),
+        onFavourite: () => _toggleFavourite(m),
+      ));
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Timeline')),
+      appBar: AppBar(
+        title: const Text('Our timeline'),
+        actions: [
+          IconButton(
+            tooltip: _oldestFirst ? 'Showing oldest first' : 'Showing newest first',
+            onPressed: () => setState(() => _oldestFirst = !_oldestFirst),
+            icon: Icon(_oldestFirst ? Icons.arrow_downward : Icons.arrow_upward),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _loading ? null : _add,
         tooltip: 'Add a memory',
@@ -143,153 +193,361 @@ class _TimelineScreenState extends State<TimelineScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _load,
-              child: LayoutBuilder(
-                builder: (context, constraints) => CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  slivers: [
-                    if (_error != null) _errorSliver(theme),
-                    if (_years.isNotEmpty) _yearPills(),
-                    if (_memories.isEmpty && _error == null)
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _EmptyState(onAdd: _add),
-                      )
-                    else
-                      _grid(constraints.maxWidth),
-                  ],
-                ),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  if (_error != null)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.screenMargin),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_error!,
+                                style: theme.textTheme.bodyMedium
+                                    ?.copyWith(color: scheme.error)),
+                            const SizedBox(height: AppSpacing.md),
+                            AppButton(
+                                label: 'Try again',
+                                variant: AppButtonVariant.outlined,
+                                onPressed: _load),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (_memories.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: AppSpacing.touchTarget + AppSpacing.sm,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.screenMargin,
+                              vertical: AppSpacing.xs),
+                          children: [
+                            for (final f in _Filter.values)
+                              Padding(
+                                padding: const EdgeInsets.only(right: AppSpacing.sm),
+                                child: FilterPill(
+                                  label: f.label,
+                                  selected: _filter == f,
+                                  count: _memories.where(f.matches).length,
+                                  onTap: () => setState(() => _filter = f),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (_memories.isEmpty && _error == null)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyTimeline(onAdd: _add),
+                    )
+                  else if (visible.isEmpty && _error == null)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.huge),
+                          child: Text(
+                            'No memories here yet. Add a tag when you save a '
+                            'memory, or tap the heart to make it a favorite.',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md, AppSpacing.sm, AppSpacing.screenMargin, 96),
+                      sliver: SliverList(delegate: SliverChildListDelegate(rows)),
+                    ),
+                ],
               ),
             ),
     );
   }
+}
 
-  Widget _errorSliver(ThemeData theme) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.screenMargin),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_error!,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.error)),
-            const SizedBox(height: AppSpacing.md),
-            AppButton(
-              label: 'Try again',
-              variant: AppButtonVariant.outlined,
-              onPressed: _load,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+/// The year, sitting on the timeline's line.
+class _YearMarker extends StatelessWidget {
+  const _YearMarker({required this.year});
 
-  Widget _yearPills() {
-    return SliverToBoxAdapter(
-      child: SizedBox(
-        height: AppSpacing.touchTarget + AppSpacing.sm,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.screenMargin,
-            vertical: AppSpacing.xs,
+  final int year;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 48,
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+                    child: Icon(Icons.favorite, size: 18, color: scheme.onPrimary),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text('$year', style: theme.textTheme.titleLarge?.copyWith(color: scheme.primary)),
+            ],
           ),
-          children: [
-            for (final year in _years)
-              Padding(
-                padding: const EdgeInsets.only(right: AppSpacing.sm),
-                child: FilterPill(
-                  label: '$year',
-                  selected: _year == year,
-                  onTap: () => setState(() => _year = year),
-                ),
-              ),
-            FilterPill(
-              label: 'All',
-              selected: _year == null,
-              onTap: () => setState(() => _year = null),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _grid(double width) {
-    final columns = width >= AppSpacing.expandedMin
-        ? 3
-        : width >= AppSpacing.compactMax
-            ? 2
-            : 1;
-    final layout =
-        columns == 1 ? MemoryCardLayout.list : MemoryCardLayout.grid;
-    const margin = AppSpacing.screenMargin;
-    const gap = AppSpacing.lg;
-    final cellWidth = (width - margin * 2 - gap * (columns - 1)) / columns;
-    final aspect = columns == 1 ? 16 / 9 : 4 / 3;
-    final visible = _visible;
-
-    return SliverPadding(
-      // Extra space at the bottom so the + button never covers a heart.
-      padding: const EdgeInsets.fromLTRB(margin, AppSpacing.sm, margin, 96),
-      sliver: SliverGrid(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
-          mainAxisSpacing: gap,
-          crossAxisSpacing: gap,
-          mainAxisExtent: cellWidth / aspect + MemoryCard.footerHeight + 2,
-        ),
-        delegate: SliverChildBuilderDelegate(
-          (context, i) {
-            final memory = visible[i];
-            return MemoryCard(
-              memory: memory,
-              authorName: _authorName(memory),
-              layout: layout,
-              onTap: () => _open(memory),
-              onFavourite: () => _toggleFavourite(memory),
-            );
-          },
-          childCount: visible.length,
         ),
       ),
     );
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
+/// One memory on the timeline: the line and a heart on the left, the
+/// scrapbook card on the right. Fades in gently when it first appears.
+class _TimelineEntry extends StatelessWidget {
+  const _TimelineEntry({
+    required this.memory,
+    required this.authorName,
+    required this.tiltLeft,
+    required this.isLast,
+    required this.onTap,
+    required this.onFavourite,
+  });
+
+  final Memory memory;
+  final String authorName;
+  final bool tiltLeft;
+  final bool isLast;
+  final VoidCallback onTap;
+  final VoidCallback onFavourite;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+    final m = memory;
+    final still = MediaQuery.of(context).disableAnimations;
+
+    final card = Material(
+      color: scheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        side: BorderSide(color: scheme.outline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (m.photos.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Transform.rotate(
+                    // a slight tilt, like a photo taped into a scrapbook
+                    angle: still ? 0 : (tiltLeft ? -0.015 : 0.015),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(6, 6, 6, 18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
+                        ],
+                      ),
+                      child: AspectRatio(
+                        aspectRatio: 4 / 3,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            MemoryPhoto(url: m.photoUrl),
+                            if (m.photos.length > 1)
+                              Positioned(
+                                right: 6,
+                                top: 6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text('📷 ${m.photos.length}',
+                                      style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              Text(longDate(m.memoryDate).toUpperCase(),
+                  style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary)),
+              const SizedBox(height: 2),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: Text(m.title, style: theme.textTheme.titleMedium)),
+                  IconButton(
+                    tooltip: m.isFavorite ? 'Remove from favorites' : 'Add to favorites',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onFavourite,
+                    icon: Icon(m.isFavorite ? Icons.favorite : Icons.favorite_border,
+                        color: m.isFavorite ? scheme.primary : scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              if (m.location != null)
+                Row(
+                  children: [
+                    Icon(Icons.place_outlined, size: 16, color: scheme.primary),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(child: Text(m.location!, style: muted)),
+                  ],
+                ),
+              if (m.description != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(m.description!,
+                    maxLines: 3, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium),
+              ],
+              if (m.tags.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: [
+                    for (final t in m.tags)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text('${t.emoji} ${t.label}',
+                            style: theme.textTheme.labelSmall
+                                ?.copyWith(color: scheme.onPrimaryContainer)),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              Text('Added by $authorName', style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final row = Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // the line, with a heart where this memory sits
+              SizedBox(
+                width: 48,
+                child: Stack(
+                  alignment: Alignment.topCenter,
+                  children: [
+                    Positioned(
+                      top: 0,
+                      bottom: isLast ? null : 0,
+                      height: isLast ? 28 : null,
+                      child: Container(width: 2, color: scheme.primaryContainer),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 18),
+                      child: Icon(
+                        m.isFavorite ? Icons.favorite : Icons.favorite_border,
+                        size: 20,
+                        color: scheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+                  child: card,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (still) return row;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(offset: Offset(0, 16 * (1 - t)), child: child),
+      ),
+      child: row,
+    );
+  }
+}
+
+class _EmptyTimeline extends StatelessWidget {
+  const _EmptyTimeline({required this.onAdd});
 
   final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.huge),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.photo_library_outlined,
-              size: 48, color: theme.colorScheme.primary),
-          const SizedBox(height: AppSpacing.lg),
-          Text('No memories yet', style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Start with the day you met, your first trip, or last weekend.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          AppButton(
-            label: 'Add your first memory',
-            icon: Icons.add,
-            onPressed: onAdd,
-          ),
-        ],
+    final scheme = theme.colorScheme;
+    const ideas = [
+      '💕 The day you first met',
+      '☕ Your first date',
+      '📸 Your first picture together',
+      '✈️ Your favourite trip',
+      '✨ A random day that became special',
+    ];
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.huge),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.auto_stories_outlined, size: 56, color: scheme.primary),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Your story starts here', style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.sm),
+            Text('Add the moments you never want to forget. Some ideas:',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+            const SizedBox(height: AppSpacing.md),
+            for (final idea in ideas)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(idea, style: theme.textTheme.bodyMedium),
+              ),
+            const SizedBox(height: AppSpacing.xl),
+            AppButton(label: 'Add your first memory', icon: Icons.add, onPressed: onAdd),
+          ],
+        ),
       ),
     );
   }
