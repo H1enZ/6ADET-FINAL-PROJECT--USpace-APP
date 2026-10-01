@@ -12,6 +12,7 @@ import '../models/question_answer.dart';
 import '../services/activity_service.dart';
 import '../services/affection_service.dart';
 import '../services/auth_service.dart';
+import '../services/chat_service.dart';
 import '../services/couple_service.dart';
 import '../services/dates_service.dart';
 import '../services/memory_service.dart';
@@ -32,12 +33,14 @@ import '../widgets/home/welcome_card.dart';
 import '../widgets/molecules/countdown_card.dart';
 import '../widgets/molecules/memory_card.dart';
 import 'add_memory_sheet.dart';
+import 'chat_screen.dart';
 import 'important_dates_screen.dart';
 import 'memory_detail_screen.dart';
 import 'mood_history_screen.dart';
 import 'mood_sheet.dart';
 import 'question_archive_screen.dart';
 import 'question_sheet.dart';
+import 'work_it_out_screen.dart';
 import 'write_note_sheet.dart';
 
 /// Home: the couple's shared space. A greeting, today's mood and question,
@@ -65,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ImportantDate> _dates = [];
   List<Activity> _activities = [];
   List<Map<String, dynamic>> _unseen = [];
+  int _unread = 0;
   bool _loading = true;
   bool _busy = false;
   bool _celebrated = false;
@@ -131,6 +135,12 @@ class _HomeScreenState extends State<HomeScreen> {
       final partnerAnswered = partnerId == null
           ? false
           : await QuestionService.partnerAnswered(_coupleId, partnerId, today);
+      int unread = 0;
+      try {
+        unread = partnerId == null ? 0 : await ChatService.unreadCount(_coupleId);
+      } catch (_) {
+        // the badge is a bonus; Home still loads without it
+      }
 
       if (!mounted) return;
       final newAffection = unseen.length > _unseen.length;
@@ -144,6 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _activities = activities;
         _unseen = unseen;
         _partnerAnswered = partnerAnswered;
+        _unread = unread;
         _error = null;
         _loading = false;
       });
@@ -234,6 +245,27 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     showFloatingHearts(context, emoji: sealed ? '🔒' : '💌');
     _showMessage(sealed ? 'Time capsule sealed 🔒' : 'Love note sent to $_partnerName 💌');
+  }
+
+  Future<void> _openChat() async {
+    final partner = _partner;
+    if (partner == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ChatScreen(coupleId: _coupleId, me: _me, partner: partner),
+    ));
+    await _load(); // clears the unread badge
+  }
+
+  Future<void> _openWorkItOut() async {
+    if (_partner == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => WorkItOutScreen(
+        coupleId: _coupleId,
+        myUserId: _myId,
+        partnerName: _partnerName,
+      ),
+    ));
+    await _load();
   }
 
   Future<void> _sendHug() async {
@@ -340,7 +372,21 @@ class _HomeScreenState extends State<HomeScreen> {
     const gap = SizedBox(height: AppSpacing.lg);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Home')),
+      appBar: AppBar(
+        title: const Text('Home'),
+        actions: [
+          IconButton(
+            tooltip: _unread > 0 ? 'Chat ($_unread unread)' : 'Chat',
+            onPressed: partner == null ? null : _openChat,
+            icon: Badge(
+              isLabelVisible: _unread > 0,
+              label: Text(_unread > 99 ? '99+' : '$_unread'),
+              child: const Icon(Icons.chat_bubble_outline),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -388,6 +434,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       QuickActions(actions: [
                         QuickAction('Add a memory',
                             Icons.add_photo_alternate_outlined, _addMemory),
+                        QuickAction('Chat', Icons.chat_bubble_outline,
+                            partner == null ? null : _openChat),
+                        QuickAction("Let's work it out", Icons.handshake_outlined,
+                            partner == null ? null : _openWorkItOut),
                         QuickAction('Our timeline', Icons.photo_library_outlined,
                             widget.onOpenTab == null
                                 ? null
