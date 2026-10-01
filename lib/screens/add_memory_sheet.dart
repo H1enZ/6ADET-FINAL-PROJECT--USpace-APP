@@ -50,6 +50,7 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
   late final _location = TextEditingController(text: widget.memory?.location);
   late DateTime _date = widget.memory?.memoryDate ?? DateTime.now();
   late List<String> _tags = [...?widget.memory?.tags];
+  final _typedTag = TextEditingController();
   late final List<_EditorPhoto> _photos = [
     for (final p in widget.memory?.photos ?? const <PhotoRef>[]) _EditorPhoto.saved(p),
   ];
@@ -63,6 +64,7 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
     _title.dispose();
     _story.dispose();
     _location.dispose();
+    _typedTag.dispose();
     super.dispose();
   }
 
@@ -122,7 +124,7 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
       _saving = true;
       _error = null;
     });
-    final tags = _tags;
+    final tags = withPendingTag(_tags, _typedTag.text); // keep a typed-but-not-added tag
     final added = [
       for (final p in _photos)
         if (p.bytes != null) NewPhoto(p.bytes!, p.extension!),
@@ -322,6 +324,7 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
                 selected: _tags,
                 known: widget.knownTags,
                 enabled: !_saving,
+                controller: _typedTag,
                 onChanged: (t) => setState(() => _tags = t),
               ),
 
