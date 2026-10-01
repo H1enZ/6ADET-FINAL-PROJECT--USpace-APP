@@ -317,7 +317,7 @@ class _ChatScreenState extends State<ChatScreen> {
       items.add(_Bubble(
         message: m,
         mine: m.senderId == _myId,
-        startsGroup: newDay || !sameGroup(prev, m),
+        startsGroup: newDay || prev == null || !sameGroup(prev, m),
         endsGroup: next == null || !sameGroup(m, next),
         reactions: _reactions[m.id] ?? const {},
         receipt: m.id == lastMineId ? (m.readAt != null ? 'Seen' : 'Sent') : null,
