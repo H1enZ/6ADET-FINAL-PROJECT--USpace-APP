@@ -20,14 +20,14 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
-      // A smooth zoom-and-fade between pages (iOS and Mac keep their slide).
+      // The same smooth zoom-and-fade between pages on every platform.
       pageTransitionsTheme: const PageTransitionsTheme(builders: {
         TargetPlatform.android: ZoomPageTransitionsBuilder(),
+        TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+        TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
         TargetPlatform.windows: ZoomPageTransitionsBuilder(),
         TargetPlatform.linux: ZoomPageTransitionsBuilder(),
         TargetPlatform.fuchsia: ZoomPageTransitionsBuilder(),
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
       }),
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
