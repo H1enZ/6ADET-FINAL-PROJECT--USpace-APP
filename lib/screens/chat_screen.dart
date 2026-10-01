@@ -317,7 +317,7 @@ class _ChatScreenState extends State<ChatScreen> {
       items.add(_Bubble(
         message: m,
         mine: m.senderId == _myId,
-        startsGroup: newDay || prev == null || !sameGroup(prev, m),
+        startsGroup: prev == null || newDay || !sameGroup(prev, m),
         endsGroup: next == null || !sameGroup(m, next),
         reactions: _reactions[m.id] ?? const {},
         receipt: m.id == lastMineId ? (m.readAt != null ? 'Seen' : 'Sent') : null,
@@ -621,7 +621,7 @@ class _Bubble extends StatelessWidget {
                 [
                   clockTime(m.createdAt),
                   if (m.isEdited) 'edited',
-                  if (receipt != null) receipt!,
+                  ?receipt,
                 ].join(' \u00B7 '),
                 style: theme.textTheme.labelSmall
                     ?.copyWith(color: scheme.onSurfaceVariant),
