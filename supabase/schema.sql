@@ -1092,3 +1092,67 @@ $$;
 
 revoke execute on function public.leave_couple() from public, anon;
 grant execute on function public.leave_couple() to authenticated;
+
+
+-- ===========================================================================
+-- 15. Your own memory tags (also in migrations/009)
+-- ===========================================================================
+
+create or replace function public.valid_memory_tags(t text[])
+returns boolean
+language sql
+immutable
+as $$
+  select t is not null
+     and coalesce(array_length(t, 1), 0) <= 10
+     and not exists (
+           select 1 from unnest(t) as x
+            where x is null
+               or char_length(x) not between 1 and 30
+               or x <> btrim(x)
+         )
+$$;
+
+-- Replace the old "only these six tags" check with the new rule.
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname
+      from pg_constraint
+     where conrelid = 'public.memories'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%tags%'
+  loop
+    execute format('alter table public.memories drop constraint %I', c.conname);
+  end loop;
+end;
+$$;
+
+alter table public.memories
+  add constraint memories_tags_valid check (public.valid_memory_tags(tags));
+
+-- Either partner may re-tag a memory in their couple.
+create or replace function public.set_memory_tags(memory_id uuid, new_tags text[])
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not valid_memory_tags(coalesce(new_tags, '{}')) then
+    raise exception 'Each tag must be 1 to 30 characters, and a memory can have up to 10 tags.';
+  end if;
+  update memories
+     set tags = coalesce(new_tags, '{}')
+   where id = memory_id
+     and couple_id = my_couple_id();
+  if not found then
+    raise exception 'Memory not found.';
+  end if;
+end;
+$$;
+
+revoke execute on function public.set_memory_tags(uuid, text[]) from public, anon;
+grant execute on function public.set_memory_tags(uuid, text[]) to authenticated;
