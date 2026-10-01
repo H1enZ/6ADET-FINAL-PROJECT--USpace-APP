@@ -25,7 +25,7 @@ enum MemoryTag {
 class PhotoRef {
   const PhotoRef({required this.path, this.url});
 
-  /// Where it is in the private bucket, e.g. "<couple_id>/123.jpg".
+  /// Where it is in the private bucket, e.g. `<couple_id>/123.jpg`.
   final String path;
 
   /// Signed link, valid for an hour. Null until signed or if signing failed.

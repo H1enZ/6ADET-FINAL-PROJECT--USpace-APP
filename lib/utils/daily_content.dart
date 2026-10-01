@@ -1,7 +1,7 @@
-/// Things that change every day on Home: the greeting, a romantic line and
-/// Today's Question. Both partners see the same line and question on the
-/// same day, because both are picked from the date, not at random.
-/// Pure Dart, unit tested in test/daily_content_test.dart.
+// Things that change every day on Home: the greeting, a romantic line and
+// Today's Question. Both partners see the same line and question on the
+// same day, because both are picked from the date, not at random.
+// Pure Dart, unit tested in test/daily_content_test.dart.
 
 /// A whole-day number for [day] (its local date), so everything picked from
 /// it stays the same all day and changes at midnight.

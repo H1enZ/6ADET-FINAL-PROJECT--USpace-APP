@@ -267,7 +267,7 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: _photos.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                    separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
                     itemBuilder: (_, i) => _thumb(i),
                   ),
                 ),
