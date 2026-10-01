@@ -6,6 +6,7 @@ import '../services/mood_service.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
+import '../widgets/effects/motion.dart';
 
 /// "How are you feeling today?" Pick a mood, optionally say why, and choose
 /// whether your partner can see it. Closes with `true` once saved.
@@ -92,7 +93,11 @@ class _MoodSheetState extends State<MoodSheet> {
                 children: [
                   for (final mood in Mood.values)
                     ChoiceChip(
-                      label: Text('${mood.emoji}  ${mood.label}'),
+                      label: PopOnChange(
+                        trigger: _mood == mood,
+                        scale: _mood == mood ? 1.18 : 1,
+                        child: Text('${mood.emoji}  ${mood.label}'),
+                      ),
                       selected: _mood == mood,
                       onSelected: _saving
                           ? null

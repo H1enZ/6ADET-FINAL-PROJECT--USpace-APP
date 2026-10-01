@@ -10,6 +10,7 @@ import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/filter_pill.dart';
 import '../utils/anniversary.dart';
 import '../utils/money.dart';
+import '../widgets/effects/motion.dart';
 import 'bucket_item_detail_screen.dart';
 import 'bucket_item_sheet.dart';
 
@@ -115,6 +116,7 @@ class _BucketListScreenState extends State<BucketListScreen> {
           current.id == item.id ? current.withDone(newValue) : current,
       ];
     });
+    if (newValue) showConfetti(context); // ticked off together 🎉
 
     try {
       await BucketService.setDone(item.id, newValue);
@@ -183,7 +185,7 @@ class _BucketListScreenState extends State<BucketListScreen> {
         child: const Icon(Icons.add),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList()
           : RefreshIndicator(
               onRefresh: _load,
               child: CustomScrollView(
@@ -476,7 +478,7 @@ class _BucketRow extends StatelessWidget {
                       const SizedBox(height: AppSpacing.sm),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(AppRadius.chipBar),
-                        child: LinearProgressIndicator(
+                        child: AnimatedProgressBar(
                           value: progress,
                           minHeight: 6,
                           color: item.isFunded

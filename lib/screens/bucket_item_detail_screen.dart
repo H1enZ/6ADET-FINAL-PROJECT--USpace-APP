@@ -10,6 +10,7 @@ import '../utils/money.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/section_label.dart';
+import '../widgets/effects/motion.dart';
 import 'bucket_item_sheet.dart';
 
 /// One bucket-list item: where, when, the budget and the savings log.
@@ -341,7 +342,7 @@ class _SavingsCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.chipBar),
-              child: LinearProgressIndicator(
+              child: AnimatedProgressBar(
                 value: progress,
                 minHeight: 10,
                 color: item.isFunded ? scheme.tertiary : scheme.primary,

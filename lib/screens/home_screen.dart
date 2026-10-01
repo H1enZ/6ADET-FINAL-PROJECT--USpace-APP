@@ -32,6 +32,7 @@ import '../widgets/home/quick_actions.dart';
 import '../widgets/home/welcome_card.dart';
 import '../widgets/molecules/countdown_card.dart';
 import '../widgets/molecules/memory_card.dart';
+import '../widgets/effects/motion.dart';
 import 'add_memory_sheet.dart';
 import 'chat_screen.dart';
 import 'important_dates_screen.dart';
@@ -158,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _error = null;
         _loading = false;
       });
-      if (newAffection) showFloatingHearts(context, emoji: '💗');
+      if (newAffection) showGesturePulse(context, _affectionEmoji(unseen.first['kind']));
       _celebrateIfToday();
     } catch (e) {
       if (!mounted) return;
@@ -176,9 +177,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final info = AnniversaryInfo.from(date);
     if (info.isToday && info.yearsAtNext > 0) {
       _celebrated = true;
+      showConfetti(context);
       showFloatingHearts(context);
     }
   }
+
+  static String _affectionEmoji(Object? kind) => switch (kind) {
+        'hug' => '🫂',
+        'kiss' => '💋',
+        'cuddle' => '🤗',
+        'listen' => '👂',
+        _ => '💗',
+      };
 
   void _showMessage(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -243,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (sent != true) return;
     await _load();
     if (!mounted) return;
-    showFloatingHearts(context, emoji: sealed ? '🔒' : '💌');
+    showEnvelopeFly(context, emoji: sealed ? '🔒' : '💌');
     _showMessage(sealed ? 'Time capsule sealed 🔒' : 'Love note sent to $_partnerName 💌');
   }
 
@@ -274,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await AffectionService.send(coupleId: _coupleId, kind: 'hug');
       if (!mounted) return;
-      showFloatingHearts(context, emoji: '🫂');
+      showGesturePulse(context, '🫂');
       _showMessage('Hug sent to $_partnerName 🫂');
     } catch (e) {
       if (!mounted) return;
@@ -352,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
         theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
 
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: SafeArea(child: SkeletonList(count: 5)));
     }
 
     final couple = _couple;
@@ -398,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                  children: staggered([
                     if (_error != null) ...[
                       Text(_error!,
                           style: theme.textTheme.bodyMedium
@@ -560,7 +570,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                       ),
                     ],
-                  ],
+                  ]),
                 ),
               ),
             ),

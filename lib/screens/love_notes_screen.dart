@@ -17,6 +17,8 @@ import '../widgets/atoms/filter_pill.dart';
 import '../widgets/atoms/seal_badge.dart';
 import '../widgets/atoms/unlock_ring.dart';
 import '../widgets/effects/floating_hearts.dart';
+import '../widgets/effects/motion.dart';
+import '../widgets/effects/seal_opening.dart';
 import 'write_note_sheet.dart';
 
 enum _Show { all, capsules, favorites }
@@ -99,6 +101,15 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
         _loading = false;
       });
       if (justOpened.isNotEmpty) {
+        final first = justOpened.first;
+        final from = _nameOf(first.authorId);
+        await showSealOpening(
+          context,
+          fromName: from == 'You' ? 'you' : from,
+          teaser: first.capsuleTitle,
+          preview: first.body,
+        );
+        if (!mounted) return;
         showFloatingHearts(context, emoji: '💌');
         _showMessage(justOpened.length == 1
             ? 'A time capsule just opened 💌'
@@ -135,7 +146,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
     if (sent != true) return;
     await _load();
     if (!mounted) return;
-    showFloatingHearts(context, emoji: sealed ? '🔒' : '💌');
+    showEnvelopeFly(context, emoji: sealed ? '🔒' : '💌');
     _showMessage('Sent to $_partnerName');
   }
 
@@ -228,7 +239,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
         label: const Text('Write a note'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList()
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -478,8 +489,8 @@ class _NoteBubble extends StatelessWidget {
                     tooltip: note.isFavorite ? 'Remove from favorites' : 'Add to favorites',
                     visualDensity: VisualDensity.compact,
                     onPressed: onFavorite,
-                    icon: Icon(note.isFavorite ? Icons.favorite : Icons.favorite_border,
-                        size: 20, color: note.isFavorite ? scheme.primary : fg),
+                    icon: AnimatedHeartIcon(
+                        filled: note.isFavorite, size: 20, emptyColor: fg),
                   ),
                   if (isMine)
                     IconButton(

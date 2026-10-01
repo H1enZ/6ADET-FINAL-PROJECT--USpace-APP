@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/mood.dart';
 import '../../theme/app_spacing.dart';
+import '../effects/motion.dart';
 import 'home_card.dart';
 
 /// Today's mood for both of you, and the last 7 days at a glance.
@@ -44,7 +45,10 @@ class MoodCard extends StatelessWidget {
               e == null
                   ? Icon(Icons.sentiment_neutral_outlined,
                       size: 30, color: scheme.outline)
-                  : Text(e.mood.emoji, style: const TextStyle(fontSize: 26)),
+                  : PopOnChange(
+                      trigger: e.mood,
+                      child: Text(e.mood.emoji, style: const TextStyle(fontSize: 26)),
+                    ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(

@@ -7,6 +7,7 @@ import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/molecules/memory_card.dart';
+import '../widgets/effects/motion.dart';
 import 'add_memory_sheet.dart';
 import 'memory_tags_sheet.dart';
 
@@ -170,8 +171,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
             IconButton(
               tooltip: m.isFavorite ? 'Remove from favorites' : 'Add to favorites',
               onPressed: _busy ? null : _toggleFavourite,
-              icon: Icon(m.isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: m.isFavorite ? scheme.primary : null),
+              icon: AnimatedHeartIcon(filled: m.isFavorite),
             ),
             // Both partners can edit; only the author can delete.
             IconButton(

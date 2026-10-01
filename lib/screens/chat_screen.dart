@@ -12,6 +12,7 @@ import '../services/chat_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/capsule_time.dart';
 import '../widgets/atoms/avatar_circle.dart';
+import '../widgets/effects/motion.dart';
 
 /// The couple's private chat. Messages arrive in real time; your partner's
 /// messages are marked read while this screen is open.
@@ -41,6 +42,12 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showEmojis = false;
   String? _error;
   RealtimeChannel? _live;
+
+  // New-message animation: ids seen so far, and the ones that just arrived.
+  final Set<String> _seen = {};
+  Set<String> _fresh = {};
+  bool _firstLoadDone = false;
+  int _sentCount = 0;
 
   String get _myId => widget.me.userId;
 
@@ -74,7 +81,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final messages = await ChatService.recent(widget.coupleId);
       final reactions = await ChatService.reactions(widget.coupleId);
       if (!mounted) return;
+      final ids = messages.map((m) => m.id).toSet();
       setState(() {
+        _fresh = _firstLoadDone ? ids.difference(_seen) : <String>{};
+        _seen.addAll(ids);
+        _firstLoadDone = true;
         _messages = messages;
         _reactions = reactions;
         _error = null;
@@ -117,6 +128,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await ChatService.send(widget.coupleId, text);
       if (preset == null) _input.clear();
+      if (mounted) setState(() => _sentCount++);
       await _load(scrollToEnd: true);
     } catch (e) {
       if (!mounted) return;
@@ -314,7 +326,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final newDay = prev == null ||
           dayLabel(prev.createdAt) != dayLabel(m.createdAt);
       if (newDay) items.add(_DaySeparator(label: dayLabel(m.createdAt)));
-      items.add(_Bubble(
+      final mineMsg = m.senderId == _myId;
+      final bubble = _Bubble(
         message: m,
         mine: m.senderId == _myId,
         startsGroup: prev == null || newDay || !sameGroup(prev, m),
@@ -323,7 +336,14 @@ class _ChatScreenState extends State<ChatScreen> {
         receipt: m.id == lastMineId ? (m.readAt != null ? 'Seen' : 'Sent') : null,
         onLongPress: () => _openActions(m),
         onPhotoTap: m.photoUrl == null ? null : () => _viewPhoto(m.photoUrl!),
-      ));
+      );
+      items.add(_fresh.contains(m.id)
+          ? FadeSlideIn(
+              key: ValueKey('in-${m.id}'),
+              from: Offset(mineMsg ? 28 : -28, 6),
+              child: bubble,
+            )
+          : bubble);
     }
 
     return Scaffold(
@@ -351,7 +371,7 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const SkeletonList(count: 6, height: 52)
                 : _error != null && _messages.isEmpty
                     ? Center(
                         child: Padding(
@@ -443,7 +463,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                       const SizedBox(width: AppSpacing.xs),
-                      IconButton.filled(
+                      PopOnChange(
+                        trigger: _sentCount,
+                        child: IconButton.filled(
                         tooltip: 'Send',
                         onPressed: _sending ? null : () => _send(),
                         icon: _sending
@@ -452,6 +474,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 height: 18,
                                 child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.send),
+                      ),
                       ),
                     ],
                   ),
@@ -597,7 +620,9 @@ class _Bubble extends StatelessWidget {
             ),
           ),
           if (counts.isNotEmpty)
-            Transform.translate(
+            PopOnChange(
+              trigger: counts.toString(),
+              child: Transform.translate(
               offset: const Offset(0, -4),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -613,6 +638,7 @@ class _Bubble extends StatelessWidget {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
+            ),
             ),
           if (endsGroup)
             Padding(

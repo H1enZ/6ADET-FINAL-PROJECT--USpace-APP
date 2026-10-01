@@ -10,6 +10,7 @@ import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/section_label.dart';
 import '../widgets/effects/floating_hearts.dart';
+import '../widgets/effects/motion.dart';
 
 /// "Let's work it out": us, not the problem. Not about who is right. It
 /// helps one partner say what they need right now, and lets the couple
@@ -391,7 +392,7 @@ class _ComfortPageState extends State<_ComfortPage> {
     try {
       await AffectionService.send(coupleId: widget.coupleId, kind: kind, message: text);
       if (!mounted) return;
-      showFloatingHearts(context, emoji: '💗');
+      showGesturePulse(context, kind == 'listen' ? '👂' : '💗');
       _toast(context, done);
       _feelings.clear();
       _comfort.clear();
@@ -516,7 +517,7 @@ class _AffectionPageState extends State<_AffectionPage> {
     try {
       await AffectionService.send(coupleId: widget.coupleId, kind: kind, message: _note.text);
       if (!mounted) return;
-      showFloatingHearts(context, emoji: emoji);
+      showGesturePulse(context, emoji);
       _toast(context, '$label sent to ${widget.partnerName} $emoji');
       _note.clear();
     } catch (e) {
@@ -911,7 +912,7 @@ class _ResolutionNotesPageState extends State<ResolutionNotesPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Our saved notes')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList()
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(

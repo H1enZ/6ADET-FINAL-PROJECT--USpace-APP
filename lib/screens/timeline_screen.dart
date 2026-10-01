@@ -11,6 +11,7 @@ import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/filter_pill.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/molecules/memory_card.dart';
+import '../widgets/effects/motion.dart';
 import 'add_memory_sheet.dart';
 import 'memory_detail_screen.dart';
 import 'memory_tags_sheet.dart';
@@ -250,7 +251,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
         child: const Icon(Icons.add),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList()
           : RefreshIndicator(
               onRefresh: _load,
               child: CustomScrollView(
@@ -502,8 +503,8 @@ class _TimelineEntry extends StatelessWidget {
                     tooltip: m.isFavorite ? 'Remove from favorites' : 'Add to favorites',
                     visualDensity: VisualDensity.compact,
                     onPressed: onFavourite,
-                    icon: Icon(m.isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: m.isFavorite ? scheme.primary : scheme.onSurfaceVariant),
+                    icon: AnimatedHeartIcon(
+                        filled: m.isFavorite, emptyColor: scheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -570,10 +571,10 @@ class _TimelineEntry extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.only(top: 18),
-                      child: Icon(
-                        m.isFavorite ? Icons.favorite : Icons.favorite_border,
+                      child: AnimatedHeartIcon(
+                        filled: m.isFavorite,
                         size: 20,
-                        color: scheme.primary,
+                        emptyColor: scheme.primary,
                       ),
                     ),
                   ],
