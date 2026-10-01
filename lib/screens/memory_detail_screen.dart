@@ -8,6 +8,7 @@ import '../utils/anniversary.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/molecules/memory_card.dart';
 import 'add_memory_sheet.dart';
+import 'memory_tags_sheet.dart';
 
 /// One memory, full size: swipe through its photos, read the story.
 /// Either partner can favourite it; only the author can edit or delete it.
@@ -18,11 +19,15 @@ class MemoryDetailScreen extends StatefulWidget {
     required this.memory,
     required this.authorName,
     required this.isMine,
+    this.knownTags = const [],
   });
 
   final Memory memory;
   final String authorName;
   final bool isMine;
+
+  /// Your own tags used on other memories, offered when tagging.
+  final List<String> knownTags;
 
   @override
   State<MemoryDetailScreen> createState() => _MemoryDetailScreenState();
@@ -68,7 +73,8 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => AddMemorySheet(coupleId: _memory.coupleId, memory: _memory),
+      builder: (_) => AddMemorySheet(
+          coupleId: _memory.coupleId, memory: _memory, knownTags: widget.knownTags),
     );
     if (saved != true) return;
     try {
@@ -81,6 +87,29 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
       });
       if (_pages.hasClients) _pages.jumpToPage(0);
       _showMessage('Changes saved');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(friendlyError(e));
+    }
+  }
+
+  Future<void> _retag() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => MemoryTagsSheet(memory: _memory, known: widget.knownTags),
+    );
+    if (saved != true) return;
+    try {
+      final fresh = await MemoryService.get(_memory.id);
+      if (!mounted) return;
+      setState(() {
+        _memory = fresh;
+        _changed = true;
+      });
+      _showMessage('Moved');
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));
@@ -133,6 +162,11 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
         appBar: AppBar(
           title: const Text('Memory'),
           actions: [
+            IconButton(
+              tooltip: 'Move to a category',
+              onPressed: _busy ? null : _retag,
+              icon: const Icon(Icons.sell_outlined),
+            ),
             IconButton(
               tooltip: m.isFavorite ? 'Remove from favorites' : 'Add to favorites',
               onPressed: _busy ? null : _toggleFavourite,
@@ -218,8 +252,9 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                             runSpacing: AppSpacing.xs,
                             children: [
                               for (final t in m.tags)
-                                Chip(
-                                  label: Text('${t.emoji} ${t.label}'),
+                                ActionChip(
+                                  label: Text(tagLabel(t)),
+                                  onPressed: _busy ? null : _retag,
                                   visualDensity: VisualDensity.compact,
                                 ),
                             ],

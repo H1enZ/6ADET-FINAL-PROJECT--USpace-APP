@@ -13,28 +13,11 @@ import '../widgets/effects/floating_hearts.dart';
 import '../widgets/molecules/memory_card.dart';
 import 'add_memory_sheet.dart';
 import 'memory_detail_screen.dart';
+import 'memory_tags_sheet.dart';
 
-enum _Filter { all, favorites, anniversaries, travel, special }
-
-extension on _Filter {
-  String get label => switch (this) {
-        _Filter.all => 'All memories',
-        _Filter.favorites => 'Favorites',
-        _Filter.anniversaries => 'Anniversaries',
-        _Filter.travel => 'Travel',
-        _Filter.special => 'Special moments',
-      };
-
-  bool matches(Memory m) => switch (this) {
-        _Filter.all => true,
-        _Filter.favorites => m.isFavorite,
-        _Filter.anniversaries => m.tags.contains(MemoryTag.anniversary),
-        _Filter.travel => m.tags.contains(MemoryTag.travel),
-        _Filter.special => m.tags.contains(MemoryTag.special) ||
-            m.tags.contains(MemoryTag.celebration) ||
-            m.tags.contains(MemoryTag.firstDate),
-      };
-}
+/// Filter keys: everything, favourites, or one tag.
+const _all = '\u0000all';
+const _favourites = '\u0000fav';
 
 /// The couple's story as a vertical scrapbook, from the beginning to now
 /// (or newest first). Filter by favorites or tags; tap a memory to open it.
@@ -50,7 +33,9 @@ class TimelineScreen extends StatefulWidget {
 class _TimelineScreenState extends State<TimelineScreen> {
   List<Memory> _memories = [];
   Map<String, String> _names = {};
-  _Filter _filter = _Filter.all;
+  String _filter = _all;
+  bool _searching = false;
+  final _search = TextEditingController();
   bool _oldestFirst = true;
   bool _loading = true;
   String? _error;
@@ -61,6 +46,57 @@ class _TimelineScreenState extends State<TimelineScreen> {
   void initState() {
     super.initState();
     _load();
+    _search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// Every tag in use, built-ins first in their usual order, then your own
+  /// alphabetically, with how many memories have each.
+  List<(String, int)> get _tagsInUse {
+    final counts = <String, int>{};
+    for (final m in _memories) {
+      for (final t in m.tags) {
+        counts[t] = (counts[t] ?? 0) + 1;
+      }
+    }
+    final builtIn = [
+      for (final t in MemoryTag.values)
+        if (counts.containsKey(t.dbName)) (t.dbName, counts[t.dbName]!),
+    ];
+    final own = counts.entries
+        .where((e) => MemoryTag.fromDb(e.key) == null)
+        .map((e) => (e.key, e.value))
+        .toList()
+      ..sort((a, b) => a.$1.toLowerCase().compareTo(b.$1.toLowerCase()));
+    return [...builtIn, ...own];
+  }
+
+  /// Your own tags (not built-ins), offered as chips when tagging.
+  List<String> get _knownTags => [
+        for (final t in _tagsInUse)
+          if (MemoryTag.fromDb(t.$1) == null) t.$1,
+      ];
+
+  bool _matches(Memory m) {
+    final passesFilter = switch (_filter) {
+      _all => true,
+      _favourites => m.isFavorite,
+      final tag => m.tags.contains(tag),
+    };
+    if (!passesFilter) return false;
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return [
+      m.title,
+      m.description ?? '',
+      m.location ?? '',
+      for (final t in m.tags) tagLabel(t),
+    ].any((field) => field.toLowerCase().contains(q));
   }
 
   Future<void> _load() async {
@@ -84,7 +120,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   List<Memory> get _visible {
-    final list = _memories.where(_filter.matches).toList();
+    final list = _memories.where(_matches).toList();
     list.sort((a, b) => _oldestFirst
         ? a.memoryDate.compareTo(b.memoryDate)
         : b.memoryDate.compareTo(a.memoryDate));
@@ -104,7 +140,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => AddMemorySheet(coupleId: _coupleId),
+      builder: (_) => AddMemorySheet(coupleId: _coupleId, knownTags: _knownTags),
     );
     if (saved != true) return;
     await _load();
@@ -139,10 +175,25 @@ class _TimelineScreenState extends State<TimelineScreen> {
           memory: memory,
           authorName: _authorName(memory),
           isMine: memory.authorId == widget.profile.userId,
+          knownTags: _knownTags,
         ),
       ),
     );
     if (changed == true) await _load();
+  }
+
+  Future<void> _retag(Memory memory) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => MemoryTagsSheet(memory: memory, known: _knownTags),
+    );
+    if (saved != true) return;
+    await _load();
+    if (!mounted) return;
+    _showMessage('Moved');
   }
 
   @override
@@ -167,6 +218,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
         isLast: i == visible.length - 1,
         onTap: () => _open(m),
         onFavourite: () => _toggleFavourite(m),
+        onRetag: () => _retag(m),
       ));
     }
 
@@ -174,6 +226,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
       appBar: AppBar(
         title: const Text('Our timeline'),
         actions: [
+          IconButton(
+            tooltip: _searching ? 'Close search' : 'Type to filter',
+            onPressed: () => setState(() {
+              _searching = !_searching;
+              if (!_searching) _search.clear();
+            }),
+            icon: Icon(_searching ? Icons.search_off : Icons.search),
+          ),
           IconButton(
             tooltip: _oldestFirst ? 'Showing oldest first' : 'Showing newest first',
             onPressed: () => setState(() => _oldestFirst = !_oldestFirst),
@@ -215,6 +275,28 @@ class _TimelineScreenState extends State<TimelineScreen> {
                         ),
                       ),
                     ),
+                  if (_searching)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.screenMargin,
+                            AppSpacing.xs, AppSpacing.screenMargin, AppSpacing.xs),
+                        child: TextField(
+                          controller: _search,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            hintText: 'Type to filter: title, story, place or tag',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _search.text.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: 'Clear',
+                                    onPressed: _search.clear,
+                                    icon: const Icon(Icons.close),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
                   if (_memories.isNotEmpty)
                     SliverToBoxAdapter(
                       child: SizedBox(
@@ -225,14 +307,19 @@ class _TimelineScreenState extends State<TimelineScreen> {
                               horizontal: AppSpacing.screenMargin,
                               vertical: AppSpacing.xs),
                           children: [
-                            for (final f in _Filter.values)
+                            for (final f in [
+                              (_all, 'All memories', _memories.length),
+                              (_favourites, 'Favorites',
+                                  _memories.where((m) => m.isFavorite).length),
+                              for (final t in _tagsInUse) (t.$1, tagLabel(t.$1), t.$2),
+                            ])
                               Padding(
                                 padding: const EdgeInsets.only(right: AppSpacing.sm),
                                 child: FilterPill(
-                                  label: f.label,
-                                  selected: _filter == f,
-                                  count: _memories.where(f.matches).length,
-                                  onTap: () => setState(() => _filter = f),
+                                  label: f.$2,
+                                  selected: _filter == f.$1,
+                                  count: f.$3,
+                                  onTap: () => setState(() => _filter = f.$1),
                                 ),
                               ),
                           ],
@@ -251,8 +338,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
                         child: Padding(
                           padding: const EdgeInsets.all(AppSpacing.huge),
                           child: Text(
-                            'No memories here yet. Add a tag when you save a '
-                            'memory, or tap the heart to make it a favorite.',
+                            _search.text.trim().isNotEmpty
+                                ? 'Nothing matches "${_search.text.trim()}".'
+                                : 'No memories here yet. Tap 🏷️ on a memory to move it '
+                                    'into a category, or ❤️ to make it a favorite.',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyMedium
                                 ?.copyWith(color: scheme.onSurfaceVariant),
@@ -321,6 +410,7 @@ class _TimelineEntry extends StatelessWidget {
     required this.isLast,
     required this.onTap,
     required this.onFavourite,
+    required this.onRetag,
   });
 
   final Memory memory;
@@ -329,6 +419,7 @@ class _TimelineEntry extends StatelessWidget {
   final bool isLast;
   final VoidCallback onTap;
   final VoidCallback onFavourite;
+  final VoidCallback onRetag;
 
   @override
   Widget build(BuildContext context) {
@@ -402,6 +493,12 @@ class _TimelineEntry extends StatelessWidget {
                 children: [
                   Expanded(child: Text(m.title, style: theme.textTheme.titleMedium)),
                   IconButton(
+                    tooltip: 'Move to a category',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onRetag,
+                    icon: Icon(Icons.sell_outlined, color: scheme.onSurfaceVariant),
+                  ),
+                  IconButton(
                     tooltip: m.isFavorite ? 'Remove from favorites' : 'Add to favorites',
                     visualDensity: VisualDensity.compact,
                     onPressed: onFavourite,
@@ -436,7 +533,7 @@ class _TimelineEntry extends StatelessWidget {
                           color: scheme.primaryContainer,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text('${t.emoji} ${t.label}',
+                        child: Text(tagLabel(t),
                             style: theme.textTheme.labelSmall
                                 ?.copyWith(color: scheme.onPrimaryContainer)),
                       ),

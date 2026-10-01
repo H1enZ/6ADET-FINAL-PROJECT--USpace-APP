@@ -1,7 +1,9 @@
-/// Tags a memory can have. The names match the database check.
+/// Built-in tags, offered as one-tap chips. Couples can also type their
+/// own (1 to 30 characters, up to 10 per memory; see migration 009).
 enum MemoryTag {
   firstDate('first_date', 'First date', '💕'),
   anniversary('anniversary', 'Anniversary', '💍'),
+  outing('outing', 'Outing', '🧺'),
   travel('travel', 'Travel', '✈️'),
   celebration('celebration', 'Celebration', '🎉'),
   everyday('everyday', 'Everyday moment', '☕'),
@@ -20,6 +22,37 @@ enum MemoryTag {
     return null;
   }
 }
+
+const maxTags = 10;
+const maxTagLength = 30;
+
+/// How a stored tag is shown: "💍 Anniversary" for built-ins,
+/// "🏷️ Special date" for your own.
+String tagLabel(String tag) {
+  final builtIn = MemoryTag.fromDb(tag);
+  return builtIn == null ? '🏷️ $tag' : '${builtIn.emoji} ${builtIn.label}';
+}
+
+/// Cleans up a typed tag: trims, squeezes spaces, caps the length, and
+/// turns a built-in's name ("outing", "First Date") into its stored name.
+/// Returns null when nothing usable is left.
+String? normalizeTag(String input) {
+  var t = input.trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (t.startsWith('#')) t = t.substring(1).trim();
+  if (t.isEmpty) return null;
+  if (t.length > maxTagLength) t = t.substring(0, maxTagLength).trim();
+  for (final tag in MemoryTag.values) {
+    if (tag.label.toLowerCase() == t.toLowerCase() ||
+        tag.dbName.toLowerCase() == t.toLowerCase()) {
+      return tag.dbName;
+    }
+  }
+  return t;
+}
+
+/// Adds [tag] unless the same tag (ignoring capital letters) is already in.
+List<String> withTag(List<String> tags, String tag) =>
+    tags.any((t) => t.toLowerCase() == tag.toLowerCase()) ? tags : [...tags, tag];
 
 /// A stored photo and a short-lived link to show it.
 class PhotoRef {
@@ -58,7 +91,8 @@ class Memory {
   final DateTime memoryDate;
   final String? description;
   final String? location;
-  final List<MemoryTag> tags;
+  /// Stored tag names: built-ins by their stored name, your own as typed.
+  final List<String> tags;
 
   /// The cover photo (the first one). Older memories only have this.
   final String? photoPath;
@@ -91,14 +125,14 @@ class Memory {
       memoryDate: DateTime.parse(row['memory_date'] as String),
       description: row['description'] as String?,
       location: row['location'] as String?,
-      tags: rawTags.map(MemoryTag.fromDb).whereType<MemoryTag>().toList(),
+      tags: rawTags,
       photoPath: cover,
       photos: [for (final p in paths) PhotoRef(path: p)],
       isFavorite: (row['is_favorite'] as bool?) ?? false,
     );
   }
 
-  Memory copyWith({bool? isFavorite, List<PhotoRef>? photos}) {
+  Memory copyWith({bool? isFavorite, List<PhotoRef>? photos, List<String>? tags}) {
     return Memory(
       id: id,
       coupleId: coupleId,
@@ -107,7 +141,7 @@ class Memory {
       memoryDate: memoryDate,
       description: description,
       location: location,
-      tags: tags,
+      tags: tags ?? this.tags,
       photoPath: photoPath,
       photos: photos ?? this.photos,
       isFavorite: isFavorite ?? this.isFavorite,

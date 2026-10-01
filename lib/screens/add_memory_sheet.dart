@@ -11,6 +11,7 @@ import '../utils/anniversary.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/section_label.dart';
+import '../widgets/molecules/tag_picker.dart';
 
 /// One photo in the editor: either already saved, or newly picked.
 class _EditorPhoto {
@@ -26,10 +27,18 @@ class _EditorPhoto {
 /// Photos (up to 10), title, story, date, location and tags.
 /// Closes with `true` once saved.
 class AddMemorySheet extends StatefulWidget {
-  const AddMemorySheet({super.key, required this.coupleId, this.memory});
+  const AddMemorySheet({
+    super.key,
+    required this.coupleId,
+    this.memory,
+    this.knownTags = const [],
+  });
 
   final String coupleId;
   final Memory? memory;
+
+  /// Your own tags used on other memories, offered as chips.
+  final List<String> knownTags;
 
   @override
   State<AddMemorySheet> createState() => _AddMemorySheetState();
@@ -40,7 +49,7 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
   late final _story = TextEditingController(text: widget.memory?.description);
   late final _location = TextEditingController(text: widget.memory?.location);
   late DateTime _date = widget.memory?.memoryDate ?? DateTime.now();
-  late final Set<MemoryTag> _tags = {...?widget.memory?.tags};
+  late List<String> _tags = [...?widget.memory?.tags];
   late final List<_EditorPhoto> _photos = [
     for (final p in widget.memory?.photos ?? const <PhotoRef>[]) _EditorPhoto.saved(p),
   ];
@@ -113,7 +122,7 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
       _saving = true;
       _error = null;
     });
-    final tags = MemoryTag.values.where(_tags.contains).toList();
+    final tags = _tags;
     final added = [
       for (final p in _photos)
         if (p.bytes != null) NewPhoto(p.bytes!, p.extension!),
@@ -309,19 +318,11 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
               const SizedBox(height: AppSpacing.xl),
 
               const SectionLabel(text: 'Tags (optional)'),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  for (final tag in MemoryTag.values)
-                    FilterChip(
-                      label: Text('${tag.emoji} ${tag.label}'),
-                      selected: _tags.contains(tag),
-                      onSelected: _saving
-                          ? null
-                          : (on) => setState(() => on ? _tags.add(tag) : _tags.remove(tag)),
-                    ),
-                ],
+              TagPicker(
+                selected: _tags,
+                known: widget.knownTags,
+                enabled: !_saving,
+                onChanged: (t) => setState(() => _tags = t),
               ),
 
               if (_error != null) ...[
