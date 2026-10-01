@@ -11,7 +11,7 @@ import 'add_memory_sheet.dart';
 import 'memory_tags_sheet.dart';
 
 /// One memory, full size: swipe through its photos, read the story.
-/// Either partner can favourite it; only the author can edit or delete it.
+/// Either partner can favourite, tag or edit it; only the author can delete it.
 /// Returns `true` when something changed so the list reloads.
 class MemoryDetailScreen extends StatefulWidget {
   const MemoryDetailScreen({
@@ -173,12 +173,13 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
               icon: Icon(m.isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: m.isFavorite ? scheme.primary : null),
             ),
+            // Both partners can edit; only the author can delete.
+            IconButton(
+              tooltip: 'Edit memory',
+              onPressed: _busy ? null : _edit,
+              icon: const Icon(Icons.edit_outlined),
+            ),
             if (widget.isMine) ...[
-              IconButton(
-                tooltip: 'Edit memory',
-                onPressed: _busy ? null : _edit,
-                icon: const Icon(Icons.edit_outlined),
-              ),
               IconButton(
                 tooltip: 'Delete memory',
                 onPressed: _busy ? null : _delete,
@@ -262,7 +263,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                         ),
                       if (m.description != null)
                         Text(m.description!, style: theme.textTheme.bodyLarge)
-                      else if (widget.isMine)
+                      else
                         Text('Tap ✏️ to add the story behind this memory.', style: muted),
                       const SizedBox(height: AppSpacing.xl),
                       Text('Added by ${widget.authorName}', style: muted),
