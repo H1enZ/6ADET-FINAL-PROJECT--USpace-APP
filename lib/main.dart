@@ -7,6 +7,7 @@
 //   4. Show Splash, which decides: Sign in, Pair, or Home.
 
 import 'package:device_preview/device_preview.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -53,6 +54,10 @@ class USpaceApp extends StatelessWidget {
         locale: DevicePreview.locale(context),
         builder: DevicePreview.appBuilder,
 
+        // Lets a mouse or trackpad drag sideways lists (filter pills, photo
+        // strips) on the web, the same way a finger swipes them on a phone.
+        scrollBehavior: const _DragEverywhereScrollBehavior(),
+
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: themeMode,
@@ -63,4 +68,19 @@ class USpaceApp extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Flutter's default only lets touch drag a scrollable list. On the web
+/// that leaves mouse users unable to reach pills hidden off to the side,
+/// so this also accepts mouse, trackpad and stylus drags.
+class _DragEverywhereScrollBehavior extends MaterialScrollBehavior {
+  const _DragEverywhereScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
 }
