@@ -36,14 +36,35 @@ void main() {
     expect(m.photoUrl, isNull);
   });
 
-  test('tags are read from the database names; unknown ones are ignored', () {
-    final m = Memory.fromMap(row(tags: ['travel', 'first_date', 'party']));
-    expect(m.tags, [MemoryTag.travel, MemoryTag.firstDate]);
+  test('tags are kept as stored, including your own', () {
+    final m = Memory.fromMap(row(tags: ['travel', 'first_date', 'Special date']));
+    expect(m.tags, ['travel', 'first_date', 'Special date']);
   });
 
-  test('every tag name matches the database list', () {
-    expect(MemoryTag.values.map((t) => t.dbName).toList(),
-        ['first_date', 'anniversary', 'travel', 'celebration', 'everyday', 'special']);
+  test('how tags are shown', () {
+    expect(tagLabel('anniversary'), '💍 Anniversary');
+    expect(tagLabel('outing'), '🧺 Outing');
+    expect(tagLabel('Special date'), '🏷️ Special date');
+  });
+
+  test('typed tags are cleaned up', () {
+    expect(normalizeTag('  Special   date '), 'Special date');
+    expect(normalizeTag('#Monthsary'), 'Monthsary');
+    expect(normalizeTag('outing'), 'outing'); // matches the built-in
+    expect(normalizeTag('First Date'), 'first_date'); // built-in by its label
+    expect(normalizeTag('   '), isNull);
+    expect(normalizeTag('x' * 40)!.length, maxTagLength);
+  });
+
+  test('the same tag is not added twice', () {
+    expect(withTag(['Outing'], 'outing'), ['Outing']);
+    expect(withTag(['Outing'], 'Picnic'), ['Outing', 'Picnic']);
+  });
+
+  test('built-in stored names', () {
+    expect(MemoryTag.values.map((t) => t.dbName).toList(), [
+      'first_date', 'anniversary', 'outing', 'travel', 'celebration', 'everyday', 'special',
+    ]);
   });
 
   test('photo links are attached without losing the order', () {

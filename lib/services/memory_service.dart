@@ -111,7 +111,7 @@ class MemoryService {
     required DateTime date,
     String? description,
     String? location,
-    List<MemoryTag> tags = const [],
+    List<String> tags = const [],
   }) {
     String? clean(String? s) {
       final t = s?.trim() ?? '';
@@ -123,7 +123,7 @@ class MemoryService {
       'memory_date': isoDate(date),
       'description': clean(description),
       'location': clean(location),
-      'tags': [for (final t in tags) t.dbName],
+      'tags': tags,
     };
   }
 
@@ -144,7 +144,7 @@ class MemoryService {
     required DateTime date,
     String? description,
     String? location,
-    List<MemoryTag> tags = const [],
+    List<String> tags = const [],
     List<NewPhoto> photos = const [],
   }) async {
     if (photos.length > maxPhotos) {
@@ -185,7 +185,7 @@ class MemoryService {
     required DateTime date,
     String? description,
     String? location,
-    List<MemoryTag> tags = const [],
+    List<String> tags = const [],
     List<PhotoRef> keep = const [],
     List<NewPhoto> added = const [],
   }) async {
@@ -227,6 +227,12 @@ class MemoryService {
   static Future<void> delete(Memory memory) async {
     await _db.from('memories').delete().eq('id', memory.id);
     await _removeFiles([for (final p in memory.photos) p.path]);
+  }
+
+  /// Either partner can move a memory into categories (its tags).
+  static Future<void> setTags(String memoryId, List<String> tags) async {
+    await _db.rpc('set_memory_tags',
+        params: {'memory_id': memoryId, 'new_tags': tags});
   }
 
   /// Either partner can favourite. Returns the new value.
