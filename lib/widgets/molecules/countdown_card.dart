@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/anniversary.dart';
 import '../atoms/unlock_ring.dart';
+import '../effects/motion.dart';
 
 /// The plum anniversary card on Home, with its ring.
 /// With no anniversary set, it invites the couple to add one.
@@ -67,7 +68,7 @@ class CountdownCard extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(
+                  child: CountUpText(
                     headline,
                     maxLines: 1,
                     style: theme.textTheme.displayLarge
