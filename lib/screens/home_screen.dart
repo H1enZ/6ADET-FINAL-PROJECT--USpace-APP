@@ -38,6 +38,7 @@ import 'mood_history_screen.dart';
 import 'mood_sheet.dart';
 import 'question_archive_screen.dart';
 import 'question_sheet.dart';
+import 'write_note_sheet.dart';
 
 /// Home: the couple's shared space. A greeting, today's mood and question,
 /// countdowns, what you have both been up to, and quick shortcuts.
@@ -220,6 +221,21 @@ class _HomeScreenState extends State<HomeScreen> {
     _showMessage('Answer saved');
   }
 
+  Future<void> _writeNote({bool sealed = false}) async {
+    if (_partner == null) return;
+    final sent = await _sheet(WriteNoteSheet(
+      coupleId: _coupleId,
+      partnerName: _partnerName,
+      anniversary: _couple?.anniversaryDate,
+      startSealed: sealed,
+    ));
+    if (sent != true) return;
+    await _load();
+    if (!mounted) return;
+    showFloatingHearts(context, emoji: sealed ? '🔒' : '💌');
+    _showMessage(sealed ? 'Time capsule sealed 🔒' : 'Love note sent to $_partnerName 💌');
+  }
+
   Future<void> _sendHug() async {
     if (_partner == null || _busy) return;
     setState(() => _busy = true);
@@ -384,6 +400,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ImportantDatesScreen(coupleId: _coupleId))),
                         QuickAction('Send a hug', Icons.volunteer_activism_outlined,
                             partner == null ? null : _sendHug),
+                        QuickAction('Love note', Icons.mail_outline,
+                            partner == null ? null : _writeNote),
+                        QuickAction('Time capsule', Icons.lock_clock_outlined,
+                            partner == null ? null : () => _writeNote(sealed: true)),
                       ]),
                       gap,
 

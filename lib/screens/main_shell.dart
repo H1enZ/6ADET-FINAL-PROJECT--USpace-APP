@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/profile.dart';
 import '../widgets/organisms/app_shell.dart';
 import 'home_screen.dart';
+import 'love_notes_screen.dart';
 import 'profile_screen.dart';
-import 'coming_soon_screen.dart';
 import 'timeline_screen.dart';
 import 'bucket_list_screen.dart';
 
@@ -35,12 +35,7 @@ class _MainShellState extends State<MainShell> {
             onOpenTab: (i) => setState(() => _index = i),
           ),
           TimelineScreen(profile: widget.profile),
-          const ComingSoonScreen(
-            title: 'Love Notes',
-            icon: Icons.favorite_border,
-            message: 'Notes to each other, and Time Capsules sealed '
-                'until a date you choose.',
-          ),
+          LoveNotesScreen(profile: widget.profile),
           BucketListScreen(profile: widget.profile),
           ProfileScreen(profile: widget.profile),
         ],
