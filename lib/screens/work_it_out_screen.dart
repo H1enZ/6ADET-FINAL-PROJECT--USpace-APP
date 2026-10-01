@@ -734,9 +734,10 @@ class ResolutionPage extends StatefulWidget {
 
 class _ResolutionPageState extends State<ResolutionPage> {
   late final List<TextEditingController> _fields = [
-    for (final a in widget.note?.answers ?? resolutionQuestions.map((q) => (q, null)))
-      TextEditingController(text: a?.$2),
-  ];
+  for (final a in widget.note?.answers.whereType<(String, String?)>() ??
+      resolutionQuestions.map<(String, String?)>((q) => (q, null)))
+    TextEditingController(text: a.$2),
+];
   late bool _shared = widget.note?.isShared ?? true;
   bool _saving = false;
 
