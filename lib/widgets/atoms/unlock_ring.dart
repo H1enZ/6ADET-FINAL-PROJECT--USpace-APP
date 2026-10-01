@@ -39,7 +39,7 @@ class UnlockRing extends StatelessWidget {
               backgroundColor: trackColor ?? scheme.primaryContainer,
             ),
           ),
-          if (child != null) child!,
+          ?child,
         ],
       ),
     );

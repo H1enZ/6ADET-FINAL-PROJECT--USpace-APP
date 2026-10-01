@@ -1,5 +1,5 @@
-/// Countdown and time text for Time Capsules. Pure Dart, unit tested in
-/// test/capsule_time_test.dart.
+// Countdown and time text for Time Capsules. Pure Dart, unit tested in
+// test/capsule_time_test.dart.
 
 /// "in 42 days", "in 1 day 3h", "in 5h 20m", "in 12 min", "any moment now".
 String opensIn(DateTime unlockAt, {DateTime? now}) {

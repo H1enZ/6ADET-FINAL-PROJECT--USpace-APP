@@ -1,5 +1,5 @@
-/// Peso amounts for the bucket list savings. Pure Dart, unit tested in
-/// test/money_test.dart.
+// Peso amounts for the bucket list savings. Pure Dart, unit tested in
+// test/money_test.dart.
 
 /// ₱60,000 or ₱1,250.50 (cents only when there are some).
 String formatPeso(num amount) {

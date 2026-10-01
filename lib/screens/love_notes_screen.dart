@@ -337,7 +337,6 @@ class _SealedCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final ready = capsule.isReady();
-    final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
