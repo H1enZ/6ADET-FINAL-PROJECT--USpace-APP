@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:final_project/models/memory.dart';
+import 'package:final_project/widgets/molecules/tag_picker.dart';
 
 Map<String, dynamic> row({String? cover, List<String> tags = const []}) => {
       'id': 'm1',
@@ -74,5 +75,12 @@ void main() {
     ]);
     expect(signed.photoUrl, 'https://signed/c1/a.jpg');
     expect(signed.photos.last.url, 'https://signed/c1/b.jpg');
+  });
+
+  test('a tag typed but not added is kept when saving', () {
+    expect(withPendingTag(['anniversary'], ' Special date '), ['anniversary', 'Special date']);
+    expect(withPendingTag(['Outing'], 'outing'), ['Outing']); // no duplicate
+    expect(withPendingTag(['anniversary'], '   '), ['anniversary']); // nothing typed
+    expect(withPendingTag([for (var i = 0; i < maxTags; i++) 't$i'], 'one more').length, maxTags);
   });
 }

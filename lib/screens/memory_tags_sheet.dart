@@ -21,11 +21,20 @@ class MemoryTagsSheet extends StatefulWidget {
 
 class _MemoryTagsSheetState extends State<MemoryTagsSheet> {
   late List<String> _tags = [...widget.memory.tags];
+  final _typed = TextEditingController();
   bool _saving = false;
   String? _error;
 
+  @override
+  void dispose() {
+    _typed.dispose();
+    super.dispose();
+  }
+
   Future<void> _save() async {
     setState(() {
+      _tags = withPendingTag(_tags, _typed.text); // keep a typed-but-not-added tag
+      _typed.clear();
       _saving = true;
       _error = null;
     });
@@ -70,6 +79,7 @@ class _MemoryTagsSheetState extends State<MemoryTagsSheet> {
                 selected: _tags,
                 known: widget.known,
                 enabled: !_saving,
+                controller: _typed,
                 onChanged: (t) => setState(() => _tags = t),
               ),
               if (_error != null) ...[

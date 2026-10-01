@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import '../../models/memory.dart';
 import '../../theme/app_spacing.dart';
 
+/// [selected] plus whatever is still typed in [typed] (not yet added with
+/// Enter or +), so pressing Save never loses a typed tag.
+List<String> withPendingTag(List<String> selected, String typed) {
+  final tag = normalizeTag(typed);
+  if (tag == null || selected.length >= maxTags) return selected;
+  return withTag(selected, tag);
+}
+
 /// Pick categories for a memory: tap a built-in or one of your own, or
 /// type a new one and press Enter (or +). Up to [maxTags].
 class TagPicker extends StatefulWidget {
@@ -12,6 +20,7 @@ class TagPicker extends StatefulWidget {
     required this.onChanged,
     this.known = const [],
     this.enabled = true,
+    this.controller,
   });
 
   final List<String> selected;
@@ -21,17 +30,23 @@ class TagPicker extends StatefulWidget {
   final List<String> known;
   final bool enabled;
 
+  /// The "type your own" box. Pass one in so the screen can include
+  /// text that was typed but not yet added when it saves
+  /// (see [withPendingTag]).
+  final TextEditingController? controller;
+
   @override
   State<TagPicker> createState() => _TagPickerState();
 }
 
 class _TagPickerState extends State<TagPicker> {
-  final _typed = TextEditingController();
+  late final TextEditingController _typed =
+      widget.controller ?? TextEditingController();
   String? _error;
 
   @override
   void dispose() {
-    _typed.dispose();
+    if (widget.controller == null) _typed.dispose();
     super.dispose();
   }
 
@@ -101,6 +116,7 @@ class _TagPickerState extends State<TagPicker> {
                 decoration: const InputDecoration(
                   labelText: 'Type your own',
                   hintText: 'e.g. Special date, Monthsary',
+                  helperText: 'Press Enter or + to add it',
                   prefixIcon: Icon(Icons.sell_outlined),
                   counterText: '',
                 ),
