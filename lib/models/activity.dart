@@ -39,7 +39,9 @@ class Activity {
             ? '$who updated ${isMe ? 'your' : 'their'} mood'
             : '$who ${isMe ? 'are' : 'is'} feeling ${mood.label.toLowerCase()} ${mood.emoji}';
       case 'note_sent':
-        return '$who sent a love note';
+        return d == 'capsule'
+            ? '$who sealed a time capsule 🔒'
+            : '$who sent a love note';
       case 'affection_sent':
         final gesture = switch (d) {
           'hug' => 'a hug 🫂',
@@ -65,7 +67,7 @@ class Activity {
         'memory_added' => '📸',
         'question_answered' => '💬',
         'mood_updated' => Mood.fromName(detail)?.emoji ?? '🙂',
-        'note_sent' => '💌',
+        'note_sent' => detail == 'capsule' ? '🔒' : '💌',
         'affection_sent' => '💗',
         'date_added' => '📅',
         'bucket_added' => '✅',
