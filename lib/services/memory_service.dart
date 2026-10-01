@@ -14,7 +14,8 @@ class NewPhoto {
 }
 
 /// Timeline memories and their photos. Row-level security limits every call
-/// to the user's own couple, and only the author can change a memory.
+/// to the user's own couple. Both partners can edit a memory; only its
+/// author can delete it (migration 010).
 class MemoryService {
   MemoryService._();
 
