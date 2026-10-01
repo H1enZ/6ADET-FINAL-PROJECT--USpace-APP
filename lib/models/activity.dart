@@ -51,6 +51,7 @@ class Activity {
           'listen' => 'something to listen to 👂',
           _ => 'some love ❤️',
         };
+        if (d == 'listen') return '$who wants to talk 👂';
         return '$who sent $gesture';
       case 'date_added':
         return d == null ? '$who saved a special date' : '$who saved a date: $d';
