@@ -8,7 +8,7 @@ import '../widgets/atoms/app_button.dart';
 import '../widgets/molecules/tag_picker.dart';
 
 /// "Move to a category": change a memory's tags. Either partner can do
-/// this (the database checks it). Closes with `true` once saved.
+/// this (the database checks it). Closes with the saved tags.
 class MemoryTagsSheet extends StatefulWidget {
   const MemoryTagsSheet({super.key, required this.memory, this.known = const []});
 
@@ -41,7 +41,7 @@ class _MemoryTagsSheetState extends State<MemoryTagsSheet> {
     try {
       await MemoryService.setTags(widget.memory.id, _tags);
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(_tags);
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = friendlyError(e));

@@ -95,14 +95,14 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   }
 
   Future<void> _retag() async {
-    final saved = await showModalBottomSheet<bool>(
+    final saved = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
       builder: (_) => MemoryTagsSheet(memory: _memory, known: widget.knownTags),
     );
-    if (saved != true) return;
+    if (saved == null) return;
     try {
       final fresh = await MemoryService.get(_memory.id);
       if (!mounted) return;

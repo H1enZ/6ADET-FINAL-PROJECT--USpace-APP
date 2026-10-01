@@ -83,8 +83,15 @@ class _TimelineScreenState extends State<TimelineScreen> {
           if (MemoryTag.fromDb(t.$1) == null) t.$1,
       ];
 
+  /// The filter in use, falling back to "All memories" when the chosen
+  /// category no longer has any memories (so the page is never blank).
+  String get _activeFilter {
+    if (_filter == _all || _filter == _favourites) return _filter;
+    return _memories.any((m) => m.tags.contains(_filter)) ? _filter : _all;
+  }
+
   bool _matches(Memory m) {
-    final passesFilter = switch (_filter) {
+    final passesFilter = switch (_activeFilter) {
       _all => true,
       _favourites => m.isFavorite,
       final tag => m.tags.contains(tag),
@@ -184,17 +191,27 @@ class _TimelineScreenState extends State<TimelineScreen> {
   }
 
   Future<void> _retag(Memory memory) async {
-    final saved = await showModalBottomSheet<bool>(
+    final saved = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
       builder: (_) => MemoryTagsSheet(memory: memory, known: _knownTags),
     );
-    if (saved != true) return;
+    if (saved == null) return;
     await _load();
     if (!mounted) return;
-    _showMessage('Moved');
+    // Point to the category it just went into, with a button to go there.
+    final added = saved.where((t) => !memory.tags.contains(t)).toList();
+    final target = added.isNotEmpty ? added.last : (saved.isNotEmpty ? saved.last : null);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(target == null
+          ? 'Removed from all categories'
+          : 'Moved to ${tagLabel(target)}'),
+      action: target == null
+          ? null
+          : SnackBarAction(label: 'Show', onPressed: () => setState(() => _filter = target)),
+    ));
   }
 
   @override
@@ -300,13 +317,13 @@ class _TimelineScreenState extends State<TimelineScreen> {
                     ),
                   if (_memories.isNotEmpty)
                     SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: AppSpacing.touchTarget + AppSpacing.sm,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.screenMargin,
-                              vertical: AppSpacing.xs),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.screenMargin,
+                            vertical: AppSpacing.xs),
+                        child: Wrap(
+                          spacing: AppSpacing.sm,
+                          runSpacing: AppSpacing.sm,
                           children: [
                             for (final f in [
                               (_all, 'All memories', _memories.length),
@@ -314,14 +331,11 @@ class _TimelineScreenState extends State<TimelineScreen> {
                                   _memories.where((m) => m.isFavorite).length),
                               for (final t in _tagsInUse) (t.$1, tagLabel(t.$1), t.$2),
                             ])
-                              Padding(
-                                padding: const EdgeInsets.only(right: AppSpacing.sm),
-                                child: FilterPill(
-                                  label: f.$2,
-                                  selected: _filter == f.$1,
-                                  count: f.$3,
-                                  onTap: () => setState(() => _filter = f.$1),
-                                ),
+                              FilterPill(
+                                label: f.$2,
+                                selected: _activeFilter == f.$1,
+                                count: f.$3,
+                                onTap: () => setState(() => _filter = f.$1),
                               ),
                           ],
                         ),
