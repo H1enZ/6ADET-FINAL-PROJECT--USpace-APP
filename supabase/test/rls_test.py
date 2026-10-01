@@ -154,7 +154,7 @@ def one(sql, params=None):
 # --- richer memories
 as_user(ana); m3 = one("insert into memories (couple_id, caption, memory_date) values (%s,'Beach day','2025-07-01') returning id", (couple_a,))
 check("author can add description, location and tags", not isinstance(try_sql("update memories set description='Sunset swim', location='Zambales', tags=array['travel','special'] where id=%s", (m3,)), Exception))
-check("unknown tag rejected", isinstance(try_sql("update memories set tags=array['party'] where id=%s", (m3,)), Exception))
+check("any short tag allowed, too-long tag rejected (rule from 009)", isinstance(try_sql("update memories set tags=array['xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'] where id=%s", (m3,)), Exception))
 as_user(ben); try_sql("update memories set description='hacked' where id=%s", (m3,))
 as_user(ana); check("partner can't edit my memory's story", one("select description from memories where id=%s", (m3,)) == "Sunset swim")
 
@@ -321,5 +321,22 @@ cur.execute("select count(*) from memories where couple_id = %s", (fg,))
 check("and its data", cur.fetchone()[0] == 0)
 cur.execute("reset role"); cur.execute("set role anon")
 check("signed-out visitor can't call it", isinstance(try_sql("select leave_couple()"), Exception))
+
+# =================== Custom memory tags (migration 009) ===================
+as_user(ana)
+mt = one("insert into memories (couple_id, caption, memory_date) values (%s,'Tag test', current_date) returning id", (couple_a,))
+check("can save your own tags", not isinstance(try_sql("update memories set tags = %s where id = %s", (["Outing", "Special date", "anniversary"], mt)), Exception))
+check("tag over 30 characters rejected", isinstance(try_sql("update memories set tags = %s where id = %s", (["x" * 31], mt)), Exception))
+check("more than 10 tags rejected", isinstance(try_sql("update memories set tags = %s where id = %s", ([f"t{i}" for i in range(11)], mt)), Exception))
+check("empty or padded tag rejected", isinstance(try_sql("update memories set tags = %s where id = %s", ([" Outing"], mt)), Exception))
+as_user(ben)
+check("partner can't edit the story directly", try_sql("update memories set caption = 'hijack' where id = %s returning id", (mt,)) == [])
+r = try_sql("select set_memory_tags(%s, %s)", (mt, ["Outing", "Monthsary"]))
+check("partner can re-tag a memory", not isinstance(r, Exception) and one("select tags from memories where id=%s", (mt,)) == ["Outing", "Monthsary"])
+check("partner re-tag still validated", isinstance(try_sql("select set_memory_tags(%s, %s)", (mt, ["x" * 31])), Exception))
+as_user(cara); check("other couple can't re-tag", isinstance(try_sql("select set_memory_tags(%s, %s)", (mt, ["mine"])), Exception))
+cur.execute("reset role"); cur.execute("set role anon")
+check("signed-out visitor can't re-tag", isinstance(try_sql("select set_memory_tags(%s, %s)", (mt, ["x"])), Exception))
+cur.execute("reset role")
 
 print(f"\n{sum(ok for _, ok in results)}/{len(results)} passed")
