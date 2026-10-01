@@ -51,6 +51,12 @@ class CoupleService {
     await _db.rpc('join_couple', params: {'code': code.trim().toUpperCase()});
   }
 
+  /// Leaves the couple. Your partner keeps everything and gets a new invite
+  /// code; if nobody is left, the space is deleted. See migration 008.
+  static Future<void> leaveCouple() async {
+    await _db.rpc('leave_couple');
+  }
+
   static Future<void> setAnniversary(String coupleId, DateTime date) async {
     await _db
         .from('couples')

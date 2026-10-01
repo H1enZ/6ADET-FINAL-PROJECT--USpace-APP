@@ -171,6 +171,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _run(() => ProfileService.updateBirthday(null), 'Birthday removed');
   }
 
+  Future<void> _unlink() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _UnlinkDialog(partnerName: _partner?.displayName),
+    );
+    if (confirmed != true) return;
+    setState(() => _busy = true);
+    try {
+      await CoupleService.leaveCouple();
+      if (!mounted) return;
+      restartFlow(context); // back to Splash, which now opens Pair
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      _showMessage(friendlyError(e));
+    }
+  }
+
   Future<void> _signOut() async {
     await AuthService.signOut();
     if (!mounted) return;
@@ -370,6 +388,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               onPressed: _busy ? null : _signOut,
                             ),
                           ),
+                          const SizedBox(height: AppSpacing.xxl),
+
+                          // Danger zone
+                          SectionLabel(
+                              text: partner == null ? 'Leave this space' : 'Unlink partner'),
+                          Text(
+                            partner == null
+                                ? 'Nobody else has joined yet. Leaving deletes this space '
+                                    'and everything in it.'
+                                : 'You will leave the space you share with '
+                                    '${partner.displayName}. They keep your memories, notes '
+                                    'and bucket list, and get a new invite code.',
+                            style: muted,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              onPressed: _busy ? null : _unlink,
+                              icon: const Icon(Icons.link_off),
+                              label: Text(partner == null ? 'Leave this space' : 'Unlink partner'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: scheme.error,
+                                side: BorderSide(color: scheme.error),
+                                minimumSize: const Size(64, AppSpacing.touchTarget),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -442,6 +488,111 @@ class _EditNameDialogState extends State<_EditNameDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(onPressed: _save, child: const Text('Save')),
+      ],
+    );
+  }
+}
+
+/// Asks for confirmation by typing CONFIRM (then Enter), so it cannot happen by accident.
+/// Closes with `true` only when confirmed.
+class _UnlinkDialog extends StatefulWidget {
+  const _UnlinkDialog({required this.partnerName});
+
+  /// Null when nobody has joined yet.
+  final String? partnerName;
+
+  @override
+  State<_UnlinkDialog> createState() => _UnlinkDialogState();
+}
+
+class _UnlinkDialogState extends State<_UnlinkDialog> {
+  final _typed = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _typed.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _typed.dispose();
+    super.dispose();
+  }
+
+  static const _word = 'CONFIRM';
+
+  bool get _ready => _typed.text.trim().toUpperCase() == _word;
+
+  /// Typing CONFIRM and pressing Enter unlinks, no click needed.
+  void _submit() {
+    if (_ready) Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final name = widget.partnerName;
+    final points = name == null
+        ? [
+            'This space and everything in it will be deleted.',
+            'You can start a new space or join someone else afterwards.',
+          ]
+        : [
+            "You won't see your shared memories, notes, bucket list or chat anymore.",
+            '$name keeps everything, including what you added.',
+            '$name gets a new invite code. You can only rejoin if they send it to you.',
+            'This cannot be undone.',
+          ];
+
+    return AlertDialog(
+      icon: Icon(Icons.link_off, color: scheme.error),
+      title: Text(name == null ? 'Leave this space?' : 'Unlink from $name?'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final p in points)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: Text('\u2022  $p', style: theme.textTheme.bodyMedium),
+              ),
+            const SizedBox(height: AppSpacing.md),
+            AppTextField(
+              label: 'Type $_word and press Enter',
+              controller: _typed,
+              hintText: _word,
+              textCapitalization: TextCapitalization.characters,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              _ready
+                  ? 'Press Enter to ${name == null ? 'leave' : 'unlink'}.'
+                  : 'Nothing happens until you type $_word.',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: _ready ? scheme.error : scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _ready ? _submit : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: scheme.error,
+            foregroundColor: scheme.onError,
+          ),
+          child: Text(name == null ? 'Leave' : 'Unlink'),
+        ),
       ],
     );
   }
