@@ -152,6 +152,7 @@ async function summarize(
     .maybeSingle();
   if (subError) throw fromDb(subError);
   if (!sub) throw new TherabotError('invalid_state', 'Save your answers before asking for a summary.');
+  const subId = String(sub.id); // the caller's own row, from the RLS-scoped read above
   if (sub.status !== 'draft' && sub.status !== 'summary_ready') {
     throw new TherabotError('invalid_state', 'Your summary can no longer be changed in this session.');
   }
@@ -162,7 +163,7 @@ async function summarize(
   // Use up one attempt BEFORE calling the AI (a failed call still counts).
   // The returned version ties the stored summary to these exact answers.
   const { data: version, error: reserveError } = await admin.rpc('therabot_reserve_summary_attempt', {
-    p_submission_id: sub.id,
+    p_submission_id: subId,
   });
   if (reserveError) throw fromDb(reserveError);
 
@@ -170,7 +171,7 @@ async function summarize(
   const { data: row, error: rowError } = await user
     .from('therabot_submissions')
     .select('what_happened, feelings, wish_understood, need_now')
-    .eq('id', sub.id)
+    .eq('id', subId)
     .eq('user_id', userId)
     .maybeSingle();
   if (rowError) throw fromDb(rowError);
@@ -194,7 +195,7 @@ async function summarize(
   const context = {}; // memories / chat messages arrive in phase 2e
   const store = async (summary: Record<string, unknown>, flagged: boolean) => {
     const { error } = await admin.rpc('therabot_store_summary', {
-      p_submission_id: sub.id,
+      p_submission_id: subId,
       p_version: version,
       p_summary: summary,
       p_context: context,
