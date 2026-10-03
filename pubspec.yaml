@@ -31,3 +31,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Home mood artwork: one transparent PNG per Home mood, named by its
+  # database value (loved.png, need_a_hug.png, ...). Until a file exists the
+  # app draws a placeholder in its place.
+  assets:
+    - assets/moods/
