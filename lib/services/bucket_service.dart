@@ -104,8 +104,31 @@ class BucketService {
   static Future<void> setDone(String id, bool done) async {
     await _db.from('bucket_items').update({
       'is_done': done,
-      'completed_at': done ? DateTime.now().toIso8601String() : null,
+      // UTC with its offset: a local time without one is read as UTC by
+      // the database, which put completions hours in the future east of UTC.
+      'completed_at': done ? DateTime.now().toUtc().toIso8601String() : null,
     }).eq('id', id);
+  }
+
+  /// Items ticked off since [since]: just what Notifications needs, without
+  /// the savings log.
+  static Future<List<({String id, String title, DateTime completedAt})>>
+      completedSince(String coupleId, DateTime since) async {
+    final rows = await _db
+        .from('bucket_items')
+        .select('id, title, completed_at')
+        .eq('couple_id', coupleId)
+        .eq('is_done', true)
+        .gte('completed_at', since.toUtc().toIso8601String())
+        .order('completed_at', ascending: false);
+    return [
+      for (final r in rows)
+        (
+          id: r['id'] as String,
+          title: r['title'] as String,
+          completedAt: DateTime.parse(r['completed_at'] as String).toLocal(),
+        ),
+    ];
   }
 
   /// Also deletes its savings log (the database cascades it).
