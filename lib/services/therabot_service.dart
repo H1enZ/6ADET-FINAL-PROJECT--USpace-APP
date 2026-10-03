@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config.dart';
 import '../models/therabot.dart';
 
 /// Therabot: "A private relationship reflection assistant".
@@ -153,10 +154,34 @@ class TherabotService {
   /// most once, so a reply later than this is a connection that went quiet.
   static const _invokeTimeout = Duration(seconds: 75);
 
+  /// Development only: a client for the local Therabot server, made once.
+  /// See [AppConfig.localTherabotUrl] for when it is allowed.
+  static FunctionsClient? _localFunctions;
+
+  static FunctionsClient _functions() {
+    if (!AppConfig.wantsLocalTherabot) return _db.functions;
+    final url = AppConfig.localTherabotUrl;
+    if (url == null) {
+      // Refuse rather than fall back, so a test never silently reaches the
+      // deployed function, and never send the token to a host not allowed.
+      throw const TherabotException(
+        'internal',
+        'THERABOT_FUNCTIONS_URL must be http://localhost, 127.0.0.1 or '
+            '10.0.2.2 (debug builds only).',
+      );
+    }
+    final token = _db.auth.currentSession?.accessToken;
+    if (token == null) throw const TherabotException('not_signed_in', _signIn);
+    final client = _localFunctions ??= FunctionsClient(url, {
+      'apikey': AppConfig.supabaseKey,
+    });
+    return client..setAuth(token);
+  }
+
   static Future<Map<String, dynamic>> _invoke(Map<String, dynamic> body) async {
     final FunctionResponse response;
     try {
-      response = await _db.functions
+      response = await _functions()
           .invoke('therabot', body: body)
           .timeout(_invokeTimeout);
     } on TimeoutException {
