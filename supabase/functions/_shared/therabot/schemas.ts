@@ -23,10 +23,45 @@ export interface SafetyCheck {
   message: string;
 }
 
+/**
+ * The private summary in sections, each in the person's own concrete terms.
+ * A section the answers don't support is an empty string, never filler.
+ */
+export interface PrivateSections {
+  what_happened: string;
+  how_you_feel: string;
+  what_matters_to_you: string;
+  what_you_want_your_partner_to_understand: string;
+  what_you_need: string;
+}
+
+/** Section keys in display order, with the heading the app shows. */
+export const SECTION_HEADINGS: ReadonlyArray<[keyof PrivateSections, string]> = [
+  ['what_happened', 'WHAT HAPPENED'],
+  ['how_you_feel', 'HOW YOU FEEL'],
+  ['what_matters_to_you', 'WHAT MATTERS TO YOU'],
+  ['what_you_want_your_partner_to_understand', 'WHAT YOU WANT YOUR PARTNER TO UNDERSTAND'],
+  ['what_you_need', 'WHAT YOU NEED'],
+];
+
+/**
+ * The plain-text summary built from the sections: each non-empty section
+ * under its heading. Kept as `summary` so older readers keep working, and
+ * identical to the text the app offers for approval.
+ */
+export function composeSummary(s: PrivateSections): string {
+  return SECTION_HEADINGS
+    .filter(([key]) => s[key].length > 0)
+    .map(([key, heading]) => `${heading}\n${s[key]}`)
+    .join('\n\n');
+}
+
 /** One partner's private reflection. Stored owner-only. */
 export interface PrivateReflection {
   safety: SafetyCheck;
+  /** Built from [sections] when present; older rows only have this. */
   summary: string;
+  sections: PrivateSections | null;
   needs: string[];
   uncertain_points: string[];
   suggested_insights: string[];
@@ -53,6 +88,8 @@ export type Validation<T> = { ok: true; value: T } | { ok: false; error: string 
 // Limits. Approved summaries are at most 1500 characters in the database.
 export const LIMITS = {
   summary: 1200,
+  // 5 sections x 200 plus headings stays under the 1200 summary limit.
+  section: 200,
   item: 300,
   safetyMessage: 500,
   needs: 5,
@@ -154,13 +191,35 @@ export function validatePrivateReflection(x: unknown): Validation<PrivateReflect
     if (!isObject(x)) throw new Error('answer must be an object');
     const safety = validateSafety(x.safety);
     if (safety.flagged) {
-      return { safety, summary: '', needs: [], uncertain_points: [], suggested_insights: [] };
+      return { safety, summary: '', sections: null, needs: [], uncertain_points: [], suggested_insights: [] };
     }
-    const extra = onlyKeys(x, ['safety', 'summary', 'needs', 'uncertain_points', 'suggested_insights']);
+    const extra = onlyKeys(x, ['safety', 'summary', 'sections', 'needs', 'uncertain_points', 'suggested_insights']);
     if (extra) throw new Error(extra);
+
+    // Sections when given (the summary is then built from them, so the two
+    // can never disagree); otherwise the older single summary.
+    let sections: PrivateSections | null = null;
+    let summary: string;
+    if (x.sections !== undefined && x.sections !== null) {
+      if (!isObject(x.sections)) throw new Error('sections must be an object');
+      const keys = SECTION_HEADINGS.map(([key]) => key);
+      const more = onlyKeys(x.sections, keys);
+      if (more) throw new Error(`sections: ${more}`);
+      const s = {} as PrivateSections;
+      for (const key of keys) {
+        s[key] = text(x.sections[key] ?? '', LIMITS.section, `sections.${key}`, true);
+      }
+      if (keys.every((key) => s[key].length === 0)) throw new Error('sections are all empty');
+      sections = s;
+      summary = text(composeSummary(s), LIMITS.summary, 'summary');
+    } else {
+      summary = text(x.summary, LIMITS.summary, 'summary');
+    }
+
     return {
       safety,
-      summary: text(x.summary, LIMITS.summary, 'summary'),
+      summary,
+      sections,
       needs: list(x.needs, 0, LIMITS.needs, LIMITS.item, 'needs'),
       uncertain_points: list(x.uncertain_points, 0, LIMITS.uncertainPoints, LIMITS.item, 'uncertain_points'),
       suggested_insights: list(x.suggested_insights, 0, LIMITS.suggestedInsights, LIMITS.insight, 'suggested_insights'),
@@ -258,13 +317,22 @@ const STRINGS = (maxItems: number, minItems = 0) => ({
   items: { type: 'string', minLength: 1, maxLength: LIMITS.item },
 });
 
+// The model writes sections only; the server builds `summary` from them.
+// Every section is required but may be "" when the answers don't support it.
 export const PRIVATE_REFLECTION_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['safety', 'summary', 'needs', 'uncertain_points', 'suggested_insights'],
+  required: ['safety', 'sections', 'needs', 'uncertain_points', 'suggested_insights'],
   properties: {
     safety: SAFETY_SCHEMA,
-    summary: { type: 'string', maxLength: LIMITS.summary },
+    sections: {
+      type: 'object',
+      additionalProperties: false,
+      required: SECTION_HEADINGS.map(([key]) => key),
+      properties: Object.fromEntries(
+        SECTION_HEADINGS.map(([key]) => [key, { type: 'string', maxLength: LIMITS.section }]),
+      ),
+    },
     needs: STRINGS(LIMITS.needs),
     uncertain_points: STRINGS(LIMITS.uncertainPoints),
     suggested_insights: STRINGS(LIMITS.suggestedInsights),

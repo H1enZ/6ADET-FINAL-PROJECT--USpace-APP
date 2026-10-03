@@ -188,34 +188,76 @@ class MySubmission {
   }
 }
 
+/// One section of a private summary: a heading and the person's own
+/// concrete details under it.
+class SummarySection {
+  const SummarySection(this.heading, this.text);
+  final String heading;
+  final String text;
+}
+
 /// One person's private AI summary. Only its owner ever sees it.
 class PrivateReflection {
   const PrivateReflection({
     required this.summary,
+    this.sections = const [],
     required this.needs,
     required this.uncertainPoints,
     required this.suggestedInsights,
   });
 
+  /// The plain summary. Older summaries only have this.
   final String summary;
+
+  /// Non-empty sections in display order. Empty for older summaries; a
+  /// section the answers didn't support is simply not here.
+  final List<SummarySection> sections;
   final List<String> needs;
   final List<String> uncertainPoints;
   final List<String> suggestedInsights;
 
+  /// Section keys and headings, in order. The same as the Edge Function's
+  /// SECTION_HEADINGS, so [approvalText] matches its `summary`.
+  static const sectionHeadings = [
+    ('what_happened', 'WHAT HAPPENED'),
+    ('how_you_feel', 'HOW YOU FEEL'),
+    ('what_matters_to_you', 'WHAT MATTERS TO YOU'),
+    (
+      'what_you_want_your_partner_to_understand',
+      'WHAT YOU WANT YOUR PARTNER TO UNDERSTAND',
+    ),
+    ('what_you_need', 'WHAT YOU NEED'),
+  ];
+
   static PrivateReflection? fromMap(Map<String, dynamic> m) {
+    final raw = m['sections'];
+    final sections = <SummarySection>[
+      if (raw is Map)
+        for (final (key, heading) in sectionHeadings)
+          if (raw[key] is String && (raw[key] as String).trim().isNotEmpty)
+            SummarySection(heading, (raw[key] as String).trim()),
+    ];
     final summary = m['summary'];
-    if (summary is! String || summary.trim().isEmpty) return null;
+    final plain = summary is String ? summary.trim() : '';
+    if (sections.isEmpty && plain.isEmpty) return null;
     return PrivateReflection(
-      summary: summary.trim(),
+      summary: plain,
+      sections: sections,
       needs: _strings(m['needs']),
       uncertainPoints: _strings(m['uncertain_points']),
       suggestedInsights: _strings(m['suggested_insights']),
     );
   }
 
-  /// The text offered for approval: the summary plus what you need. Only
-  /// this approved text (never the answers) feeds the shared reflection.
+  /// The text offered for approval. Only this approved text (never the
+  /// answers) feeds the shared reflection.
+  ///
+  /// With sections: each under its heading, exactly as shown on screen.
+  /// Older summaries: the summary plus what you need.
   String get approvalText {
+    if (sections.isNotEmpty) {
+      return sections.map((s) => '${s.heading}\n${s.text}').join('\n\n');
+    }
     if (needs.isEmpty) return summary;
     final withNeeds = '$summary\n\nWhat I need: ${needs.join('; ')}.';
     return withNeeds.length <= maxApprovedLength ? withNeeds : summary;
