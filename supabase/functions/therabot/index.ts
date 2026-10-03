@@ -248,7 +248,8 @@ async function summarize(
   return {
     status: 'summary_ready',
     reflection: {
-      summary: reflection.summary,
+      summary: reflection.summary, // built from sections; kept for older apps
+      sections: reflection.sections,
       needs: reflection.needs,
       uncertain_points: reflection.uncertain_points,
       suggested_insights: reflection.suggested_insights,

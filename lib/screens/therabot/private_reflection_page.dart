@@ -569,17 +569,40 @@ class _PrivateReflectionPageState extends State<PrivateReflectionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: staggered([
-        // Exactly the text "That's accurate" approves, needs included, so
-        // you never approve words you have not seen.
+        // Exactly the text "That's accurate" approves (the same headings
+        // and words), so you never approve words you have not seen.
         TherabotCard(
           tinted: true,
           label: 'Your private reflection',
-          child: Text(
-            s.approvalText,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: scheme.onPrimaryContainer,
-            ),
-          ),
+          child: s.sections.isEmpty
+              ? Text(
+                  s.approvalText,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final (i, section) in s.sections.indexed) ...[
+                      if (i > 0) const SizedBox(height: AppSpacing.md),
+                      Text(
+                        section.heading,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        section.text,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
         ),
         if (s.uncertainPoints.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
