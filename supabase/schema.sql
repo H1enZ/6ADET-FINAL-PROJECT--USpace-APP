@@ -2248,3 +2248,16 @@ begin
   end if;
 end;
 $$;
+
+
+-- ===========================================================================
+-- 18. Mood set for the redesigned Home screen (also in migrations/012)
+-- ===========================================================================
+-- The eight Home moods; the older values stay allowed for history.
+alter table public.moods drop constraint if exists moods_mood_check;
+alter table public.moods add constraint moods_mood_check check (mood in (
+  -- Offered by the app (the eight Home moods)
+  'loved', 'happy', 'calm', 'emotional', 'need_a_hug', 'flirty', 'romantic', 'excited',
+  -- History only: allowed so older check-ins stay valid
+  'relaxed', 'tired', 'stressed', 'sad', 'anxious', 'lonely', 'upset'
+));

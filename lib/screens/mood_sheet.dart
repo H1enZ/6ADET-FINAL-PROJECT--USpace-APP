@@ -91,7 +91,7 @@ class _MoodSheetState extends State<MoodSheet> {
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
                 children: [
-                  for (final mood in Mood.values)
+                  for (final mood in Mood.selectableMoods)
                     ChoiceChip(
                       label: PopOnChange(
                         trigger: _mood == mood,
