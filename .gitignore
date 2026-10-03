@@ -28,3 +28,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/launch.json
+
+# Supabase CLI local cache (project link, version check). Never commit.
+supabase/.temp/
