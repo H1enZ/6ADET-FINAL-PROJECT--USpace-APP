@@ -31,7 +31,7 @@ class MoodService {
     final text = note?.trim() ?? '';
     await _db.from('moods').insert({
       'couple_id': coupleId,
-      'mood': mood.name,
+      'mood': mood.dbValue,
       'note': text.isEmpty ? null : text,
       'is_shared': shared,
     });

@@ -1,24 +1,50 @@
-/// The ten moods for Today's Mood. The names match the database check.
+/// Every mood the database allows (migration 012). [dbValue] is what is
+/// stored in moods.mood and must match the database check.
+///
+/// The first eight are the Home moods, in grid order, and are the only ones
+/// anyone can pick. The rest come from the earlier mood list: they stay so
+/// older check-ins still show in history and the activity feed.
+///
+/// [emoji] is only for short text (history, activity lines). The Home hero
+/// and grid use MoodVisual's artwork instead.
 enum Mood {
-  happy('Happy', '😊'),
-  loved('Loved', '🥰'),
-  excited('Excited', '🤩'),
-  relaxed('Relaxed', '😌'),
-  tired('Tired', '😴'),
-  stressed('Stressed', '😣'),
-  sad('Sad', '😔'),
-  anxious('Anxious', '🥺'),
-  lonely('Lonely', '🫂'),
-  upset('Upset', '😞');
+  loved('loved', 'Loved', '🥰'),
+  happy('happy', 'Happy', '😊'),
+  calm('calm', 'Calm', '😌'),
+  emotional('emotional', 'Emotional', '🥹'),
+  needAHug('need_a_hug', 'Need a Hug', '🫂'),
+  flirty('flirty', 'Flirty', '😘'),
+  romantic('romantic', 'Romantic', '💞'),
+  excited('excited', 'Excited', '🤩'),
 
-  const Mood(this.label, this.emoji);
+  // History only: never offered for a new check-in.
+  relaxed('relaxed', 'Relaxed', '😌', selectable: false),
+  tired('tired', 'Tired', '😴', selectable: false),
+  stressed('stressed', 'Stressed', '😣', selectable: false),
+  sad('sad', 'Sad', '😔', selectable: false),
+  anxious('anxious', 'Anxious', '😟', selectable: false),
+  lonely('lonely', 'Lonely', '🥺', selectable: false),
+  upset('upset', 'Upset', '😞', selectable: false);
 
+  const Mood(this.dbValue, this.label, this.emoji, {this.selectable = true});
+
+  final String dbValue;
   final String label;
   final String emoji;
 
-  static Mood? fromName(String? name) {
+  /// False for the older moods kept only for history.
+  final bool selectable;
+
+  /// The eight Home moods, in grid order (two rows of four).
+  static List<Mood> get selectableMoods => [
+    for (final m in values)
+      if (m.selectable) m,
+  ];
+
+  /// The mood stored as [value] (a moods.mood value), or null.
+  static Mood? fromName(String? value) {
     for (final mood in Mood.values) {
-      if (mood.name == name) return mood;
+      if (mood.dbValue == value) return mood;
     }
     return null;
   }
@@ -60,7 +86,8 @@ class MoodEntry {
 MoodEntry? latestMoodOn(List<MoodEntry> entries, String userId, DateTime day) {
   MoodEntry? latest;
   for (final e in entries) {
-    final sameDay = e.createdAt.year == day.year &&
+    final sameDay =
+        e.createdAt.year == day.year &&
         e.createdAt.month == day.month &&
         e.createdAt.day == day.day;
     if (e.userId != userId || !sameDay) continue;

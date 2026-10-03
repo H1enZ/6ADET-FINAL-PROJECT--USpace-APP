@@ -45,10 +45,13 @@ void main() {
 
   group('moods', () {
     test('every mood name matches the database list', () {
-      expect(Mood.values.map((m) => m.name).toList(), [
-        'happy', 'loved', 'excited', 'relaxed', 'tired',
-        'stressed', 'sad', 'anxious', 'lonely', 'upset',
+      // The database check after migration 012.
+      expect(Mood.values.map((m) => m.dbValue).toList(), [
+        'loved', 'happy', 'calm', 'emotional', 'need_a_hug', 'flirty', 'romantic', 'excited',
+        'relaxed', 'tired', 'stressed', 'sad', 'anxious', 'lonely', 'upset',
       ]);
+      expect(Mood.selectableMoods.length, 8);
+      expect(Mood.fromName('need_a_hug'), Mood.needAHug);
       expect(Mood.fromName('hangry'), isNull);
     });
 
