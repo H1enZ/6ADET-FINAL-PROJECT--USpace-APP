@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/profile.dart';
 import '../models/resolution_note.dart';
 import '../services/affection_service.dart';
 import '../services/auth_service.dart';
@@ -11,6 +12,8 @@ import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/section_label.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
+import '../widgets/therabot/therabot_widgets.dart';
+import 'therabot/therabot_screen.dart';
 
 /// "Let's work it out": us, not the problem. Not about who is right. It
 /// helps one partner say what they need right now, and lets the couple
@@ -21,11 +24,19 @@ class WorkItOutScreen extends StatelessWidget {
     required this.coupleId,
     required this.myUserId,
     required this.partnerName,
+    this.me,
+    this.partner,
+    this.anniversary,
   });
 
   final String coupleId;
   final String myUserId;
   final String partnerName;
+
+  /// Passed on to Therabot, so its Talk step can open your chat.
+  final Profile? me;
+  final Profile? partner;
+  final DateTime? anniversary;
 
   void _open(BuildContext context, Widget page) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
@@ -82,6 +93,53 @@ class WorkItOutScreen extends StatelessWidget {
                         ?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: AppSpacing.xl),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                    child: Material(
+                      color: scheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => _open(
+                          context,
+                          TherabotScreen(
+                            coupleId: coupleId,
+                            partnerName: partnerName,
+                            me: me,
+                            partner: partner,
+                            anniversary: anniversary,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          child: Row(
+                            children: [
+                              Icon(Icons.auto_awesome_outlined, size: 32, color: scheme.primary),
+                              const SizedBox(width: AppSpacing.lg),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Therabot',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(color: scheme.onPrimaryContainer)),
+                                    Text(therabotSubtitle,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(color: scheme.onPrimaryContainer)),
+                                    const SizedBox(height: 2),
+                                    Text('Reflect separately, then see a shared reflection together.',
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(color: scheme.onPrimaryContainer)),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, color: scheme.onPrimaryContainer),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   for (final n in needs)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.md),

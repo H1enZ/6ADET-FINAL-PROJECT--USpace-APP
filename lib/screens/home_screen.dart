@@ -41,6 +41,7 @@ import 'mood_history_screen.dart';
 import 'mood_sheet.dart';
 import 'question_archive_screen.dart';
 import 'question_sheet.dart';
+import 'therabot/therabot_screen.dart';
 import 'work_it_out_screen.dart';
 import 'write_note_sheet.dart';
 
@@ -273,6 +274,24 @@ class _HomeScreenState extends State<HomeScreen> {
         coupleId: _coupleId,
         myUserId: _myId,
         partnerName: _partnerName,
+        me: _me,
+        partner: _partner,
+        anniversary: _couple?.anniversaryDate,
+      ),
+    ));
+    await _load();
+  }
+
+  Future<void> _openTherabot() async {
+    final partner = _partner;
+    if (partner == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => TherabotScreen(
+        coupleId: _coupleId,
+        partnerName: _partnerName,
+        me: _me,
+        partner: partner,
+        anniversary: _couple?.anniversaryDate,
       ),
     ));
     await _load();
@@ -448,6 +467,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             partner == null ? null : _openChat),
                         QuickAction("Let's work it out", Icons.handshake_outlined,
                             partner == null ? null : _openWorkItOut),
+                        QuickAction('Therabot', Icons.auto_awesome_outlined,
+                            partner == null ? null : _openTherabot),
                         QuickAction('Our timeline', Icons.photo_library_outlined,
                             widget.onOpenTab == null
                                 ? null
