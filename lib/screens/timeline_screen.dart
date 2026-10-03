@@ -260,6 +260,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab-timeline',
         onPressed: _loading ? null : _add,
         tooltip: 'Add a memory',
         shape: const CircleBorder(),

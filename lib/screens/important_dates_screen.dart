@@ -116,6 +116,7 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
       child: Scaffold(
         appBar: AppBar(title: const Text('Special dates')),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'fab-important-dates',
           onPressed: _loading ? null : _add,
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
