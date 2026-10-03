@@ -61,6 +61,11 @@ class _TherabotScreenState extends State<TherabotScreen> {
   DateTime? _partnerWritingSince;
   Timer? _poll;
 
+  /// Set ONLY when the server refused to start a session because of the
+  /// daily limit (it alone knows the count): shown in place of the Start
+  /// button until you try again or the session changes.
+  String? _dailyLimit;
+
   String get _partner => widget.partnerName;
 
   @override
@@ -95,6 +100,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
           : await TherabotService.mySubmission(session.id);
       if (!mounted || generation != _generation) return;
       setState(() {
+        if (session?.id != _session?.id) _resetSessionState();
         _session = session;
         _submission = submission;
         _error = null;
@@ -115,6 +121,20 @@ class _TherabotScreenState extends State<TherabotScreen> {
       });
     }
   }
+
+  /// Forgets everything that belonged to the previous session, so nothing
+  /// (errors, waiting state, a limit message) carries over to a new one.
+  void _resetSessionState() {
+    _reflecting = false;
+    _reflectError = null;
+    _reflectErrorCode = null;
+    _partnerWritingSince = null;
+    _dailyLimit = null;
+  }
+
+  static bool _isDailyLimit(TherabotException e) =>
+      e.code == 'invalid_state' &&
+      e.message.contains('Therabot sessions a day');
 
   /// While waiting on your partner (or on the reflection), checks again
   /// quietly every 20 seconds. Progress only, never their content.
@@ -184,7 +204,41 @@ class _TherabotScreenState extends State<TherabotScreen> {
     }
   }
 
-  Future<void> _start() => _run(TherabotService.start);
+  /// Starts a NEW session and opens its blank questions straight away.
+  /// The questions page is created fresh, with no answers from before.
+  Future<void> _start() async {
+    setState(() => _busy = true);
+    try {
+      await TherabotService.start();
+    } catch (e) {
+      if (!mounted) return;
+      final error = therabotError(e);
+      setState(() {
+        _busy = false;
+        // The server's answer stays on screen instead of a passing toast.
+        if (_isDailyLimit(error)) _dailyLimit = error.message;
+      });
+      if (!_isDailyLimit(error)) therabotToast(context, error.message);
+      await _load();
+      return;
+    }
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    final s = _session;
+    if (s != null &&
+        s.status == TherabotStatus.collecting &&
+        _submission == null) {
+      await _openPrivate();
+    }
+  }
+
+  /// Clears a limit message and tries again (time may have passed).
+  Future<void> _retryStart() async {
+    setState(() => _dailyLimit = null);
+    await _start();
+  }
 
   Future<bool> _confirm(String title, String body, String yes) async {
     final ok = await showDialog<bool>(
@@ -382,12 +436,31 @@ class _TherabotScreenState extends State<TherabotScreen> {
   Future<void> _okayForNow() async {
     final s = _session;
     if (s == null) return;
-    final done = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => TherabotCompletionPage(sessionId: s.id),
       ),
     );
-    if (done == true && mounted) Navigator.of(context).pop();
+    // Stay in Therabot, on whatever the session is now (often complete).
+    if (mounted) await _load();
+  }
+
+  Future<void> _openHistory() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TherabotHistoryScreen(partnerName: _partner),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  /// Opens a next-step page again from a finished reflection. Nothing is
+  /// recorded: your choice was already made.
+  Future<void> _revisit(TherabotChoice choice, TherabotSession s) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => _pageFor(choice, s)));
+    if (mounted) await _load();
   }
 
   Future<void> _nameIt() async {
@@ -420,7 +493,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
         IconButton(
           tooltip: 'Past reflections',
           icon: const Icon(Icons.history),
-          onPressed: () => _push(TherabotHistoryScreen(partnerName: _partner)),
+          onPressed: _openHistory,
         ),
         PopupMenuButton<String>(
           tooltip: 'More',
@@ -473,10 +546,12 @@ class _TherabotScreenState extends State<TherabotScreen> {
       case TherabotStatus.reflecting:
         return _reflectingView(context);
       case TherabotStatus.reflectionReady:
-      case TherabotStatus.completed:
         return s.reflection == null
             ? _intro(context, ended: true)
             : _reflection(context, s);
+      case TherabotStatus.completed:
+        // Finished: it lives in Past reflections now, not on the hub.
+        return _completed(context, s);
       case TherabotStatus.closed:
         final sub = _submission;
         if (sub != null && sub.isSafety) {
@@ -561,8 +636,47 @@ class _TherabotScreenState extends State<TherabotScreen> {
           'see theirs. Private answers are cleared after 24 hours.',
         ),
         const SizedBox(height: AppSpacing.xl),
-        AppButton(
+        _startSection(
+          context,
           label: ended ? 'Start a new reflection' : 'Start a reflection',
+        ),
+      ],
+    );
+  }
+
+  /// The Start button, or the daily-limit message in its place.
+  Widget _startSection(BuildContext context, {required String label}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = theme.textTheme.bodyMedium?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    final limit = _dailyLimit;
+    if (limit != null) {
+      return TherabotCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Taking a pause for today',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Semantics(liveRegion: true, child: Text(limit, style: muted)),
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(
+              onPressed: _busy ? null : _retryStart,
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppButton(
+          label: label,
           icon: Icons.auto_awesome_outlined,
           isLoading: _busy,
           onPressed: _start,
@@ -572,9 +686,81 @@ class _TherabotScreenState extends State<TherabotScreen> {
         Text(
           "Either of you can start. Therabot isn't therapy, and it never decides who is right.",
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
+          style: muted,
+        ),
+      ],
+    );
+  }
+
+  /// A finished session: both of you chose a next step. The reflection
+  /// itself lives in Past reflections; here you can start a new one, or
+  /// quietly reopen a next-step page.
+  Widget _completed(BuildContext context, TherabotSession s) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final muted = theme.textTheme.bodyMedium?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    final mine = s.myChoice;
+    final theirs = s.partnerChoice;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TherabotCard(
+          tinted: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Reflection complete 💗',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                '${s.title == null ? 'Your reflection is' : '"${s.title}" is'} '
+                'saved in Past reflections, where you can read it again any time.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+              if (mine != null && theirs != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'You chose ${mine.label} · $_partner chose ${theirs.label}',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
+              ],
+            ],
           ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        // Primary action first: a finished session never blocks a new one.
+        _startSection(context, label: 'Start a new reflection'),
+        const SizedBox(height: AppSpacing.md),
+        AppButton(
+          label: 'See Past reflections',
+          icon: Icons.history,
+          variant: AppButtonVariant.outlined,
+          onPressed: _openHistory,
+          fullWidth: true,
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Text('Revisit a next step', style: muted),
+        const SizedBox(height: AppSpacing.xs),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final c in TherabotChoice.values)
+              TextButton(
+                onPressed: () => _revisit(c, s),
+                child: Text('${c.emoji} ${c.label}'),
+              ),
+          ],
         ),
       ],
     );
@@ -871,6 +1057,20 @@ class _TherabotScreenState extends State<TherabotScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Not complete yet: the server keeps this session open (and refuses
+        // a new one) until both of you have chosen, or for 24 hours.
+        if (mine != null && theirs == null) ...[
+          TherabotCard(
+            tentative: true,
+            child: Text(
+              "You've chosen ${mine.label}. This reflection completes when "
+              '$_partner chooses too (or after 24 hours), and then you can '
+              'start a new one.',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         Row(
           children: [
             Expanded(
@@ -921,18 +1121,6 @@ class _TherabotScreenState extends State<TherabotScreen> {
             color: scheme.onSurfaceVariant,
           ),
         ),
-        if (s.status == TherabotStatus.completed) ...[
-          const SizedBox(height: AppSpacing.xl),
-          // A finished session no longer blocks a new one.
-          AppButton(
-            label: 'Start a new reflection',
-            icon: Icons.auto_awesome_outlined,
-            variant: AppButtonVariant.outlined,
-            isLoading: _busy,
-            onPressed: _start,
-            fullWidth: true,
-          ),
-        ],
       ],
     );
   }
