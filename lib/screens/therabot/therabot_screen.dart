@@ -68,6 +68,14 @@ class _TherabotScreenState extends State<TherabotScreen> {
 
   String get _partner => widget.partnerName;
 
+  /// Display only: "Partner 1" / "Partner 2" as your two usernames, by who
+  /// started the session (you may well be Partner 2).
+  TherabotNames _names(int myPartnerNumber) => TherabotNames(
+    myPartnerNumber: myPartnerNumber,
+    myName: widget.me?.displayName,
+    partnerName: widget.partner?.displayName,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -329,6 +337,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
     ),
     TherabotChoice.talk => TherabotTalkPage(
       questions: s.reflection?.discussionQuestions ?? const [],
+      names: _names(s.myPartnerNumber),
       partnerName: _partner,
       onOpenChat: _openChat,
     ),
@@ -448,7 +457,11 @@ class _TherabotScreenState extends State<TherabotScreen> {
   Future<void> _openHistory() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => TherabotHistoryScreen(partnerName: _partner),
+        builder: (_) => TherabotHistoryScreen(
+          partnerName: _partner,
+          myUsername: widget.me?.displayName,
+          partnerUsername: widget.partner?.displayName,
+        ),
       ),
     );
     if (mounted) await _load();
@@ -1094,8 +1107,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
         const SizedBox(height: AppSpacing.lg),
         SharedReflectionView(
           reflection: s.reflection!,
-          myPartnerNumber: s.myPartnerNumber,
-          partnerName: _partner,
+          names: _names(s.myPartnerNumber),
         ),
         const SizedBox(height: AppSpacing.xxl),
         Text('What would help you next?', style: theme.textTheme.titleLarge),
