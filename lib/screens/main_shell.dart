@@ -27,6 +27,16 @@ class _MainShellState extends State<MainShell> {
   static const _therabotTab = 3;
   int _index = 0;
 
+  /// Bumped when a notification opens a tab, so that tab is rebuilt and
+  /// loads fresh (Timeline doesn't update live). Normal tab switches keep
+  /// each tab's state.
+  final _freshOpens = List.filled(5, 0);
+
+  void _openFromHome(int tab) => setState(() {
+    _freshOpens[tab]++;
+    _index = tab;
+  });
+
   @override
   Widget build(BuildContext context) {
     return AppShell(
@@ -36,9 +46,15 @@ class _MainShellState extends State<MainShell> {
         index: _index,
         children: [
           for (final (i, tab) in [
-            HomeScreen(profile: widget.profile),
-            TimelineScreen(profile: widget.profile),
-            LoveNotesScreen(profile: widget.profile),
+            HomeScreen(profile: widget.profile, onOpenTab: _openFromHome),
+            TimelineScreen(
+              key: ValueKey('timeline:${_freshOpens[1]}'),
+              profile: widget.profile,
+            ),
+            LoveNotesScreen(
+              key: ValueKey('notes:${_freshOpens[2]}'),
+              profile: widget.profile,
+            ),
             _index == _therabotTab
                 ? TherabotTab(profile: widget.profile)
                 : const SizedBox.shrink(),

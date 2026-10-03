@@ -43,6 +43,31 @@ class MemoryService {
     return _withPhotos(rows);
   }
 
+  /// The newest memory by [authorId] whose caption starts with [prefix]
+  /// (the activity feed keeps only the first 120 characters), or null.
+  /// One row and its photos, for opening it from Notifications.
+  static Future<Memory?> findByCaption(
+    String coupleId,
+    String authorId,
+    String prefix,
+  ) async {
+    // Escape LIKE wildcards so the caption is matched literally.
+    final literal = prefix.replaceAllMapped(
+      RegExp(r'[\\%_]'),
+      (m) => '\\${m[0]}',
+    );
+    final rows = await _db
+        .from('memories')
+        .select()
+        .eq('couple_id', coupleId)
+        .eq('author_id', authorId)
+        .like('caption', '$literal%')
+        .order('created_at', ascending: false)
+        .limit(1);
+    final found = await _withPhotos(rows);
+    return found.isEmpty ? null : found.first;
+  }
+
   static Future<Memory> get(String id) async {
     final row = await _db.from('memories').select().eq('id', id).single();
     return (await _withPhotos([row])).first;

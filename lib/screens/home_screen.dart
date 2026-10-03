@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../models/activity.dart';
+import '../models/app_notification.dart';
 import '../models/couple.dart';
 import '../models/important_date.dart';
 import '../models/mood.dart';
@@ -15,7 +18,9 @@ import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/couple_service.dart';
 import '../services/dates_service.dart';
+import '../services/memory_service.dart';
 import '../services/mood_service.dart';
+import '../services/notification_service.dart';
 import '../services/profile_service.dart';
 import '../services/question_service.dart';
 import '../theme/app_effects.dart';
@@ -27,7 +32,6 @@ import '../widgets/atoms/header_icon_button.dart';
 import '../widgets/brand/uspace_wordmark.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
-import '../widgets/home/activity_feed.dart';
 import '../widgets/home/affection_banner.dart';
 import '../widgets/home/home_card.dart';
 import '../widgets/home/mood_grid.dart';
@@ -39,8 +43,10 @@ import 'add_memory_sheet.dart';
 import 'bucket_list_screen.dart';
 import 'chat_screen.dart';
 import 'important_dates_screen.dart';
+import 'memory_detail_screen.dart';
 import 'mood_history_screen.dart';
 import 'mood_sheet.dart';
+import 'notifications_screen.dart';
 import 'question_archive_screen.dart';
 import 'question_sheet.dart';
 import 'work_it_out_screen.dart';
@@ -50,9 +56,13 @@ import 'write_note_sheet.dart';
 /// the next special day. Recent activity lives behind the bell.
 /// Updates live when your partner does something; pull down to refresh.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.profile});
+  const HomeScreen({super.key, required this.profile, this.onOpenTab});
 
   final Profile profile;
+
+  /// Switches the bottom tab (1 Timeline, 2 Love Notes, 3 Therabot), so a
+  /// notification can open the right place. Provided by MainShell.
+  final ValueChanged<int>? onOpenTab;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -64,15 +74,19 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MoodEntry> _moods = [];
   List<QuestionAnswer> _answers = [];
   List<ImportantDate> _dates = [];
-  List<Activity> _activities = [];
   List<Map<String, dynamic>> _unseen = [];
   bool _partnerAnswered = false;
   int _unread = 0;
+
+  /// New notifications: the bell's count.
+  int _newNotifications = 0;
   bool _loading = true;
   bool _busy = false;
   bool _celebrated = false;
   String? _error;
   RealtimeChannel? _live;
+  Timer? _liveDebounce;
+  int _loadGeneration = 0;
 
   /// A mood tapped in the grid but not saved yet. Shown on the hero.
   Mood? _preview;
@@ -80,6 +94,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// On the hero's Share / Add a note row, to scroll it into view.
   final _heroActionsKey = GlobalKey();
+
+  /// On the anniversary countdown, so a notification can scroll to it.
+  final _countdownKey = GlobalKey();
 
   String get _coupleId => widget.profile.coupleId!;
   String get _myId => widget.profile.userId;
@@ -110,7 +127,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _load();
     try {
       _live = ActivityService.listen(_coupleId, () {
-        if (mounted) _load();
+        // One action can insert several rows (an activity and an affection):
+        // wait for the burst to settle, then reload once.
+        _liveDebounce?.cancel();
+        _liveDebounce = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) _load();
+        });
       });
     } catch (_) {
       // Live updates are a bonus; pull to refresh still works.
@@ -119,41 +141,76 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _liveDebounce?.cancel();
     final live = _live;
     if (live != null) ActivityService.stopListening(live);
     super.dispose();
   }
 
   Future<void> _load() async {
+    // Loads can overlap (live update + pull to refresh + after an action).
+    // Only the newest one may update the screen.
+    final generation = ++_loadGeneration;
     try {
       final today = _today;
-      final couple = await CoupleService.couple(_coupleId);
-      final members = await ProfileService.withPhotos(
-        await CoupleService.members(_coupleId),
-      );
-      final moods = await MoodService.recent(_coupleId, days: 8);
-      final answers = await QuestionService.answersFor(_coupleId, today);
-      final dates = await DatesService.list(_coupleId);
-      final activities = await ActivityService.recent(_coupleId);
-      final unseen = await AffectionService.unseenFromPartner(_coupleId, _myId);
+      // Wave 1: everything that doesn't depend on anything else, at once.
+      final first = await Future.wait<Object?>([
+        CoupleService.couple(_coupleId),
+        CoupleService.members(_coupleId).then(ProfileService.withPhotos),
+        MoodService.recent(_coupleId, days: 8),
+        QuestionService.answersFor(_coupleId, today),
+        DatesService.list(_coupleId),
+        ActivityService.recent(_coupleId, limit: 40),
+        AffectionService.unseenFromPartner(_coupleId, _myId),
+      ]);
+      final couple = first[0] as Couple?;
+      final members = first[1] as List<Profile>;
+      final moods = first[2] as List<MoodEntry>;
+      final answers = first[3] as List<QuestionAnswer>;
+      final dates = first[4] as List<ImportantDate>;
+      final activities = first[5] as List<Activity>;
+      final unseen = first[6] as List<Map<String, dynamic>>;
 
       String? partnerId;
       for (final m in members) {
         if (m.userId != _myId) partnerId = m.userId;
       }
-      final partnerAnswered = partnerId == null
-          ? false
-          : await QuestionService.partnerAnswered(_coupleId, partnerId, today);
-      int unread = 0;
-      try {
-        unread = partnerId == null
-            ? 0
-            : await ChatService.unreadCount(_coupleId);
-      } catch (_) {
-        // the badge is a bonus; Home still loads without it
+
+      // Wave 2: needs the partner. The badge and the bell's count are a
+      // bonus: if either fails, Home still loads without it.
+      Future<int> orZero(Future<int> Function() f) async {
+        try {
+          return await f();
+        } catch (_) {
+          return 0;
+        }
       }
 
-      if (!mounted) return;
+      final second = await Future.wait<Object>([
+        partnerId == null
+            ? Future.value(false)
+            : QuestionService.partnerAnswered(_coupleId, partnerId, today),
+        orZero(
+          () async =>
+              partnerId == null ? 0 : await ChatService.unreadCount(_coupleId),
+        ),
+        orZero(
+          () async => NotificationService.unreadCount(
+            await _loadNotifications(
+              couple: couple,
+              members: members,
+              answers: answers,
+              activities: activities,
+              dates: dates,
+            ),
+          ),
+        ),
+      ]);
+      final partnerAnswered = second[0] as bool;
+      final unread = second[1] as int;
+      final newNotifications = second[2] as int;
+
+      if (!mounted || generation != _loadGeneration) return;
       final newAffection = unseen.length > _unseen.length;
       setState(() {
         _couple = couple;
@@ -161,10 +218,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _moods = moods;
         _answers = answers;
         _dates = dates;
-        _activities = activities;
         _unseen = unseen;
         _partnerAnswered = partnerAnswered;
         _unread = unread;
+        _newNotifications = newNotifications;
         _error = null;
         _loading = false;
       });
@@ -173,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       _celebrateIfToday();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = friendlyError(e);
         _loading = false;
@@ -359,27 +416,138 @@ class _HomeScreenState extends State<HomeScreen> {
     await _load(); // clears the unread badge
   }
 
-  /// Recent activity, behind the bell. (The full Notifications screen
-  /// replaces this page in the next phase.)
-  Future<void> _openActivity() async {
-    final names = {for (final m in _members) m.userId: m.displayName};
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Recent activity')),
-          body: ListView(
-            padding: const EdgeInsets.all(AppSpacing.screenMargin),
-            children: [
-              ActivityFeed(
-                activities: _activities,
-                myUserId: _myId,
-                names: names,
-              ),
-            ],
-          ),
+  /// Builds the notifications. Home passes what it already loaded; the
+  /// Notifications screen calls it without, so it fetches fresh data.
+  Future<List<AppNotification>> _loadNotifications({
+    Couple? couple,
+    List<Profile>? members,
+    List<QuestionAnswer>? answers,
+    List<Activity>? activities,
+    List<ImportantDate>? dates,
+  }) {
+    final people = members ?? _members;
+    String partner = 'Your partner';
+    for (final m in people) {
+      if (m.userId != _myId) partner = m.displayName.split(' ').first;
+    }
+    return NotificationService.load(
+      coupleId: _coupleId,
+      myId: _myId,
+      partnerName: partner,
+      answeredToday: (answers ?? _answers).any((a) => a.userId == _myId),
+      anniversary: (couple ?? _couple)?.anniversaryDate,
+      activities: activities,
+      dates: dates,
+    );
+  }
+
+  /// Keys that were new on the last visit to Notifications. If you follow
+  /// one and come straight back, the others are still highlighted.
+  Set<String> _recentlyNew = {};
+  DateTime? _recentlyNewAt;
+
+  /// The bell: opens Notifications, then follows whatever was tapped.
+  Future<void> _openNotifications() async {
+    final fresh =
+        _recentlyNewAt != null &&
+        DateTime.now().difference(_recentlyNewAt!) <
+            const Duration(minutes: 10);
+    final tapped = await Navigator.of(context).push<AppNotification>(
+      MaterialPageRoute(
+        builder: (_) => NotificationsScreen(
+          myId: _myId,
+          load: () => _loadNotifications(),
+          keepNew: fresh ? _recentlyNew : const {},
+          onNewKeys: (keys) {
+            _recentlyNew = keys;
+            _recentlyNewAt = DateTime.now();
+          },
         ),
       ),
     );
+    if (!mounted) return;
+    if (tapped != null) await _follow(tapped);
+    // Recounts the bell from what is now remembered as seen.
+    if (mounted) await _load();
+  }
+
+  /// Opens the place a notification is about.
+  Future<void> _follow(AppNotification n) async {
+    // Tabs opened from a notification reload, so the new item is there.
+    void tab(int i) => widget.onOpenTab?.call(i);
+    switch (n.target) {
+      case NotificationTarget.memory:
+        final hint = n.targetHint;
+        final author = n.targetId;
+        if (hint != null && author != null) {
+          try {
+            final memory = await MemoryService.findByCaption(
+              _coupleId,
+              author,
+              hint,
+            );
+            if (!mounted) return;
+            if (memory != null) {
+              await _push(
+                MemoryDetailScreen(
+                  memory: memory,
+                  authorName: memory.authorId == _myId ? 'you' : _partnerName,
+                  isMine: memory.authorId == _myId,
+                ),
+              );
+              return;
+            }
+          } catch (_) {
+            // fall back to the timeline
+          }
+        }
+        tab(1);
+      case NotificationTarget.timeline:
+        tab(1);
+      case NotificationTarget.moodHistory:
+        await _openMoodHistory();
+      case NotificationTarget.loveNotes:
+        tab(2);
+      case NotificationTarget.importantDates:
+        await _push(ImportantDatesScreen(coupleId: _coupleId));
+      case NotificationTarget.bucketList:
+        // _openNotifications reloads Home afterwards anyway.
+        await _push(BucketListScreen(profile: widget.profile));
+      case NotificationTarget.questions:
+        await _push(
+          QuestionArchiveScreen(
+            coupleId: _coupleId,
+            myUserId: _myId,
+            partnerName: _partnerName,
+          ),
+        );
+      case NotificationTarget.answerQuestion:
+        await _answerQuestion();
+      case NotificationTarget.therabot:
+        tab(3);
+      case NotificationTarget.chat:
+        await _openChat();
+      case NotificationTarget.sendHugBack:
+        // Never sends on its own: offer it, so a stray tap can't send a hug.
+        if (_partner == null) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Send $_partnerName a hug back?'),
+            action: SnackBarAction(label: 'Send a hug', onPressed: _sendHug),
+          ),
+        );
+      case NotificationTarget.countdown:
+        final target = _countdownKey.currentContext;
+        if (target != null && target.mounted) {
+          await Scrollable.ensureVisible(
+            target,
+            duration: motionOff(target) ? Duration.zero : AppMotion.medium,
+            curve: AppMotion.enter,
+          );
+        }
+      case NotificationTarget.home:
+        break; // nothing more to open
+    }
   }
 
   Future<void> _openWorkItOut() async {
@@ -674,9 +842,12 @@ class _HomeScreenState extends State<HomeScreen> {
         // The anniversary, then the next special days.
         section(
           'countdown',
-          CountdownCard(
-            anniversary: couple.anniversaryDate,
-            onTap: _setAnniversary,
+          KeyedSubtree(
+            key: _countdownKey,
+            child: CountdownCard(
+              anniversary: couple.anniversaryDate,
+              onTap: _setAnniversary,
+            ),
           ),
           after: AppSpacing.md,
         ),
@@ -769,7 +940,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           HeaderIconButton(
                             icon: Icons.notifications_none_rounded,
                             label: 'Notifications',
-                            onPressed: _openActivity,
+                            count: _newNotifications,
+                            onPressed: _openNotifications,
                           ),
                         ],
                       ),

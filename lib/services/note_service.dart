@@ -20,6 +20,30 @@ class NoteService {
     return rows.map(LoveNote.fromMap).toList();
   }
 
+  /// Capsules that opened between [since] and [until], for Notifications.
+  /// Only the envelope, never the message.
+  static Future<
+    List<({String id, String authorId, DateTime openedAt, String? title})>
+  >
+  openedCapsules(String coupleId, DateTime since, DateTime until) async {
+    final rows = await _db
+        .from('notes')
+        .select('id, author_id, unlock_at, capsule_title')
+        .eq('couple_id', coupleId)
+        .not('unlock_at', 'is', null)
+        .gte('unlock_at', since.toUtc().toIso8601String())
+        .lte('unlock_at', until.toUtc().toIso8601String());
+    return [
+      for (final r in rows)
+        (
+          id: r['id'] as String,
+          authorId: r['author_id'] as String,
+          openedAt: DateTime.parse(r['unlock_at'] as String).toLocal(),
+          title: r['capsule_title'] as String?,
+        ),
+    ];
+  }
+
   /// Capsules still sealed, soonest first. Never includes the message.
   static Future<List<SealedNote>> sealed() async {
     final result = await _db.rpc('sealed_notes');

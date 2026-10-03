@@ -36,7 +36,7 @@ class HeaderIconButton extends StatelessWidget {
     final n = count ?? 0;
     final unread = n > 0 || showDot;
     final semantic = n > 0
-        ? '$label, $n unread'
+        ? '$label, $n new'
         : (showDot ? '$label, new' : label);
 
     return Semantics(
