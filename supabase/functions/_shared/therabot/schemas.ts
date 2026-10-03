@@ -106,7 +106,7 @@ export const LIMITS = {
 // Words that mark a statement as a possibility rather than a fact. A bare
 // "may" is not enough: in Filipino "may" means "there is".
 const HEDGE =
-  /\b(might|could|possibly|perhaps|maybe|seem|seems|seemed|one possibility|it'?s possible|it is possible|(it|you|they|each of you|both of you|partner [12]) may|may (be|have|not|feel|mean|need|want|see))\b/i;
+  /\b(might|could|possibly|perhaps|maybe|seem|seems|seemed|one possibility|it'?s possible|it is possible|(it|you|they|each|each of you|both|both of you|there|partner [12]) may|may (be|have|not|feel|mean|need|want|see))\b/i;
 
 // ---------------------------------------------------------------- helpers
 
@@ -129,10 +129,20 @@ function text(x: unknown, max: number, field: string, allowEmpty = false): strin
   return t;
 }
 
+/**
+ * A list of short texts. Empty items are dropped and extra items beyond
+ * [max] are cut off instead of discarding the whole answer (a user's
+ * summaries are limited); an over-long item is still rejected, because
+ * cutting it mid-sentence could change its meaning.
+ */
 function list(x: unknown, min: number, max: number, itemMax: number, field: string): string[] {
   if (!Array.isArray(x)) throw new Error(`${field} must be a list`);
-  if (x.length < min || x.length > max) throw new Error(`${field} must have ${min}-${max} items`);
-  return x.map((item, i) => text(item, itemMax, `${field}[${i}]`));
+  const items = x
+    .filter((item) => !(typeof item === 'string' && item.trim().length === 0))
+    .slice(0, max)
+    .map((item, i) => text(item, itemMax, `${field}[${i}]`));
+  if (items.length < min) throw new Error(`${field} must have ${min}-${max} items`);
+  return items;
 }
 
 export function validateSafety(x: unknown): SafetyCheck {
@@ -283,7 +293,10 @@ export function validateSharedReflection(x: unknown): Validation<SharedReflectio
       x.discussion_questions, LIMITS.questionsMin, LIMITS.questionsMax, LIMITS.item, 'discussion_questions',
     );
     for (const q of questions) {
-      if (!q.endsWith('?')) throw new Error('a discussion question is not a question');
+      // Allow a closing quote or bracket after the question mark.
+      if (!q.replace(/["'”’)\]]+$/, '').endsWith('?')) {
+        throw new Error('a discussion question is not a question');
+      }
     }
 
     return {
