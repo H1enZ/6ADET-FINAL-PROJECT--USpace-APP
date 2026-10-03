@@ -40,6 +40,29 @@ function stopped<T>(
   };
 }
 
+/**
+ * Why the first answer was rejected, for the single retry. Built only from
+ * rule names (never from user text or the rejected answer).
+ */
+function retryNote(reason: string | undefined): string {
+  const why = reason === 'schema'
+    ? 'it broke a limit: a section or list item was too long, a list had too many items, or a field was missing'
+    : reason === 'provider_bad_output'
+    ? 'it was cut off or was not valid JSON; keep it shorter'
+    : reason === 'lint:label'
+    ? 'it used a label word for a person; only repeat such a word in quotes, as theirs'
+    : reason === 'lint:verdict'
+    ? 'it said or implied who is right, wrong or to blame; describe without judging, quoting their own words'
+    : reason === 'lint:command'
+    ? 'it told them what to do about the relationship'
+    : reason === 'lint:option_pick'
+    ? 'it chose or recommended a next step; never pick one'
+    : reason === 'lint:motive'
+    ? "it stated someone's motives as fact"
+    : 'it did not follow the rules';
+  return `\n\nYour previous answer was rejected because ${why}. Write a new answer that fixes only that.`;
+}
+
 export async function generateChecked<T>(
   provider: AiProvider,
   base: Omit<AiRequest, 'attempt'>,
@@ -48,16 +71,19 @@ export async function generateChecked<T>(
   lintFields: (value: T) => LintInput,
 ): Promise<Generated<T>> {
   const rejected: string[] = [];
+  // Summed over both attempts, so a retry's cost is visible too.
+  const total = { inputTokens: 0, outputTokens: 0 };
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     let json: unknown;
     let model = provider.model;
-    let usage: Generated<T>['usage'];
     try {
-      const result = await provider.generateJson({ ...base, attempt });
+      const system = attempt > 1 ? base.system + retryNote(rejected.at(-1)) : base.system;
+      const result = await provider.generateJson({ ...base, system, attempt });
       json = result.json;
       model = result.model;
-      usage = result.usage;
+      total.inputTokens += result.usage?.inputTokens ?? 0;
+      total.outputTokens += result.usage?.outputTokens ?? 0;
     } catch (e) {
       if (e instanceof AiError) {
         if (e.kind === 'rate_limited') {
@@ -105,7 +131,7 @@ export async function generateChecked<T>(
       attempts: attempt,
       provider: provider.name,
       model,
-      usage,
+      usage: total,
       rejected,
     };
   }

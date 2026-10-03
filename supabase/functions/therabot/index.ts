@@ -39,6 +39,9 @@ interface LogEntry {
   model?: string;
   attempts?: number;
   rejected?: string[];
+  /** Token counts only (summed over a retry); never any text. */
+  input_tokens?: number;
+  output_tokens?: number;
   outcome: string;
   ms: number;
 }
@@ -234,6 +237,8 @@ async function summarize(
   entry.model = generated.model;
   entry.attempts = generated.attempts;
   entry.rejected = generated.rejected;
+  entry.input_tokens = generated.usage?.inputTokens;
+  entry.output_tokens = generated.usage?.outputTokens;
 
   if (generated.safety.flagged || !generated.value) {
     await store({ safety: generated.safety }, true);
@@ -340,6 +345,9 @@ async function reflect(
           restating: r.perspectives.map((p) => ({
             texts: [p.summary, ...p.needs],
             source: [p.partner === '1' ? p1.approved_summary : p2.approved_summary],
+            // Both partners read this: a verdict or next-step pick from one
+            // partner's words must stay visibly theirs, in quotes.
+            quoteAll: true,
           })),
           authored: [
             ...r.differences,
@@ -352,6 +360,8 @@ async function reflect(
       entry.model = generated.model;
       entry.attempts = generated.attempts;
       entry.rejected = generated.rejected;
+      entry.input_tokens = generated.usage?.inputTokens;
+      entry.output_tokens = generated.usage?.outputTokens;
       flagged = generated.safety.flagged || !generated.value;
       if (!flagged && generated.value) reflectionToStore = storedReflection(generated.value);
     }
@@ -415,6 +425,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
     try {
       provider = getProvider(Deno.env.get('AI_PROVIDER'), {
         mockMarkers: Deno.env.get('MOCK_MARKERS') === '1',
+        groqApiKey: Deno.env.get('GROQ_API_KEY'),
+        groqModel: Deno.env.get('GROQ_MODEL'),
       });
     } catch {
       throw new TherabotError('ai_unavailable', MESSAGES.aiUnavailable);

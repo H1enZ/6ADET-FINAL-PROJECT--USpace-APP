@@ -28,6 +28,11 @@ export interface LintResult {
 export interface Restatement {
   texts: readonly string[];
   source: readonly string[];
+  /**
+   * Shared text: repeated verdicts and next-step picks must also be in
+   * quotes (not only labels), so they never read as Therabot's own view.
+   */
+  quoteAll?: boolean;
 }
 
 export interface LintInput {
@@ -97,6 +102,7 @@ export function lintNeutrality(input: LintInput): LintResult {
   const restating = input.restating.map((r) => ({
     texts: r.texts.map(normalise),
     source: normalise(r.source.join('\n')),
+    quoteAll: r.quoteAll === true,
   }));
 
   for (const [rule, pattern] of RULES) {
@@ -110,7 +116,9 @@ export function lintNeutrality(input: LintInput): LintResult {
           const start = match.index ?? 0;
           const end = start + match[0].length;
           const ownWords = group.source.includes(match[0]);
-          const attributed = rule !== 'label' || quoted(text, start, end);
+          const mustQuote = rule === 'label' ||
+            (group.quoteAll && (rule === 'verdict' || rule === 'option_pick'));
+          const attributed = !mustQuote || quoted(text, start, end);
           if (!ownWords || !attributed) return { ok: false, rule };
         }
       }
