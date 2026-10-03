@@ -51,10 +51,24 @@ sections: write each in second person ("You..."), at most ${LIMITS.section} char
 clearer and shorter than the original, with the same meaning and the same strength:
 - what_happened: the actual event or situation, and the reason they gave for it.
 - how_you_feel: the feelings they named, in their words.
-- what_matters_to_you: priorities, values and constraints they stated (for example school, exams, grades, work,
-  family, money, health, time or space) and anything they said they are putting first.
+- what_matters_to_you: ONLY a value, priority, constraint, responsibility or concern that this person explicitly
+  says is THEIR OWN (for example their own school, exams, grades, work, family, money, health, time or space),
+  and anything they said they are putting first. Something they say matters to their partner, or that they
+  only acknowledge or understand about their partner, is NOT theirs: leave it out of this section and keep it
+  where it belongs (usually what_you_want_your_partner_to_understand). If nothing is explicitly their own, "".
 - what_you_want_your_partner_to_understand: what they want their partner to understand.
 - what_you_need: what they said they need now.
+
+Ownership (never switch whose something is):
+- "my exams", "my work", "I need to study" belong to this person; "your exams", "my partner's exams", "their work",
+  "their family" belong to the partner. Keep that owner in every section ("your partner's exams", not "your exams").
+  When something they acknowledge belongs to their partner, name the owner explicitly when you restate it
+  ("your partner's exams are important", not "exams are important"), so it can't be read as their own.
+- Acknowledging something is not owning it. Example input: "I understand that exams are important, but the silence
+  made me unsure." (the exams are the partner's). WRONG what_matters_to_you: "Exams are important to you."
+  RIGHT what_matters_to_you: "" and what_you_want_your_partner_to_understand: "You understand that your partner's
+  exams are important, but the silence made you unsure."
+- When it is unclear whose something is, do not put it in what_matters_to_you.
 
 Faithfulness rules (they matter more than sounding warm):
 - Keep concrete details. Never replace them with generic relationship language. If they said "I have exams",
@@ -67,8 +81,12 @@ Faithfulness rules (they matter more than sounding warm):
 - A section their answers don't support is "" (empty). Never invent content to fill it, and don't repeat
   the same sentence in two sections.
 - needs: at most ${LIMITS.needs} short phrases of what they said they need, in their own terms (may be []).
-- uncertain_points: at most ${LIMITS.uncertainPoints} things you are unsure you understood, phrased as gentle questions or
-  "I wasn't sure whether...".
+  One stated need is one item: never split it into several (a need and its reason stay together).
+- uncertain_points: at most ${LIMITS.uncertainPoints}, and only for genuine ambiguity that changes what the summary should
+  say (for example, it is unclear whose priority something is, or two answers seem to contradict each other).
+  Never ask for details just because they were left out, and never ask about an answer that is empty or missing
+  (an empty answer just means an empty section). [] is the expected answer when the summary is already
+  faithful. Phrase each as a gentle question or "I wasn't sure whether...".
 - suggested_insights: at most ${LIMITS.suggestedInsights} optional short preferences they might want to remember about
   themselves (they decide whether to save them); usually [].
 - saved_preferences in the input are things this person chose to save earlier; use them only to understand their wording.`;
