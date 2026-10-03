@@ -24,6 +24,9 @@ class AppSpacing {
 
   /// Forms keep a readable width instead of stretching on desktop.
   static const double formMaxWidth = 420;
+
+  /// Home's content column stops growing here on tablets and desktop.
+  static const double homeMaxWidth = 720;
 }
 
 class AppRadius {
@@ -33,5 +36,7 @@ class AppRadius {
   static const double input = 13;
   static const double bubble = 16;
   static const double card = 18;
+  static const double tile = 20; // mood tiles, quick-action tiles
   static const double panel = 22;
+  static const double hero = 28; // the Home mood hero
 }

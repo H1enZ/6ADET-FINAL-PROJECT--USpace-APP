@@ -12,6 +12,9 @@ class AppTypography {
       // Countdown numerals
       displayLarge: GoogleFonts.poppins(
           fontSize: 44, fontWeight: FontWeight.w700, height: 1.1),
+      // The mood word on the Home hero ("LOVED")
+      headlineMedium: GoogleFonts.poppins(
+          fontSize: 30, fontWeight: FontWeight.w700, height: 1.1, letterSpacing: 0.5),
       // Screen titles
       titleLarge: GoogleFonts.poppins(
           fontSize: 21, fontWeight: FontWeight.w700, height: 1.25),
