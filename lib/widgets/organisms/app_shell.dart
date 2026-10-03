@@ -27,7 +27,7 @@ class AppShell extends StatelessWidget {
     _Destination('Home', Icons.home_outlined, Icons.home),
     _Destination('Timeline', Icons.photo_library_outlined, Icons.photo_library),
     _Destination('Love Notes', Icons.favorite_border, Icons.favorite),
-    _Destination('Bucket List', Icons.check_circle_outline, Icons.check_circle),
+    _Destination('Therabot', Icons.auto_awesome_outlined, Icons.auto_awesome),
     _Destination('Profile', Icons.person_outline, Icons.person),
   ];
 
