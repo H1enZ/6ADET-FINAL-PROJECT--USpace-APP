@@ -58,6 +58,22 @@ class AppGradients {
           end: Alignment.bottomRight,
           colors: [Color(0xFFFFF1EA), Color(0xFFFBE1E6)],
         );
+
+  // On the light blush the caption grey and the rose are just under 4.5:1,
+  // so text placed straight on it is nudged a little toward plum (5:1+).
+  // The dark gradient already passes with the plain tokens.
+
+  /// Secondary text sitting directly on [blush].
+  static Color onBlushText(ColorScheme scheme) =>
+      scheme.brightness == Brightness.dark
+      ? scheme.onSurfaceVariant
+      : Color.lerp(scheme.onSurfaceVariant, scheme.secondary, 0.25)!;
+
+  /// Links and text buttons sitting directly on [blush].
+  static Color onBlushLink(ColorScheme scheme) =>
+      scheme.brightness == Brightness.dark
+      ? scheme.primary
+      : Color.lerp(scheme.primary, scheme.secondary, 0.25)!;
 }
 
 /// Shared motion timing, so every screen animates with the same feel.

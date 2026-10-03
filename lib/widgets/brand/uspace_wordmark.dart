@@ -35,31 +35,35 @@ class USpaceWordmark extends StatelessWidget {
       label: 'USpace',
       header: isHeader,
       excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'USpace',
-            style: GoogleFonts.poppins(
-              fontSize: size,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
-              height: 1.1,
-              color: color ?? scheme.secondary,
-            ),
-          ),
-          // Sits a little high, like a superscript, as in the logo.
-          Padding(
-            padding: EdgeInsets.only(left: s * 0.08, top: s * 0.04),
-            child: Icon(
-              Icons.favorite_rounded,
-              size: s * 0.42,
-              color: heartColor ?? scheme.primary,
-            ),
-          ),
-        ],
-      ),
+      // With very large text on a narrow phone the mark would be wider than
+      // the screen: it shrinks to fit instead (never larger than designed).
+      child: FittedBox(fit: BoxFit.scaleDown, child: _mark(scheme, s)),
     );
   }
+
+  Widget _mark(ColorScheme scheme, double s) => Row(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'USpace',
+        style: GoogleFonts.poppins(
+          fontSize: size,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
+          height: 1.1,
+          color: color ?? scheme.secondary,
+        ),
+      ),
+      // Sits a little high, like a superscript, as in the logo.
+      Padding(
+        padding: EdgeInsets.only(left: s * 0.08, top: s * 0.04),
+        child: Icon(
+          Icons.favorite_rounded,
+          size: s * 0.42,
+          color: heartColor ?? scheme.primary,
+        ),
+      ),
+    ],
+  );
 }

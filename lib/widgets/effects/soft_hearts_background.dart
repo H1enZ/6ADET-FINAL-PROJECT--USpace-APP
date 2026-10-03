@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'motion.dart';
@@ -57,6 +58,18 @@ class _SoftHeartsBackgroundState extends State<SoftHeartsBackground>
     duration: const Duration(seconds: 18),
   );
 
+  // The drift is a few pixels over 18 s, so ~10 paints a second look the
+  // same as 60 and leave the GPU idle most of the time. The painter listens
+  // to this step, which only changes 180 times per loop.
+  static const _steps = 180;
+  late final ValueNotifier<int> _step = ValueNotifier(0);
+
+  @override
+  void initState() {
+    super.initState();
+    _drift.addListener(() => _step.value = (_drift.value * _steps).floor());
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -70,6 +83,7 @@ class _SoftHeartsBackgroundState extends State<SoftHeartsBackground>
   @override
   void dispose() {
     _drift.dispose();
+    _step.dispose();
     super.dispose();
   }
 
@@ -88,7 +102,11 @@ class _SoftHeartsBackgroundState extends State<SoftHeartsBackground>
               // The painter repaints from the animation directly, so the
               // widget tree is not rebuilt on every frame.
               child: CustomPaint(
-                painter: _HeartsPainter(color: color, drift: _drift),
+                painter: _HeartsPainter(
+                  color: color,
+                  step: _step,
+                  steps: _steps,
+                ),
               ),
             ),
           ),
@@ -100,11 +118,12 @@ class _SoftHeartsBackgroundState extends State<SoftHeartsBackground>
 }
 
 class _HeartsPainter extends CustomPainter {
-  _HeartsPainter({required this.color, required this.drift})
-    : super(repaint: drift);
+  _HeartsPainter({required this.color, required this.step, required this.steps})
+    : super(repaint: step);
 
   final Color color;
-  final Animation<double> drift; // 0..1, loops
+  final ValueListenable<int> step; // 0..steps-1, loops
+  final int steps;
 
   // Fixed layout (fractions of the canvas) so the composition is calm and
   // the same on every run: few hearts, mostly near the edges.
@@ -117,27 +136,30 @@ class _HeartsPainter extends CustomPainter {
     (0.80, 0.84, 40.0, -0.28),
   ];
 
+  // Each heart's shape is built once (centred on the origin) and reused.
+  static final List<Path> _paths = [
+    for (final (_, _, s, _) in _hearts)
+      heartPath(Rect.fromCenter(center: Offset.zero, width: s, height: s)),
+  ];
+
   @override
   void paint(Canvas canvas, Size size) {
-    final t = drift.value;
+    final t = step.value / steps;
     final paint = Paint()..color = color;
     for (var i = 0; i < _hearts.length; i++) {
-      final (fx, fy, s, tilt) = _hearts[i];
+      final (fx, fy, _, tilt) = _hearts[i];
       // A slow bob of a few pixels, each heart out of phase.
       final bob = math.sin((t + i / _hearts.length) * 2 * math.pi) * 6;
       final c = Offset(fx * size.width, fy * size.height + bob);
       canvas.save();
       canvas.translate(c.dx, c.dy);
       canvas.rotate(tilt);
-      canvas.drawPath(
-        heartPath(Rect.fromCenter(center: Offset.zero, width: s, height: s)),
-        paint,
-      );
+      canvas.drawPath(_paths[i], paint);
       canvas.restore();
     }
   }
 
   @override
   bool shouldRepaint(_HeartsPainter old) =>
-      old.color != color || old.drift != drift;
+      old.color != color || old.step != step;
 }

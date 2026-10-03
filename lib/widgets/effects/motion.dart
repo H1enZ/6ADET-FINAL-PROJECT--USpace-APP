@@ -36,9 +36,18 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
       vsync: this, duration: const Duration(milliseconds: 380));
   late final Animation<double> _t = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
 
+  bool _started = false;
+
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    // With reduce motion it is simply there: no delay, no frames spent.
+    if (motionOff(context)) {
+      _c.value = 1;
+      return;
+    }
     final delay = Duration(milliseconds: 55 * math.min(widget.index, 8));
     Future<void>.delayed(delay, () {
       if (mounted) _c.forward();
@@ -53,14 +62,17 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    if (motionOff(context)) return widget.child;
-    return AnimatedBuilder(
-      animation: _t,
-      child: widget.child,
-      builder: (context, child) => Opacity(
-        opacity: _t.value,
-        child: Transform.translate(
-          offset: Offset(widget.from.dx * (1 - _t.value), widget.from.dy * (1 - _t.value)),
+    final still = motionOff(context);
+    // Always the same widgets, so switching reduce motion never rebuilds the
+    // child (a focused text field keeps focus). FadeTransition changes the
+    // layer's opacity without repainting what is inside it.
+    return FadeTransition(
+      opacity: still ? kAlwaysCompleteAnimation : _t,
+      child: AnimatedBuilder(
+        animation: _t,
+        child: widget.child,
+        builder: (context, child) => Transform.translate(
+          offset: still ? Offset.zero : widget.from * (1 - _t.value),
           child: child,
         ),
       ),
