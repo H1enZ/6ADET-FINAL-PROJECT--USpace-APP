@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
+import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/atoms/app_button.dart';
-import '../widgets/atoms/seal_badge.dart';
+import '../widgets/brand/uspace_wordmark.dart';
+import '../widgets/effects/motion.dart';
+import '../widgets/effects/soft_hearts_background.dart';
 import 'main_shell.dart';
 import 'pair_screen.dart';
 import 'sign_in_screen.dart';
@@ -13,13 +18,33 @@ import 'sign_in_screen.dart';
 /// Called after signing in, pairing and signing out.
 void restartFlow(BuildContext context) {
   Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute<void>(builder: (_) => const SplashScreen()),
+    _fadeRoute(context, const SplashScreen()),
     (route) => false,
   );
 }
 
-/// The entry point. Decides between three routes:
-///   no session              -> Sign in (waits for a tap first)
+/// A soft, quick fade between the entry screens (none with reduce motion).
+PageRoute<void> _fadeRoute(BuildContext context, Widget page) {
+  final still = motionOff(context);
+  return PageRouteBuilder<void>(
+    transitionDuration: still ? Duration.zero : AppMotion.quick,
+    reverseTransitionDuration: still ? Duration.zero : AppMotion.quick,
+    pageBuilder: (_, _, _) => page,
+    transitionsBuilder: (_, animation, _, child) => FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: AppMotion.enter),
+      child: child,
+    ),
+  );
+}
+
+/// The signed-in account has no profile row (schema not applied).
+class _NoProfile implements Exception {
+  const _NoProfile();
+}
+
+/// The entry point. A short, quiet moment with the wordmark while it decides
+/// where you belong:
+///   no session              -> Sign in
 ///   signed in, not paired   -> Pair
 ///   signed in and paired    -> Home
 class SplashScreen extends StatefulWidget {
@@ -29,70 +54,114 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   String? _error;
 
-  /// Set once the session check is done and the next screen is Sign in.
-  /// The splash then waits for a tap instead of moving on by itself.
-  Widget? _waitingForTap;
+  /// True once the check has taken a while, to show a quiet "loading" line.
+  bool _slow = false;
+
+  /// Shows the "slow" line; cancelled on retry, routing and dispose.
+  Timer? _slowTimer;
+
+  // The wordmark fades in and settles from 0.96 to 1.0, quickly.
+  late final AnimationController _intro = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
+  );
+  late final Animation<double> _fade = CurvedAnimation(
+    parent: _intro,
+    curve: AppMotion.enter,
+  );
+  late final Animation<double> _scale = Tween(
+    begin: 0.96,
+    end: 1.0,
+  ).animate(_fade);
+
+  bool _started = false;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (motionOff(context)) {
+      _intro.value = 1; // shown at once, no movement
+    } else {
+      _intro.forward();
+    }
     _decide();
+  }
+
+  @override
+  void dispose() {
+    _slowTimer?.cancel();
+    _intro.dispose();
+    super.dispose();
   }
 
   Future<void> _decide() async {
     final started = DateTime.now();
+    final still = motionOff(context);
+    // After a moment, say we're still working, so a slow network doesn't
+    // look like a frozen screen.
+    _slowTimer?.cancel();
+    _slowTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted && _error == null) setState(() => _slow = true);
+    });
     try {
       final Widget next;
       if (AuthService.session == null) {
         next = const SignInScreen();
       } else {
         final profile = await CoupleService.myProfile();
-        if (profile == null) {
-          throw StateError('no profile');
-        }
+        if (profile == null) throw const _NoProfile();
         next = profile.isPaired
             ? MainShell(profile: profile)
             : PairScreen(profile: profile);
       }
 
-      // Hold the splash briefly so it doesn't flash.
+      // Hold just long enough for the wordmark to land, so it doesn't flash.
+      final minimum = still
+          ? const Duration(milliseconds: 300)
+          : const Duration(milliseconds: 500);
       final waited = DateTime.now().difference(started);
-      const minimum = Duration(milliseconds: 1400);
       if (waited < minimum) await Future<void>.delayed(minimum - waited);
 
+      _slowTimer?.cancel();
       if (!mounted) return;
-      if (next is SignInScreen) {
-        setState(() => _waitingForTap = next);
-      } else {
-        _go(next);
-      }
-    } on StateError {
+      Navigator.of(context).pushReplacement(_fadeRoute(context, next));
+    } on _NoProfile {
+      _slowTimer?.cancel();
       if (!mounted) return;
-      setState(() => _error =
-          'Your account has no profile. Check that supabase/schema.sql '
-          'was run on this Supabase project, then create the account again.');
+      setState(
+        () => _error =
+            "We couldn't find your profile. Sign out, then sign in or "
+            'create your account again.',
+      );
     } catch (e) {
+      _slowTimer?.cancel();
       if (!mounted) return;
       setState(() => _error = friendlyError(e));
     }
   }
 
-  void _go(Widget next) {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => next),
-    );
-  }
-
   void _retry() {
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _slow = false;
+    });
     _decide();
   }
 
   Future<void> _signOut() async {
-    await AuthService.signOut();
+    try {
+      await AuthService.signOut();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = friendlyError(e));
+      return;
+    }
     if (!mounted) return;
     restartFlow(context);
   }
@@ -102,106 +171,91 @@ class _SplashScreenState extends State<SplashScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    final waiting = _waitingForTap;
-
     return Scaffold(
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: waiting == null ? null : () => _go(waiting),
+      body: SoftHeartsBackground(
+        gradient: AppGradients.blush(theme.brightness),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.screenMargin),
-            // Full width, so everything is centred like the mockup.
-            child: SizedBox(
-              width: double.infinity,
-              child: Column(
-                children: [
-                  const Spacer(flex: 3),
-                  const SealBadge(size: 96),
-                  const SizedBox(height: AppSpacing.xxl),
-                  Text(
-                    'USpace',
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      color: scheme.secondary,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Container(width: 56, height: 2, color: scheme.primary),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    '\u201CThe diary of what\u2019s next\u201D',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const Spacer(flex: 3),
-                  if (_error == null && waiting != null) ...[
-                    Semantics(
-                      button: true,
-                      label: 'Continue to sign in',
-                      child: Icon(Icons.touch_app_outlined,
-                          color: scheme.primary, size: 28),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Tap anywhere to continue',
-                      style: theme.textTheme.labelLarge
-                          ?.copyWith(color: scheme.primary),
-                    ),
-                  ] else if (_error == null) ...[
-                    const _LoadingDots(),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      'Checking your session\u2026',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.screenMargin),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: AppSpacing.formMaxWidth,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FadeTransition(
+                      opacity: _fade,
+                      child: ScaleTransition(
+                        scale: _scale,
+                        child: Column(
+                          children: [
+                            const USpaceWordmark(size: 44, isHeader: true),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              'A private space for the two of you',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: AppGradients.onBlushText(scheme),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ] else ...[
-                    Text(
-                      _error!,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: scheme.error),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    AppButton(label: 'Try again', onPressed: _retry),
-                    TextButton(onPressed: _signOut, child: const Text('Sign out')),
+                    const SizedBox(height: AppSpacing.huge),
+                    if (_error != null) ...[
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.error,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      AppButton(label: 'Try again', onPressed: _retry),
+                      TextButton(
+                        onPressed: _signOut,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppGradients.onBlushLink(scheme),
+                          minimumSize: const Size(
+                            AppSpacing.touchTarget,
+                            AppSpacing.touchTarget,
+                          ),
+                        ),
+                        child: const Text('Sign out'),
+                      ),
+                    ] else
+                      // Reserved height, so the wordmark never jumps.
+                      SizedBox(
+                        height: AppSpacing.xxl,
+                        child: AnimatedOpacity(
+                          opacity: _slow ? 1 : 0,
+                          duration: motionOff(context)
+                              ? Duration.zero
+                              : AppMotion.medium,
+                          child: Semantics(
+                            liveRegion: _slow,
+                            child: Text(
+                              'Opening your space…',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: AppGradients.onBlushText(scheme),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
-                  const SizedBox(height: AppSpacing.xxl),
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Three dots fading from rose to blush, as in the mockup.
-class _LoadingDots extends StatelessWidget {
-  const _LoadingDots();
-
-  @override
-  Widget build(BuildContext context) {
-    final rose = Theme.of(context).colorScheme.primary;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final alpha in const [1.0, 0.5, 0.25])
-          Container(
-            width: 8,
-            height: 8,
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            decoration: BoxDecoration(
-              color: rose.withValues(alpha: alpha),
-              shape: BoxShape.circle,
-            ),
-          ),
-      ],
     );
   }
 }

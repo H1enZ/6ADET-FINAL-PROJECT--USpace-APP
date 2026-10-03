@@ -20,6 +20,10 @@ class AppTextField extends StatelessWidget {
     this.textCapitalization = TextCapitalization.none,
     this.maxLength,
     this.maxLines = 1,
+    this.enabled = true,
+    this.onChanged,
+    this.focusNode,
+    this.helperText,
   });
 
   final String label;
@@ -37,35 +41,57 @@ class AppTextField extends StatelessWidget {
   final int? maxLength;
   final int maxLines;
 
+  /// False while a form is submitting, so it can't be edited mid-request.
+  final bool enabled;
+  final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
+
+  /// A short hint under the field (e.g. a password rule), read with it and
+  /// replaced by the error when validation fails.
+  final String? helperText;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        // The visible label is for sighted users; screen readers get the same
+        // label on the field itself below, so it is read once, with the field.
+        ExcludeSemantics(
+          child: Text(
+            label.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.xs + 2),
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          validator: validator,
-          keyboardType: keyboardType,
-          autofillHints: autofillHints,
-          textInputAction: textInputAction,
-          onFieldSubmitted: onFieldSubmitted,
-          textCapitalization: textCapitalization,
-          maxLength: maxLength,
-          maxLines: obscureText ? 1 : maxLines,
-          decoration: InputDecoration(
-            hintText: hintText,
-            prefixIcon: prefixIcon == null ? null : Icon(prefixIcon),
-            suffixIcon: suffix,
-            counterText: '',
+        Semantics(
+          // Names the field for screen readers ("Email, text field").
+          label: label,
+          child: TextFormField(
+            controller: controller,
+            focusNode: focusNode,
+            enabled: enabled,
+            onChanged: onChanged,
+            obscureText: obscureText,
+            validator: validator,
+            keyboardType: keyboardType,
+            autofillHints: autofillHints,
+            textInputAction: textInputAction,
+            onFieldSubmitted: onFieldSubmitted,
+            textCapitalization: textCapitalization,
+            maxLength: maxLength,
+            maxLines: obscureText ? 1 : maxLines,
+            decoration: InputDecoration(
+              hintText: hintText,
+              helperText: helperText,
+              helperMaxLines: 2,
+              prefixIcon: prefixIcon == null ? null : Icon(prefixIcon),
+              suffixIcon: suffix,
+              counterText: '',
+            ),
           ),
         ),
       ],
