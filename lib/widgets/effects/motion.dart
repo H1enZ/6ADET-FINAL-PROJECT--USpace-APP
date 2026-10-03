@@ -9,7 +9,9 @@ import 'floating_hearts.dart';
 // Everything here checks the device's "reduce motion" setting first and
 // shows the calm, still version when it is on.
 
-bool motionOff(BuildContext context) => MediaQuery.of(context).disableAnimations;
+// disableAnimationsOf listens to this one setting only, so callers do not
+// rebuild on unrelated MediaQuery changes (e.g. the keyboard opening).
+bool motionOff(BuildContext context) => MediaQuery.disableAnimationsOf(context);
 
 /// Fades and slides a child in once, when it first appears. Give each item
 /// in a list a growing [index] so they arrive one after another.
@@ -67,8 +69,15 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
 }
 
 /// Wraps each child so a column of cards arrives one after another.
+/// A child's key is carried onto its wrapper, so keyed sections keep their
+/// state (and don't fade in again) when something appears above them.
 List<Widget> staggered(List<Widget> children) => [
-      for (var i = 0; i < children.length; i++) FadeSlideIn(index: i, child: children[i]),
+      for (var i = 0; i < children.length; i++)
+        FadeSlideIn(
+          key: children[i].key == null ? null : ValueKey(children[i].key),
+          index: i,
+          child: children[i],
+        ),
     ];
 
 /// A quick bouncy "pop" every time [trigger] changes (not on first build).
@@ -211,8 +220,19 @@ class SkeletonList extends StatefulWidget {
 
 class _SkeletonListState extends State<SkeletonList> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1300))
-    ..repeat();
+      vsync: this, duration: const Duration(milliseconds: 1300));
+
+  // The shimmer only runs when motion is on; with reduce motion it stays
+  // still instead of ticking every frame.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (motionOff(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
 
   @override
   void dispose() {
