@@ -127,8 +127,12 @@ class WelcomeCard extends StatelessWidget {
                   if (unseenAffection.length > 3)
                     Text('+ ${unseenAffection.length - 3} more',
                         style: theme.textTheme.labelSmall),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                  // Wrap, not Row: on a narrow screen the second button
+                  // moves to its own line instead of overflowing.
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
                     children: [
                       TextButton(
                           onPressed: onDismissAffection,

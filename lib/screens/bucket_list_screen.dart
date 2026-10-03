@@ -177,6 +177,7 @@ class _BucketListScreenState extends State<BucketListScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Bucket List')),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab-bucket-list',
         onPressed: _loading ? null : _add,
         tooltip: 'Add bucket-list item',
         shape: const CircleBorder(),

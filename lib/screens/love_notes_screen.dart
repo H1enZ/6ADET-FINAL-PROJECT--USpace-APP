@@ -232,6 +232,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab-love-notes',
         onPressed: _loading ? null : _write,
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,

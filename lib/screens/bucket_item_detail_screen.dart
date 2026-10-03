@@ -178,6 +178,7 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'fab-bucket-item-savings',
           onPressed: _loading ? null : _addSavings,
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
