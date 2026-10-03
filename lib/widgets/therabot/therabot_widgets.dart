@@ -385,17 +385,51 @@ class TherabotErrorView extends StatelessWidget {
 }
 
 /// A list of short lines with a quiet marker.
+/// AI-written reflection text with "Partner 1" / "Partner 2" shown as the
+/// partners' usernames (see [TherabotNames]). The text itself is unchanged;
+/// only the labels it already contains are rendered as names.
+class PartnerText extends StatelessWidget {
+  const PartnerText(this.text, {super.key, this.names, this.style});
+
+  final String text;
+  final TherabotNames? names;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = names;
+    if (n == null) return Text(text, style: style);
+    final nameStyle = TextStyle(
+      fontWeight: FontWeight.w600,
+      color: style?.color,
+    );
+    return Text.rich(
+      TextSpan(
+        children: [
+          for (final s in n.segments(text))
+            TextSpan(text: s.text, style: s.partner == null ? null : nameStyle),
+        ],
+      ),
+      style: style,
+    );
+  }
+}
+
 class SoftList extends StatelessWidget {
   const SoftList({
     super.key,
     required this.items,
     this.italic = false,
     this.marker = '•',
+    this.names,
   });
 
   final List<String> items;
   final bool italic;
   final String marker;
+
+  /// Set for AI-written items, so partner labels show as usernames.
+  final TherabotNames? names;
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +455,9 @@ class SoftList extends StatelessWidget {
                     ),
                   ),
                 ),
-                Expanded(child: Text(item, style: style)),
+                Expanded(
+                  child: PartnerText(item, names: names, style: style),
+                ),
               ],
             ),
           ),
@@ -536,9 +572,17 @@ class NextStepGrid extends StatelessWidget {
 /// Short phrases (like needs) as soft pills that wrap onto several lines,
 /// so nothing a person wrote is cut off.
 class SoftPills extends StatelessWidget {
-  const SoftPills({super.key, required this.items, this.onTinted = false});
+  const SoftPills({
+    super.key,
+    required this.items,
+    this.onTinted = false,
+    this.names,
+  });
 
   final List<String> items;
+
+  /// Set for AI-written items, so partner labels show as usernames.
+  final TherabotNames? names;
 
   /// Sitting on a tinted card: use the white pill so it stands out.
   final bool onTinted;
@@ -563,9 +607,9 @@ class SoftPills extends StatelessWidget {
                   : scheme.primaryContainer,
               borderRadius: BorderRadius.circular(AppRadius.bubble),
             ),
-            child: Text(
+            child: PartnerText(
               item,
-              softWrap: true,
+              names: names,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: onTinted ? scheme.onSurface : scheme.onPrimaryContainer,
               ),

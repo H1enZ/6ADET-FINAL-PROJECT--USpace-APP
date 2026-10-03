@@ -327,6 +327,54 @@ class SharedReflection {
   }
 }
 
+/// Display only: who "Partner 1" and "Partner 2" are, by username. The AI
+/// never sees these names; it is given and returns only "Partner 1" (who
+/// started the session) and "Partner 2", and the stored reflection keeps
+/// those labels. They become usernames here, at render time, and nowhere
+/// else.
+class TherabotNames {
+  const TherabotNames({
+    required this.myPartnerNumber,
+    this.myName,
+    this.partnerName,
+  });
+
+  /// 1 if the signed-in person started the session, 2 if their partner did.
+  final int myPartnerNumber;
+  final String? myName;
+  final String? partnerName;
+
+  /// The username for [partner], or "Partner 1" / "Partner 2" when unknown.
+  String of(int partner) {
+    final name = (partner == myPartnerNumber ? myName : partnerName)?.trim();
+    return name == null || name.isEmpty ? 'Partner $partner' : name;
+  }
+
+  /// Exactly the labels the Edge Function uses. Word boundaries keep
+  /// "Partner 12" or "partner 1" from matching.
+  static final _label = RegExp(r'\bPartner ([12])\b');
+
+  /// [text] split into plain runs and partner labels (partner set), so a
+  /// label can be shown as a name without changing the text itself.
+  List<({String text, int? partner})> segments(String text) {
+    final out = <({String text, int? partner})>[];
+    var at = 0;
+    for (final m in _label.allMatches(text)) {
+      if (m.start > at) {
+        out.add((text: text.substring(at, m.start), partner: null));
+      }
+      final partner = m.group(1) == '2' ? 2 : 1;
+      out.add((text: of(partner), partner: partner));
+      at = m.end;
+    }
+    if (at < text.length) out.add((text: text.substring(at), partner: null));
+    return out;
+  }
+
+  /// [text] as it reads on screen, for copying.
+  String display(String text) => segments(text).map((s) => s.text).join();
+}
+
 /// A finished session in the caller's history (therabot_history). It holds
 /// no private answers or summaries: those are gone after 24 hours.
 class TherabotHistoryEntry {

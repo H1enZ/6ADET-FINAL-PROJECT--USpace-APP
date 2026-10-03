@@ -210,11 +210,15 @@ class TherabotTalkPage extends StatefulWidget {
     super.key,
     required this.questions,
     required this.partnerName,
+    this.names,
     this.onOpenChat,
   });
 
   /// The discussion questions from your shared reflection, as returned.
   final List<String> questions;
+
+  /// Shows "Partner 1" / "Partner 2" in [questions] as usernames.
+  final TherabotNames? names;
   final String partnerName;
   final VoidCallback? onOpenChat;
 
@@ -239,7 +243,8 @@ class _TherabotTalkPageState extends State<TherabotTalkPage> {
   Future<void> _copy() async {
     final qs = _questions;
     final text = [
-      for (var i = 0; i < qs.length; i++) '${i + 1}. ${qs[i]}',
+      for (var i = 0; i < qs.length; i++)
+        '${i + 1}. ${widget.names?.display(qs[i]) ?? qs[i]}',
     ].join('\n');
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
@@ -293,8 +298,9 @@ class _TherabotTalkPageState extends State<TherabotTalkPage> {
               key: ValueKey(_at),
               tinted: true,
               label: 'Question ${_at + 1} of ${qs.length}',
-              child: Text(
+              child: PartnerText(
                 qs[_at],
+                names: widget.names,
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: scheme.onPrimaryContainer,
                 ),
@@ -347,7 +353,7 @@ class _TherabotTalkPageState extends State<TherabotTalkPage> {
                   style: muted,
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                SoftList(items: qs),
+                SoftList(items: qs, names: widget.names),
               ],
             ),
           ),

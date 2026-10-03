@@ -12,14 +12,14 @@ class SharedReflectionView extends StatelessWidget {
   const SharedReflectionView({
     super.key,
     required this.reflection,
-    required this.myPartnerNumber,
-    required this.partnerName,
+    required this.names,
     this.animate = true,
   });
 
   final SharedReflection reflection;
-  final int myPartnerNumber;
-  final String partnerName;
+
+  /// Shows "Partner 1" / "Partner 2" as usernames. Display only.
+  final TherabotNames names;
   final bool animate;
 
   @override
@@ -34,17 +34,19 @@ class SharedReflectionView extends StatelessWidget {
     Widget perspective(int partner) {
       final p = reflection.perspectiveOf(partner);
       if (p == null) return const SizedBox.shrink();
-      final mine = partner == myPartnerNumber;
+      final mine = partner == names.myPartnerNumber;
+      final name = names.of(partner);
       return Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.md),
         child: TherabotCard(
           tinted: mine,
-          label: mine ? 'Your perspective' : "$partnerName's perspective",
+          label: "$name's perspective",
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
+              PartnerText(
                 p.summary,
+                names: names,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: mine ? scheme.onPrimaryContainer : null,
                 ),
@@ -52,8 +54,7 @@ class SharedReflectionView extends StatelessWidget {
               if (p.needs.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  (mine ? 'What you need' : 'What $partnerName needs')
-                      .toUpperCase(),
+                  'What $name needs'.toUpperCase(),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: mine
                         ? scheme.onPrimaryContainer
@@ -61,7 +62,7 @@ class SharedReflectionView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                SoftPills(items: p.needs, onTinted: mine),
+                SoftPills(items: p.needs, onTinted: mine, names: names),
               ],
             ],
           ),
@@ -85,7 +86,7 @@ class SharedReflectionView extends StatelessWidget {
                 style: muted,
               ),
               const SizedBox(height: AppSpacing.sm),
-              SoftList(items: reflection.differences),
+              SoftList(items: reflection.differences, names: names),
             ],
           ),
         ),
@@ -107,6 +108,7 @@ class SharedReflectionView extends StatelessWidget {
                 items: reflection.possibleMisunderstandings,
                 italic: true,
                 marker: '?',
+                names: names,
               ),
             ],
           ),
@@ -116,7 +118,11 @@ class SharedReflectionView extends StatelessWidget {
       if (reflection.commonGround.isNotEmpty) ...[
         TherabotCard(
           label: 'Common ground',
-          child: SoftList(items: reflection.commonGround, marker: '♡'),
+          child: SoftList(
+            items: reflection.commonGround,
+            marker: '♡',
+            names: names,
+          ),
         ),
         gap,
       ],
@@ -142,8 +148,9 @@ class SharedReflectionView extends StatelessWidget {
                         ),
                       ),
                       Expanded(
-                        child: Text(
+                        child: PartnerText(
                           reflection.discussionQuestions[i],
+                          names: names,
                           style: theme.textTheme.bodyLarge,
                         ),
                       ),

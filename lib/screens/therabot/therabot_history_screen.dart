@@ -12,9 +12,18 @@ import 'shared_reflection_view.dart';
 /// Never anyone's private answers or summaries (those are gone after 24
 /// hours). Hiding is just for you; deleting needs both of you.
 class TherabotHistoryScreen extends StatefulWidget {
-  const TherabotHistoryScreen({super.key, required this.partnerName});
+  const TherabotHistoryScreen({
+    super.key,
+    required this.partnerName,
+    this.myUsername,
+    this.partnerUsername,
+  });
 
   final String partnerName;
+
+  /// Display only: shown in place of "Partner 1" / "Partner 2".
+  final String? myUsername;
+  final String? partnerUsername;
 
   @override
   State<TherabotHistoryScreen> createState() => _TherabotHistoryScreenState();
@@ -160,6 +169,11 @@ class _TherabotHistoryScreenState extends State<TherabotHistoryScreen> {
                 child: _HistoryCard(
                   entry: e,
                   partnerName: widget.partnerName,
+                  names: TherabotNames(
+                    myPartnerNumber: e.myPartnerNumber,
+                    myName: widget.myUsername,
+                    partnerName: widget.partnerUsername,
+                  ),
                   onHide: (hide) => _act(
                     () => TherabotService.setHidden(e.sessionId, hide),
                     hide
@@ -184,6 +198,7 @@ class _HistoryCard extends StatelessWidget {
   const _HistoryCard({
     required this.entry,
     required this.partnerName,
+    required this.names,
     required this.onHide,
     required this.onRequestDelete,
     required this.onCancelDelete,
@@ -191,6 +206,7 @@ class _HistoryCard extends StatelessWidget {
 
   final TherabotHistoryEntry entry;
   final String partnerName;
+  final TherabotNames names;
   final ValueChanged<bool> onHide;
   final VoidCallback onRequestDelete;
   final VoidCallback onCancelDelete;
@@ -307,8 +323,7 @@ class _HistoryCard extends StatelessWidget {
                 children: [
                   SharedReflectionView(
                     reflection: e.reflection!,
-                    myPartnerNumber: e.myPartnerNumber,
-                    partnerName: partnerName,
+                    names: names,
                     animate: false,
                   ),
                 ],
