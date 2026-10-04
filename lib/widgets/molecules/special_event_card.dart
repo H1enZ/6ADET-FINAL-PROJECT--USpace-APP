@@ -1,11 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
+import '../../models/mood_visual.dart';
 
 import '../../theme/app_spacing.dart';
 import '../../utils/anniversary.dart';
 import '../../utils/special_events.dart';
 import '../atoms/avatar_circle.dart';
-import '../atoms/unlock_ring.dart';
 import '../effects/motion.dart';
+import '../home/mood_particles.dart';
 
 /// The plum card on Home that counts down to the nearest special day:
 /// a monthsary, an anniversary, either birthday, Valentine's Day or one of
@@ -42,10 +46,12 @@ class SpecialEventCard extends StatelessWidget {
   final String? hint;
   final VoidCallback? onTap;
 
-  static const _plumTop = Color(0xFF5B2A56);
-  static const _plumBottom = Color(0xFF34162F);
+  static const _plumTop = Color(0xFF6E2D61);
+  static const _plumMid = Color(0xFF4B1D47);
+  static const _plumBottom = Color(0xFF2B1029);
   static const _cream = Color(0xFFFFF3EC);
   static const _pink = Color(0xFFF6A9C1);
+  static const _rose = Color(0xFFEF6F98);
 
   IconData get _icon => switch (event.kind) {
     SpecialEventKind.anniversary => Icons.favorite_rounded,
@@ -58,20 +64,18 @@ class SpecialEventCard extends StatelessWidget {
 
   String get _partner => partnerName ?? 'your partner';
 
-  /// "days until your 3rd monthsary"
-  String get _countdownLine {
-    final unit = event.daysUntil == 1 ? 'day' : 'days';
-    final what = switch (event.kind) {
-      SpecialEventKind.anniversary =>
-        'your ${ordinal(event.count)} anniversary',
-      SpecialEventKind.monthsary => 'your ${ordinal(event.count)} monthsary',
-      SpecialEventKind.partnerBirthday => '$_partner\'s birthday',
-      SpecialEventKind.myBirthday => 'your birthday',
-      SpecialEventKind.valentines => 'Valentine\'s Day',
-      SpecialEventKind.custom => event.title,
-    };
-    return '$unit until $what';
-  }
+  /// "days until"
+  String get _lead => '${event.daysUntil == 1 ? 'day' : 'days'} until';
+
+  /// "your 3rd monthsary", highlighted after [_lead].
+  String get _what => switch (event.kind) {
+    SpecialEventKind.anniversary => 'your ${ordinal(event.count)} anniversary',
+    SpecialEventKind.monthsary => 'your ${ordinal(event.count)} monthsary',
+    SpecialEventKind.partnerBirthday => '$_partner\'s birthday',
+    SpecialEventKind.myBirthday => 'your birthday',
+    SpecialEventKind.valentines => 'Valentine\'s Day',
+    SpecialEventKind.custom => event.title,
+  };
 
   /// "Happy 1st Anniversary ♥"
   String get _celebration => switch (event.kind) {
@@ -119,9 +123,7 @@ class SpecialEventCard extends StatelessWidget {
         return ('Our day of love', 'Every February 14');
       case SpecialEventKind.custom:
         return (
-          event.isToday
-              ? 'A day to remember'
-              : 'Counting down together',
+          event.isToday ? 'A day to remember' : 'Counting down together',
           event.repeatsYearly
               ? 'Every ${monthDay(event.date)}'
               : 'Just the two of you',
@@ -132,9 +134,8 @@ class SpecialEventCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
     final narrow = MediaQuery.sizeOf(context).width < 360;
-    final ringSize = narrow ? 80.0 : 92.0;
+    final ringSize = narrow ? 84.0 : 96.0;
     final (supportTitle, supportLine) = _support;
     final progress = event.progress;
     final percent = progress == null
@@ -143,15 +144,27 @@ class SpecialEventCard extends StatelessWidget {
         ? 100
         : (progress * 100).round().clamp(0, 99);
 
+    // Cream fading into pink, for the big number and the celebration.
+    Widget glowText(Widget child) => ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (r) => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [_cream, Color(0xFFFFC4D6)],
+      ).createShader(r),
+      child: child,
+    );
+
     final headline = event.isToday
-        ? Text(
-            _celebration,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: _cream,
-              fontWeight: FontWeight.w700,
-              height: 1.15,
+        ? glowText(
+            Text(
+              _celebration,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+              ),
             ),
           )
         : Column(
@@ -160,24 +173,37 @@ class SpecialEventCard extends StatelessWidget {
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: CountUpText(
-                  '${event.daysUntil}',
-                  maxLines: 1,
-                  style: theme.textTheme.displayLarge?.copyWith(
-                    color: _cream,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                    fontSize: narrow ? 52 : 60,
+                child: glowText(
+                  CountUpText(
+                    '${event.daysUntil}',
+                    maxLines: 1,
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                      fontSize: narrow ? 56 : 66,
+                      letterSpacing: -1.5,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              Text(
-                _countdownLine,
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: '$_lead '),
+                    TextSpan(
+                      text: _what,
+                      style: const TextStyle(
+                        color: _pink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: _cream.withValues(alpha: 0.92),
+                  color: _cream.withValues(alpha: 0.9),
                   height: 1.25,
                 ),
               ),
@@ -186,7 +212,7 @@ class SpecialEventCard extends StatelessWidget {
 
     final dateLine = Row(
       children: [
-        Icon(Icons.calendar_today_rounded, size: 14, color: _pink),
+        const Icon(Icons.calendar_month_rounded, size: 15, color: _pink),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
@@ -194,46 +220,141 @@ class SpecialEventCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelMedium?.copyWith(
-              color: _cream.withValues(alpha: 0.8),
+              color: _cream.withValues(alpha: 0.85),
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
       ],
     );
 
-    final ring = UnlockRing(
-      elapsedFraction: progress ?? 0,
-      size: ringSize,
-      strokeWidth: 6,
-      color: _pink,
-      trackColor: _cream.withValues(alpha: 0.14),
-      child: Column(
+    final ring = SizedBox.square(
+      dimension: ringSize,
+      child: CustomPaint(
+        painter: _GlowRing(
+          value: progress ?? 0,
+          track: _cream.withValues(alpha: 0.12),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: narrow ? 32 : 36,
+                height: narrow ? 32 : 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _pink.withValues(alpha: 0.16),
+                ),
+                child: Icon(
+                  event.isToday ? Icons.celebration_rounded : _icon,
+                  color: _pink,
+                  size: narrow ? 18 : 20,
+                ),
+              ),
+              if (percent != null || event.isToday) ...[
+                const SizedBox(height: 3),
+                Text(
+                  event.isToday ? 'Today' : '$percent%',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: _cream,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final eyebrow = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: _pink.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: _pink.withValues(alpha: 0.25)),
+      ),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            event.isToday ? Icons.celebration_rounded : _icon,
+            event.isToday ? Icons.auto_awesome_rounded : Icons.favorite_rounded,
+            size: 11,
             color: _pink,
-            size: narrow ? 22 : 26,
           ),
-          if (percent != null || event.isToday) ...[
-            const SizedBox(height: 2),
-            Text(
-              event.isToday ? 'Today' : '$percent%',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: _cream,
-                fontWeight: FontWeight.w700,
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              event.isToday ? 'TODAY' : 'NEXT SPECIAL DAY',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: _pink,
+                letterSpacing: 1.1,
+                fontWeight: FontWeight.w800,
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
 
-    final partners = _Partners(
-      myName: myName,
-      myPhoto: myPhoto,
-      partnerName: partnerName,
-      partnerPhoto: partnerPhoto,
+    final support = Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+      decoration: BoxDecoration(
+        color: _cream.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _cream.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFC4D6), _rose],
+              ),
+            ),
+            child: Icon(_icon, size: 18, color: _plumBottom),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  supportTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: _cream,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  hint ?? supportLine,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: hint != null ? _pink : _cream.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onTap != null)
+            Icon(
+              Icons.chevron_right_rounded,
+              color: _cream.withValues(alpha: 0.6),
+            ),
+        ],
+      ),
     );
 
     final content = Column(
@@ -241,31 +362,34 @@ class SpecialEventCard extends StatelessWidget {
       children: [
         Row(
           children: [
-            partners,
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                event.isToday ? 'TODAY' : 'NEXT SPECIAL DAY',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: _pink,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+            _Partners(
+              myName: myName,
+              myPhoto: myPhoto,
+              partnerName: partnerName,
+              partnerPhoto: partnerPhoto,
             ),
+            const SizedBox(width: AppSpacing.sm),
+            Flexible(child: eyebrow),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   headline,
+                  const SizedBox(height: AppSpacing.sm),
+                  // The short accent bar the mood hero uses.
+                  Container(
+                    width: 28,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _rose,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.sm),
                   dateLine,
                 ],
@@ -276,89 +400,77 @@ class SpecialEventCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
-        Container(height: 1, color: _cream.withValues(alpha: 0.12)),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _pink.withValues(alpha: 0.16),
-              ),
-              child: Icon(_icon, size: 16, color: _pink),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    supportTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: _cream,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    hint ?? supportLine,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: hint != null
-                          ? _pink
-                          : _cream.withValues(alpha: 0.72),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (onTap != null)
-              Icon(
-                Icons.chevron_right_rounded,
-                color: _cream.withValues(alpha: 0.6),
-              ),
-          ],
-        ),
+        support,
       ],
     );
 
+    final radius = BorderRadius.circular(AppRadius.hero);
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: _plumBottom.withValues(alpha: dark ? 0.5 : 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: _plumBottom.withValues(alpha: 0.45),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: _rose.withValues(alpha: 0.12),
+            blurRadius: 36,
+            spreadRadius: -6,
           ),
         ],
       ),
       child: Material(
-        borderRadius: BorderRadius.circular(AppRadius.card),
+        borderRadius: radius,
         clipBehavior: Clip.antiAlias,
         color: _plumBottom,
         child: Ink(
           decoration: BoxDecoration(
+            borderRadius: radius,
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [_plumTop, _plumBottom],
+              colors: [_plumTop, _plumMid, _plumBottom],
+              stops: [0, 0.5, 1],
             ),
-            border: dark
-                ? Border.all(color: _cream.withValues(alpha: 0.08))
-                : null,
-            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(color: _pink.withValues(alpha: 0.14)),
           ),
           child: InkWell(
             onTap: onTap,
             child: Stack(
               children: [
-                // Decorative hearts, behind everything.
-                const Positioned.fill(child: _Hearts()),
+                // A soft pink glow behind the ring.
+                Positioned(
+                  right: -50,
+                  top: 10,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 220,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            _rose.withValues(alpha: 0.30),
+                            _rose.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // The same drifting hearts as the mood hero.
+                const Positioned.fill(
+                  child: IgnorePointer(
+                    child: ExcludeSemantics(
+                      child: MoodParticlesLayer(
+                        style: MoodParticles.hearts,
+                        color: _pink,
+                      ),
+                    ),
+                  ),
+                ),
                 Padding(
                   padding: EdgeInsets.all(
                     narrow ? AppSpacing.lg : AppSpacing.xl,
@@ -374,7 +486,71 @@ class SpecialEventCard extends StatelessWidget {
   }
 }
 
-/// You and your partner, two small overlapping photos.
+/// The progress ring: a pink gradient arc with a soft glow.
+class _GlowRing extends CustomPainter {
+  _GlowRing({required this.value, required this.track});
+
+  final double value;
+  final Color track;
+
+  static const _stroke = 8.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final arcRect = rect.deflate(_stroke / 2 + 2);
+    canvas.drawArc(
+      arcRect,
+      0,
+      2 * math.pi,
+      false,
+      Paint()
+        ..color = track
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _stroke,
+    );
+    final sweep = 2 * math.pi * value.clamp(0.0, 1.0);
+    if (sweep <= 0) return;
+    final shader = const SweepGradient(
+      transform: GradientRotation(-math.pi / 2),
+      colors: [
+        Color(0xFFFFC4D6),
+        SpecialEventCard._pink,
+        SpecialEventCard._rose,
+        Color(0xFFFFC4D6),
+      ],
+    ).createShader(rect);
+    // Glow underneath, then the crisp arc.
+    canvas.drawArc(
+      arcRect,
+      -math.pi / 2,
+      sweep,
+      false,
+      Paint()
+        ..color = SpecialEventCard._rose.withValues(alpha: 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _stroke + 2
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    canvas.drawArc(
+      arcRect,
+      -math.pi / 2,
+      sweep,
+      false,
+      Paint()
+        ..shader = shader
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _stroke
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GlowRing old) => old.value != value || old.track != track;
+}
+
+/// You and your partner: two overlapping photos joined by a little heart.
 class _Partners extends StatelessWidget {
   const _Partners({
     required this.myName,
@@ -389,15 +565,19 @@ class _Partners extends StatelessWidget {
   final String? partnerPhoto;
 
   static const _size = 32.0;
+  static const _ring = 2.0;
   static const _overlap = 10.0;
 
   @override
   Widget build(BuildContext context) {
+    const outer = _size + 2 * _ring;
     Widget ringed(String name, String? url) => Container(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(_ring),
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        color: SpecialEventCard._plumTop,
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFC4D6), SpecialEventCard._rose],
+        ),
       ),
       child: AvatarCircle(
         name: name,
@@ -408,49 +588,42 @@ class _Partners extends StatelessWidget {
     );
 
     final partner = partnerName;
+    final width = partner == null ? outer : 2 * outer - _overlap;
     return Semantics(
       label: partner == null ? 'You' : 'You and $partner',
       child: ExcludeSemantics(
         child: SizedBox(
-          width: partner == null ? _size + 4 : 2 * (_size + 4) - _overlap,
-          height: _size + 4,
+          width: width,
+          height: outer + 4,
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
               if (partner != null)
                 Positioned(
-                  left: _size + 4 - _overlap,
+                  left: outer - _overlap,
                   child: ringed(partner, partnerPhoto),
                 ),
               ringed(myName, myPhoto),
+              if (partner != null)
+                Positioned(
+                  left: width / 2 - 8,
+                  bottom: -2,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: SpecialEventCard._plumMid,
+                    ),
+                    child: const Icon(
+                      Icons.favorite_rounded,
+                      size: 10,
+                      color: SpecialEventCard._rose,
+                    ),
+                  ),
+                ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A few faint hearts scattered across the card.
-class _Hearts extends StatelessWidget {
-  const _Hearts();
-
-  @override
-  Widget build(BuildContext context) {
-    Widget heart(double size, double alpha) => Icon(
-      Icons.favorite_rounded,
-      size: size,
-      color: SpecialEventCard._pink.withValues(alpha: alpha),
-    );
-    return IgnorePointer(
-      child: ExcludeSemantics(
-        child: Stack(
-          children: [
-            Positioned(right: 18, top: 10, child: heart(18, 0.14)),
-            Positioned(right: 54, top: 30, child: heart(10, 0.12)),
-            Positioned(left: 92, top: 14, child: heart(9, 0.12)),
-            Positioned(right: -10, bottom: 56, child: heart(46, 0.06)),
-            Positioned(left: -12, bottom: -10, child: heart(40, 0.05)),
-          ],
         ),
       ),
     );

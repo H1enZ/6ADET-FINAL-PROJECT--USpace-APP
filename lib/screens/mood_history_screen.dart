@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../models/mood.dart';
+import '../models/mood_visual.dart';
 import '../services/auth_service.dart';
 import '../services/mood_service.dart';
 import '../theme/app_spacing.dart';
-import '../utils/anniversary.dart';
+import '../widgets/home/mood_art.dart';
 
-/// The last five weeks of moods: each day shows your mood and your
-/// partner's shared mood (their latest check-in that day).
+/// The days either of you checked in, newest first and grouped by month.
+/// Each day shows your mood and your partner's shared mood (the latest
+/// check-in that day). Days with no mood from either of you are left out.
 class MoodHistoryScreen extends StatefulWidget {
   const MoodHistoryScreen({
     super.key,
@@ -26,10 +28,22 @@ class MoodHistoryScreen extends StatefulWidget {
   State<MoodHistoryScreen> createState() => _MoodHistoryScreenState();
 }
 
+/// One day with at least one mood on it.
+class _Day {
+  _Day(this.date, this.mine, this.partner);
+
+  final DateTime date;
+  final MoodEntry? mine;
+  final MoodEntry? partner;
+}
+
 class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
   List<MoodEntry> _entries = [];
   bool _loading = true;
   String? _error;
+
+  /// How far back the history reaches.
+  static const _days = 365;
 
   @override
   void initState() {
@@ -39,7 +53,7 @@ class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
 
   Future<void> _load() async {
     try {
-      final entries = await MoodService.recent(widget.coupleId);
+      final entries = await MoodService.recent(widget.coupleId, days: _days);
       if (!mounted) return;
       setState(() {
         _entries = entries;
@@ -55,75 +69,408 @@ class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
     }
   }
 
+  /// Only the dates that have a mood from either of you, newest first.
+  List<_Day> get _moodDays {
+    final dates = <DateTime>{
+      for (final e in _entries)
+        if (e.userId == widget.myUserId || e.userId == widget.partnerId)
+          DateTime(e.createdAt.year, e.createdAt.month, e.createdAt.day),
+    }.toList()..sort((a, b) => b.compareTo(a));
+    return [
+      for (final d in dates)
+        _Day(
+          d,
+          latestMoodOn(_entries, widget.myUserId, d),
+          widget.partnerId == null
+              ? null
+              : latestMoodOn(_entries, widget.partnerId!, d),
+        ),
+    ];
+  }
+
+  static const _months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final muted =
-        theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
-    final today = DateTime.now();
-    final days = [
-      for (var i = 0; i < 35; i++) today.subtract(Duration(days: i)),
+    final days = _moodDays;
+
+    final children = <Widget>[
+      if (_error != null)
+        Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+          child: Text(
+            _error!,
+            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error),
+          ),
+        ),
     ];
 
-    Widget cell(MoodEntry? e) => SizedBox(
-          width: 44,
-          child: Text(e?.mood.emoji ?? '\u00B7',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: e == null ? 18 : 22)),
+    if (days.isEmpty && _error == null) {
+      children.add(const _EmptyHistory());
+    } else {
+      int? month;
+      int? year;
+      for (final day in days) {
+        if (day.date.month != month || day.date.year != year) {
+          month = day.date.month;
+          year = day.date.year;
+          final count = days
+              .where((d) => d.date.month == month && d.date.year == year)
+              .length;
+          children.add(
+            _MonthHeader(
+              title: '${_months[month - 1]} $year',
+              count: count,
+              first: children.isEmpty,
+            ),
+          );
+        }
+        children.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: _DayCard(day: day, partnerName: widget.partnerName),
+          ),
         );
+      }
+      children.add(
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.md),
+          child: Text(
+            'Private check-ins only appear on your side. '
+            'Your partner sees only the moods you shared.',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mood history')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(AppSpacing.screenMargin),
-              children: [
-                if (_error != null)
-                  Text(_error!,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: scheme.error)),
-                Row(
-                  children: [
-                    const Expanded(child: SizedBox()),
-                    SizedBox(
-                        width: 44,
-                        child: Text('You',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.labelSmall)),
-                    SizedBox(
-                        width: 44,
-                        child: Text(widget.partnerName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.labelSmall)),
-                  ],
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenMargin,
+                  AppSpacing.sm,
+                  AppSpacing.screenMargin,
+                  AppSpacing.xxl,
                 ),
-                const Divider(),
-                for (final day in days)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(longDate(day), style: muted)),
-                        cell(latestMoodOn(_entries, widget.myUserId, day)),
-                        cell(widget.partnerId == null
-                            ? null
-                            : latestMoodOn(_entries, widget.partnerId!, day)),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: AppSpacing.lg),
+                children: children,
+              ),
+            ),
+    );
+  }
+}
+
+class _MonthHeader extends StatelessWidget {
+  const _MonthHeader({
+    required this.title,
+    required this.count,
+    required this.first,
+  });
+
+  final String title;
+  final int count;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: EdgeInsets.only(
+        top: first ? AppSpacing.sm : AppSpacing.xl,
+        bottom: AppSpacing.md,
+      ),
+      child: Semantics(
+        header: true,
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              '$count ${count == 1 ? 'day' : 'days'}',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Container(
+                height: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One day: the date on the left, then your mood and your partner's.
+class _DayCard extends StatelessWidget {
+  const _DayCard({required this.day, required this.partnerName});
+
+  final _Day day;
+  final String partnerName;
+
+  static const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _shortMonths = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final d = day.date;
+    final dark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: dark
+            ? Color.alphaBlend(
+                scheme.primaryContainer.withValues(alpha: 0.35),
+                scheme.surfaceContainer,
+              )
+            : scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: dark ? 0.35 : 0.6),
+        ),
+      ),
+      child: Row(
+        children: [
+          // The date.
+          SizedBox(
+            width: 46,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  'Private check-ins only appear in your own column. '
-                  'Your partner sees only the moods you shared.',
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: scheme.onSurfaceVariant),
+                  '${d.day}',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${_shortMonths[d.month - 1]} ${d.year}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  _weekdays[d.weekday - 1],
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
+          ),
+          Container(
+            width: 1,
+            height: 52,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            color: scheme.outlineVariant.withValues(alpha: 0.45),
+          ),
+          Expanded(
+            child: _MoodSide(who: 'You', entry: day.mine),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _MoodSide(who: partnerName, entry: day.partner),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One person's mood that day, or a quiet "No mood shared".
+class _MoodSide extends StatelessWidget {
+  const _MoodSide({required this.who, required this.entry});
+
+  final String who;
+  final MoodEntry? entry;
+
+  static const _art = 34.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final e = entry;
+    final visual = e == null ? null : MoodVisual.of(e.mood);
+
+    final Widget badge = visual != null
+        ? Container(
+            width: _art + 6,
+            height: _art + 6,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: visual.gradientFor(theme.brightness),
+              ),
+            ),
+            child: MoodArt(visual: visual, size: _art, semantic: false),
+          )
+        : Container(
+            width: _art + 6,
+            height: _art + 6,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Icon(
+              Icons.remove_rounded,
+              size: 14,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+            ),
+          );
+
+    final Widget words = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          who,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          e == null ? 'No mood shared' : e.mood.label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: e == null
+              ? theme.textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                  fontStyle: FontStyle.italic,
+                )
+              : theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: visual!.accentFor(theme.brightness),
+                  height: 1.15,
+                ),
+        ),
+        if (e != null && !e.isShared)
+          Text(
+            'Private',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+      ],
+    );
+
+    // On a narrow phone the art sits above the words, so long mood names
+    // never break mid-word.
+    final narrow = MediaQuery.sizeOf(context).width < 360;
+    return Semantics(
+      label: e == null
+          ? '$who: no mood shared'
+          : '$who: ${e.mood.label}${e.isShared ? '' : ', private'}',
+      child: ExcludeSemantics(
+        child: narrow
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [badge, const SizedBox(height: 6), words],
+              )
+            : Row(
+                children: [
+                  badge,
+                  const SizedBox(width: 8),
+                  Expanded(child: words),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _EmptyHistory extends StatelessWidget {
+  const _EmptyHistory();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 96),
+      child: Column(
+        children: [
+          Icon(
+            Icons.favorite_border_rounded,
+            size: 44,
+            color: scheme.primary.withValues(alpha: 0.8),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'No moods shared yet.',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Your shared mood journey will appear here.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

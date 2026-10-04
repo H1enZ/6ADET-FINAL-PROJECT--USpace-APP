@@ -33,7 +33,6 @@ import '../widgets/atoms/header_icon_button.dart';
 import '../widgets/brand/uspace_wordmark.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
-import '../widgets/home/affection_banner.dart';
 import '../widgets/home/home_card.dart';
 import '../widgets/home/mood_grid.dart';
 import '../widgets/home/mood_hero.dart';
@@ -593,21 +592,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _dismissAffection() async {
-    try {
-      await AffectionService.markSeen();
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage(friendlyError(e));
-    }
-  }
-
-  /// Only marks their gesture seen once the hug back has actually gone.
-  Future<void> _sendBack() async {
-    if (await _sendHug()) await _dismissAffection();
-  }
-
   Future<void> _push(Widget screen, {bool reload = false}) async {
     final changed = await Navigator.of(
       context,
@@ -776,18 +760,6 @@ class _HomeScreenState extends State<HomeScreen> {
               partnerName: partnerFirst!,
               mood: partnerMood,
               onTap: _openMoodHistory,
-            ),
-            after: AppSpacing.md,
-          ),
-        if (_unseen.isNotEmpty && partner != null)
-          section(
-            'affection',
-            AffectionBanner(
-              partnerName: partnerFirst!,
-              unseen: _unseen,
-              busy: _busy,
-              onSendBack: _sendBack,
-              onDismiss: _dismissAffection,
             ),
             after: AppSpacing.md,
           ),
