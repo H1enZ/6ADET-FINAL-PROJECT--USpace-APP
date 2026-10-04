@@ -27,6 +27,7 @@ import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
 import '../utils/daily_content.dart';
+import '../utils/special_events.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/header_icon_button.dart';
 import '../widgets/brand/uspace_wordmark.dart';
@@ -38,7 +39,7 @@ import '../widgets/home/mood_grid.dart';
 import '../widgets/home/mood_hero.dart';
 import '../widgets/home/partner_mood_chip.dart';
 import '../widgets/home/quick_actions.dart';
-import '../widgets/molecules/countdown_card.dart';
+import '../widgets/molecules/special_event_card.dart';
 import 'add_memory_sheet.dart';
 import 'bucket_list_screen.dart';
 import 'chat_screen.dart';
@@ -643,6 +644,46 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static String _first(String name) => name.split(' ').first;
 
+  /// The card for whichever special day comes first.
+  Widget _specialEventCard(DateTime today) {
+    final together = _couple?.anniversaryDate;
+    final partner = _partner;
+    final event = nearestEvent(
+      today: today,
+      together: together,
+      myBirthday: _me.birthday,
+      partnerBirthday: partner?.birthday,
+      custom: [
+        for (final d in _dates)
+          CustomDate(
+            title: d.title,
+            date: d.eventDate,
+            repeatsYearly: d.repeatsYearly,
+            createdAt: d.createdAt,
+          ),
+      ],
+    );
+    final aboutUs =
+        event.kind == SpecialEventKind.anniversary ||
+        event.kind == SpecialEventKind.monthsary;
+    return SpecialEventCard(
+      event: event,
+      myName: _first(_me.displayName),
+      myPhoto: _me.avatarUrl,
+      partnerName: partner == null ? null : _first(partner.displayName),
+      partnerPhoto: partner?.avatarUrl,
+      together: together,
+      hint: together == null ? 'Tap to add your anniversary' : null,
+      // Anniversary days (or a missing anniversary) edit the date; the
+      // couple's own dates open where they are managed.
+      onTap: together == null || aboutUs
+          ? _setAnniversary
+          : event.kind == SpecialEventKind.custom
+          ? () => _push(ImportantDatesScreen(coupleId: _coupleId))
+          : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -850,16 +891,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // The anniversary, then the next special days.
+        // The nearest special day, then the rest of what is coming up.
         section(
           'countdown',
-          KeyedSubtree(
-            key: _countdownKey,
-            child: CountdownCard(
-              anniversary: couple.anniversaryDate,
-              onTap: _setAnniversary,
-            ),
-          ),
+          KeyedSubtree(key: _countdownKey, child: _specialEventCard(today)),
           after: AppSpacing.md,
         ),
         section(

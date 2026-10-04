@@ -7,6 +7,7 @@ class ImportantDate {
     required this.title,
     required this.eventDate,
     this.repeatsYearly = true,
+    this.createdAt,
   });
 
   final String id;
@@ -14,12 +15,18 @@ class ImportantDate {
   final DateTime eventDate;
   final bool repeatsYearly;
 
+  /// When it was added. Measures progress towards a one-off date.
+  final DateTime? createdAt;
+
   factory ImportantDate.fromMap(Map<String, dynamic> row) => ImportantDate(
-        id: row['id'] as String,
-        title: row['title'] as String,
-        eventDate: DateTime.parse(row['event_date'] as String),
-        repeatsYearly: (row['repeats_yearly'] as bool?) ?? true,
-      );
+    id: row['id'] as String,
+    title: row['title'] as String,
+    eventDate: DateTime.parse(row['event_date'] as String),
+    repeatsYearly: (row['repeats_yearly'] as bool?) ?? true,
+    createdAt: row['created_at'] == null
+        ? null
+        : DateTime.tryParse(row['created_at'] as String),
+  );
 
   /// When it next happens: this year's (or next year's) date if it repeats,
   /// otherwise the date itself. Null for a one-off date that has passed.
