@@ -49,6 +49,7 @@ import 'mood_sheet.dart';
 import 'notifications_screen.dart';
 import 'question_archive_screen.dart';
 import 'question_sheet.dart';
+import 'time_capsules/time_capsule_screen.dart';
 import 'work_it_out_screen.dart';
 import 'write_note_sheet.dart';
 
@@ -385,23 +386,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _showMessage('Answer saved');
   }
 
-  Future<void> _writeNote({bool sealed = false}) async {
+  Future<void> _writeNote() async {
     if (_partner == null) return;
     final sent = await _sheet(
-      WriteNoteSheet(
-        coupleId: _coupleId,
-        partnerName: _partnerName,
-        anniversary: _couple?.anniversaryDate,
-        startSealed: sealed,
-      ),
+      WriteNoteSheet(coupleId: _coupleId, partnerName: _partnerName),
     );
     if (sent != true) return;
     await _load();
     if (!mounted) return;
-    showEnvelopeFly(context, emoji: sealed ? '🔒' : '💌');
-    _showMessage(
-      sealed ? 'Time capsule sealed 🔒' : 'Love note sent to $_partnerName 💌',
-    );
+    showEnvelopeFly(context, emoji: '💌');
+    _showMessage('Love note sent to $_partnerName 💌');
   }
 
   Future<void> _openChat() async {
@@ -508,6 +502,18 @@ class _HomeScreenState extends State<HomeScreen> {
         await _openMoodHistory();
       case NotificationTarget.loveNotes:
         tab(2);
+      case NotificationTarget.timeCapsules:
+        // A "ready" reminder opens Ready, pointing at that capsule; other
+        // capsule news opens the screen as you left it.
+        final ready = n.key.startsWith('time-capsule-ready:');
+        await _push(
+          TimeCapsuleScreen(
+            profile: widget.profile,
+            openReady: ready,
+            highlightId: ready ? n.targetId : null,
+          ),
+          reload: true,
+        );
       case NotificationTarget.importantDates:
         await _push(ImportantDatesScreen(coupleId: _coupleId));
       case NotificationTarget.bucketList:
@@ -828,9 +834,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   QuickAction(
-                    'Time capsule',
+                    'Time capsules',
                     Icons.lock_clock_outlined,
-                    partner == null ? null : () => _writeNote(sealed: true),
+                    partner == null
+                        ? null
+                        : () => _push(
+                            TimeCapsuleScreen(profile: widget.profile),
+                            reload: true,
+                          ),
                     disabledReason: _needsPartner,
                   ),
                 ],

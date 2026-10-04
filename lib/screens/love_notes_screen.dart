@@ -19,12 +19,15 @@ import '../widgets/atoms/unlock_ring.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/effects/seal_opening.dart';
+import 'time_capsules/time_capsule_screen.dart';
 import 'write_note_sheet.dart';
 
 enum _Show { all, capsules, favorites }
 
-/// Love Notes: sealed Time Capsules waiting to open, and every note you can
-/// read. New notes arrive live; a capsule opens by itself at its moment.
+/// Love Notes: every note you can read, plus Previous Capsules (the older
+/// notes-based Time Capsules, which still open by themselves at their
+/// moment). New Time Capsules live on their own screen. New notes arrive
+/// live.
 class LoveNotesScreen extends StatefulWidget {
   const LoveNotesScreen({super.key, required this.profile});
 
@@ -38,7 +41,6 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
   List<LoveNote> _notes = [];
   List<SealedNote> _sealed = [];
   Map<String, String> _names = {};
-  DateTime? _anniversary;
   _Show _show = _Show.all;
   bool _loading = true;
   String? _error;
@@ -87,14 +89,12 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
     try {
       final before = {for (final s in _sealed) s.id};
       final members = await CoupleService.members(_coupleId);
-      final couple = await CoupleService.couple(_coupleId);
       final notes = await NoteService.list(_coupleId);
       final sealed = await NoteService.sealed();
       if (!mounted) return;
       final justOpened = notes.where((n) => before.contains(n.id)).toList();
       setState(() {
         _names = {for (final m in members) m.userId: m.displayName};
-        _anniversary = couple.anniversaryDate;
         _notes = notes;
         _sealed = sealed;
         _error = null;
@@ -130,24 +130,25 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
   String _nameOf(String userId) =>
       userId == _myId ? 'You' : (_names[userId] ?? 'Your partner');
 
-  Future<void> _write({bool sealed = false}) async {
+  Future<void> _write() async {
     final sent = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => WriteNoteSheet(
-        coupleId: _coupleId,
-        partnerName: _partnerName,
-        anniversary: _anniversary,
-        startSealed: sealed,
-      ),
+      builder: (_) => WriteNoteSheet(coupleId: _coupleId, partnerName: _partnerName),
     );
     if (sent != true) return;
     await _load();
     if (!mounted) return;
-    showEnvelopeFly(context, emoji: sealed ? '🔒' : '💌');
+    showEnvelopeFly(context, emoji: '💌');
     _showMessage('Sent to $_partnerName');
+  }
+
+  Future<void> _openTimeCapsules() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => TimeCapsuleScreen(profile: widget.profile)),
+    );
   }
 
   Future<void> _toggleFavorite(LoveNote note) async {
@@ -225,8 +226,8 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
         title: const Text('Love notes'),
         actions: [
           IconButton(
-            tooltip: 'Seal a time capsule',
-            onPressed: _loading ? null : () => _write(sealed: true),
+            tooltip: 'Time capsules',
+            onPressed: _openTimeCapsules,
             icon: const Icon(Icons.lock_clock_outlined),
           ),
         ],
@@ -266,7 +267,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
                             ),
                           ],
                           if (nothing && _error == null)
-                            _EmptyNotes(onWrite: _write, onSeal: () => _write(sealed: true))
+                            _EmptyNotes(onWrite: _write, onSeal: _openTimeCapsules)
                           else ...[
                             Wrap(
                               spacing: AppSpacing.sm,
@@ -274,7 +275,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
                                 FilterPill(label: 'All', selected: _show == _Show.all,
                                     count: _notes.length + _sealed.length,
                                     onTap: () => setState(() => _show = _Show.all)),
-                                FilterPill(label: 'Time capsules', selected: _show == _Show.capsules,
+                                FilterPill(label: 'Previous capsules', selected: _show == _Show.capsules,
                                     count: _sealed.length + _notes.where((n) => n.wasCapsule).length,
                                     onTap: () => setState(() => _show = _Show.capsules)),
                                 FilterPill(label: 'Favorites', selected: _show == _Show.favorites,
@@ -284,7 +285,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
                             ),
                             const SizedBox(height: AppSpacing.lg),
                             if (showSealed) ...[
-                              Text('SEALED 🔒', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                              Text('PREVIOUS CAPSULES · SEALED', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
                               const SizedBox(height: AppSpacing.sm),
                               for (final s in _sealed)
                                 _SealedCard(
@@ -379,7 +380,7 @@ class _SealedCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        capsule.capsuleTitle ?? 'A time capsule',
+                        capsule.capsuleTitle ?? 'A previous time capsule',
                         style: theme.textTheme.titleMedium?.copyWith(color: scheme.onSecondary),
                       ),
                       const SizedBox(height: 2),
@@ -467,7 +468,7 @@ class _NoteBubble extends StatelessWidget {
                       const SizedBox(width: AppSpacing.xs),
                       Expanded(
                         child: Text(
-                          '${note.capsuleTitle ?? 'Time capsule'} \u00B7 sealed ${longDate(note.sentAt)}',
+                          '${note.capsuleTitle ?? 'Previous capsule'} \u00B7 sealed ${longDate(note.sentAt)}',
                           style: small,
                         ),
                       ),
@@ -528,7 +529,7 @@ class _EmptyNotes extends StatelessWidget {
           Text('Say it in writing', style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Leave a love note for today, or seal a Time Capsule that opens '
+            'Leave a love note for today, or write a Time Capsule that opens '
             'on your anniversary, a birthday, or a year from now.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -541,7 +542,7 @@ class _EmptyNotes extends StatelessWidget {
             children: [
               AppButton(label: 'Write a note', icon: Icons.edit_outlined, onPressed: onWrite),
               AppButton(
-                label: 'Seal a capsule',
+                label: 'Time capsules',
                 icon: Icons.lock_outline,
                 variant: AppButtonVariant.outlined,
                 onPressed: onSeal,

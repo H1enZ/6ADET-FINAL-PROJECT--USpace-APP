@@ -5,12 +5,14 @@ import '../models/app_notification.dart';
 import '../models/important_date.dart';
 import '../models/mood.dart';
 import '../models/therabot.dart';
+import '../models/time_capsule.dart';
 import '../utils/anniversary.dart';
 import 'activity_service.dart';
 import 'bucket_service.dart';
 import 'dates_service.dart';
 import 'note_service.dart';
 import 'therabot_service.dart';
+import 'time_capsule_service.dart';
 
 /// Notifications, built on the device from data the app already reads.
 /// Nothing is written to the database: what you have seen is remembered
@@ -75,6 +77,10 @@ class NotificationService {
       dates != null
           ? Future.value(dates)
           : safe(() => DatesService.list(coupleId)),
+      safe(() async {
+        await TimeCapsuleService.syncClock();
+        return TimeCapsuleService.list(coupleId);
+      }),
     ]);
     final acts = (results[0] as List<Activity>?) ?? const <Activity>[];
     final done =
@@ -89,9 +95,11 @@ class NotificationService {
         const [];
     final session = results[3] as TherabotSession?;
     final allDates = (results[4] as List<ImportantDate>?) ?? const [];
+    final timeCapsules = (results[5] as List<TimeCapsule>?) ?? const [];
 
     final reminders = <AppNotification>[
       ..._fromCapsules(capsules, myId, partnerName),
+      ..._fromReadyCapsules(timeCapsules, myId, partnerName),
       ..._fromDates(allDates, now),
       ?_fromAnniversary(anniversary, now),
       ?_fromTherabot(session, partnerName),
@@ -231,6 +239,29 @@ class NotificationService {
           },
           NotificationTarget.moodHistory,
         ),
+        // Time Capsule events carry only the capsule's id, never its text.
+        'capsule_opened' => (
+          NotificationKind.capsule,
+          mine ? 'You opened a time capsule' : 'Your Time Capsule was opened',
+          mine ? 'Reply whenever you are ready.' : 'You can read it together now.',
+          NotificationTarget.timeCapsules,
+        ),
+        'capsule_replied' => (
+          NotificationKind.capsule,
+          mine
+              ? 'You replied to a time capsule'
+              : 'Your partner replied to your Time Capsule',
+          mine ? 'Waiting for their answer.' : 'Read it and answer once.',
+          NotificationTarget.timeCapsules,
+        ),
+        'capsule_responded' => (
+          NotificationKind.capsule,
+          mine
+              ? 'You answered their reply'
+              : 'Your partner replied to your Time Capsule response',
+          'You both replied.',
+          NotificationTarget.timeCapsules,
+        ),
         'note_sent' when d == 'capsule' => (
           NotificationKind.capsule,
           mine ? 'You sealed a time capsule' : '$partner sealed a time capsule',
@@ -346,6 +377,30 @@ class NotificationService {
         time: c.openedAt,
         isReminder: true,
         target: NotificationTarget.loveNotes,
+      );
+    }
+  }
+
+  /// A Time Capsule from your partner whose moment has come and that you
+  /// haven't opened. Only for the receiver: the sender gets no reminder.
+  /// Safe details only (who), never the title or letter.
+  static Iterable<AppNotification> _fromReadyCapsules(
+    List<TimeCapsule> capsules,
+    String myId,
+    String partner,
+  ) sync* {
+    final now = TimeCapsuleService.now();
+    for (final c in capsules) {
+      if (c.receiverId != myId || !c.isReady(now)) continue;
+      yield AppNotification(
+        key: 'time-capsule-ready:${c.id}',
+        kind: NotificationKind.capsule,
+        title: 'A time capsule from $partner is ready',
+        body: 'Open it whenever you are ready.',
+        time: c.readySince,
+        isReminder: true,
+        target: NotificationTarget.timeCapsules,
+        targetId: c.id,
       );
     }
   }

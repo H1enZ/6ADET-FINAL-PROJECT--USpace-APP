@@ -18,6 +18,7 @@ enum NotificationTarget {
   timeline,
   moodHistory,
   loveNotes,
+  timeCapsules,
   importantDates,
   bucketList,
   questions, // the archive of past answers

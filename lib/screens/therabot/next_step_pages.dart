@@ -792,7 +792,6 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
       builder: (_) => WriteNoteSheet(
         coupleId: widget.coupleId,
         partnerName: widget.partnerName,
-        anniversary: widget.anniversary,
       ),
     );
     if (sent != true || !mounted) return;

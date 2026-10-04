@@ -354,13 +354,17 @@ class _NotificationCard extends StatelessWidget {
     return out.toString();
   }
 
-  /// "5m ago" for events, "Opened 2h ago" for a capsule that just opened;
-  /// other reminders say their day in the body instead.
+  /// "5m ago" for events, "Opened 2h ago" for a previous (Love Notes)
+  /// capsule that just opened, "Ready 2h ago" for a Time Capsule waiting to
+  /// be opened; other reminders say their day in the body instead.
   static String? _when(AppNotification n) {
     final t = n.time;
     if (t == null) return null;
     if (n.isReminder) {
-      return n.kind == NotificationKind.capsule ? 'Opened ${timeAgo(t)}' : null;
+      if (n.kind != NotificationKind.capsule) return null;
+      return n.target == NotificationTarget.timeCapsules
+          ? 'Ready ${timeAgo(t)}'
+          : 'Opened ${timeAgo(t)}';
     }
     return timeAgo(t);
   }
@@ -396,6 +400,7 @@ class _NotificationCard extends StatelessWidget {
     NotificationTarget.timeline => 'Opens your timeline',
     NotificationTarget.moodHistory => 'Opens mood history',
     NotificationTarget.loveNotes => 'Opens Love Notes',
+    NotificationTarget.timeCapsules => 'Opens Time Capsules',
     NotificationTarget.importantDates => 'Opens special dates',
     NotificationTarget.bucketList => 'Opens the bucket list',
     NotificationTarget.questions => 'Opens your questions',
