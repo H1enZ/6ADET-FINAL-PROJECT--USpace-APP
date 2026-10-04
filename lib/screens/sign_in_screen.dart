@@ -104,6 +104,29 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
+  /// Show or hide the password, then put the cursor back in it so typing
+  /// carries on there (the eye button doesn't move focus by itself).
+  /// Same controller and focus node, so the text and selection are kept.
+  void _togglePasswordVisibility() {
+    final selection = _password.selection;
+    // On the web, switching this while the browser's text input is open
+    // leaves it with the old settings, and it loses the field as soon as
+    // the field moves (for example when the error message goes away). So
+    // let go of the field first; focusing it again opens a fresh one.
+    _passwordFocus.unfocus();
+    setState(() => _showPassword = !_showPassword);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _busy) return;
+      _passwordFocus.requestFocus();
+      // A field focused from code selects all its text on the web, so the
+      // next key would replace the password. Put the caret back (focus
+      // changes are applied in a microtask, so this runs after).
+      Future.microtask(() {
+        if (mounted && selection.isValid) _password.selection = selection;
+      });
+    });
+  }
+
   /// Any edit clears the last error from the server.
   void _edited(String _) {
     if (_error != null) setState(() => _error = null);
@@ -306,10 +329,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                       ),
                                       onPressed: _busy
                                           ? null
-                                          : () => setState(
-                                              () => _showPassword =
-                                                  !_showPassword,
-                                            ),
+                                          : _togglePasswordVisibility,
                                     ),
                                     validator: _passwordError,
                                   ),
