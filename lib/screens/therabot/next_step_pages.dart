@@ -15,7 +15,8 @@ import '../../widgets/atoms/app_text_field.dart';
 import '../../widgets/effects/floating_hearts.dart';
 import '../../widgets/effects/motion.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
-import '../write_note_sheet.dart';
+import '../../models/love_note.dart';
+import '../write_love_note_screen.dart';
 
 // The four next steps after a shared reflection. Each is a choice for one
 // person; none is better than another. Nothing here is ever sent without a
@@ -784,17 +785,14 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
   }
 
   Future<void> _appreciation() async {
-    final sent = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => WriteNoteSheet(
-        coupleId: widget.coupleId,
-        partnerName: widget.partnerName,
-      ),
+    // An appreciation is a Thank You love note.
+    final sent = await openWriteLoveNote(
+      context,
+      coupleId: widget.coupleId,
+      partnerName: widget.partnerName,
+      initial: NoteCategory.thankYou,
     );
-    if (sent != true || !mounted) return;
+    if (!sent || !mounted) return;
     showEnvelopeFly(context);
     therabotToast(context, 'Appreciation sent to ${widget.partnerName} 💌');
   }

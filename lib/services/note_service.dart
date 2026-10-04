@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/love_note.dart';
+import 'memory_service.dart';
 
 /// Love notes and Time Capsules. The database hides a sealed capsule's text
 /// from both partners until it opens; only its envelope (who, when, teaser)
@@ -17,7 +18,18 @@ class NoteService {
         .select()
         .eq('couple_id', coupleId)
         .order('sent_at', ascending: false);
-    return rows.map(LoveNote.fromMap).toList();
+    final notes = rows.map(LoveNote.fromMap).toList();
+    final paths = notes.map((n) => n.photoPath).whereType<String>().toList();
+    if (paths.isEmpty) return notes;
+    try {
+      final urls = await MemoryService.signedUrls(paths);
+      return [
+        for (final n in notes)
+          n.photoPath == null ? n : n.withPhotoUrl(urls[n.photoPath]),
+      ];
+    } catch (_) {
+      return notes; // show them without photos rather than not at all
+    }
   }
 
   /// Capsules that opened between [since] and [until], for Notifications.
@@ -56,19 +68,34 @@ class NoteService {
   /// Sends a note, or seals a capsule when [unlockAt] is given.
   /// The insert deliberately does NOT ask for the row back: a sealed capsule
   /// is invisible even to its author, so asking would be refused.
+  /// An ordinary note's [title] goes in capsule_title. A [photo] is uploaded
+  /// first, and removed again if the note can't be saved.
   static Future<void> send({
     required String coupleId,
     required String body,
     DateTime? unlockAt,
     String? capsuleTitle,
+    String? title,
+    NoteCategory? category,
+    NewPhoto? photo,
   }) async {
-    final teaser = capsuleTitle?.trim() ?? '';
-    await _db.from('notes').insert({
-      'couple_id': coupleId,
-      'body': body.trim(),
-      'unlock_at': unlockAt?.toUtc().toIso8601String(),
-      'capsule_title': unlockAt == null || teaser.isEmpty ? null : teaser,
-    });
+    final heading = (unlockAt == null ? title : capsuleTitle)?.trim() ?? '';
+    final path = photo == null
+        ? null
+        : await MemoryService.uploadNotePhoto(coupleId, photo);
+    try {
+      await _db.from('notes').insert({
+        'couple_id': coupleId,
+        'body': body.trim(),
+        'unlock_at': unlockAt?.toUtc().toIso8601String(),
+        'capsule_title': heading.isEmpty ? null : heading,
+        'category': category?.key,
+        'photo_path': path,
+      });
+    } catch (_) {
+      if (path != null) await MemoryService.removeFiles([path]);
+      rethrow;
+    }
   }
 
   /// Either partner can favourite a note they can read.
@@ -77,8 +104,9 @@ class NoteService {
   }
 
   /// Only the author can delete a note (the database enforces it).
-  static Future<void> delete(String id) async {
+  static Future<void> delete(String id, {String? photoPath}) async {
     await _db.from('notes').delete().eq('id', id);
+    if (photoPath != null) await MemoryService.removeFiles([photoPath]);
   }
 
   /// Only the author, only while still sealed.

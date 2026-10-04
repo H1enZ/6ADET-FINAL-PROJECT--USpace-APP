@@ -22,7 +22,8 @@ class MemoryService {
   static SupabaseClient get _db => Supabase.instance.client;
   static const _bucket = 'memory-photos';
   static const maxPhotos = 10;
-  static const maxPhotoBytes = 5 * 1024 * 1024; // 5 MB, also enforced by Storage
+  static const maxPhotoBytes =
+      5 * 1024 * 1024; // 5 MB, also enforced by Storage
   static const _types = {
     'jpg': 'image/jpeg',
     'jpeg': 'image/jpeg',
@@ -75,7 +76,9 @@ class MemoryService {
 
   /// Attaches each memory's photos (from memory_photos, or the old single
   /// cover) and signs every link in one request.
-  static Future<List<Memory>> _withPhotos(List<Map<String, dynamic>> rows) async {
+  static Future<List<Memory>> _withPhotos(
+    List<Map<String, dynamic>> rows,
+  ) async {
     if (rows.isEmpty) return [];
     final ids = [for (final r in rows) r['id'] as String];
     final photoRows = await _db
@@ -86,28 +89,41 @@ class MemoryService {
 
     final byMemory = <String, List<String>>{};
     for (final p in photoRows) {
-      byMemory.putIfAbsent(p['memory_id'] as String, () => []).add(p['path'] as String);
+      byMemory
+          .putIfAbsent(p['memory_id'] as String, () => [])
+          .add(p['path'] as String);
     }
     final memories = [
       for (final r in rows)
         Memory.fromMap(r, photoPaths: byMemory[r['id']] ?? const []),
     ];
 
-    final paths = {for (final m in memories) ...m.photos.map((p) => p.path)}.toList();
+    final paths = {
+      for (final m in memories) ...m.photos.map((p) => p.path),
+    }.toList();
     if (paths.isEmpty) return memories;
     try {
-      final signed = await _db.storage.from(_bucket).createSignedUrls(paths, 60 * 60);
+      final signed = await _db.storage
+          .from(_bucket)
+          .createSignedUrls(paths, 60 * 60);
       final urls = {for (final s in signed) s.path: s.signedUrl};
       return [
         for (final m in memories)
-          m.copyWith(photos: [for (final p in m.photos) p.withUrl(urls[p.path])]),
+          m.copyWith(
+            photos: [for (final p in m.photos) p.withUrl(urls[p.path])],
+          ),
       ];
     } catch (_) {
       return memories; // show them without photos rather than not at all
     }
   }
 
-  static Future<String> _upload(String coupleId, NewPhoto photo, int index) async {
+  static Future<String> _upload(
+    String coupleId,
+    NewPhoto photo,
+    int index, {
+    String folder = '',
+  }) async {
     final ext = photo.extension.toLowerCase();
     final type = _types[ext];
     if (type == null) {
@@ -116,14 +132,33 @@ class MemoryService {
     if (photo.bytes.lengthInBytes > maxPhotoBytes) {
       throw const AppException('One photo is over 5 MB. Choose a smaller one.');
     }
-    final path = '$coupleId/${DateTime.now().microsecondsSinceEpoch}-$index.$ext';
-    await _db.storage.from(_bucket).uploadBinary(
+    final path =
+        '$coupleId/$folder${DateTime.now().microsecondsSinceEpoch}-$index.$ext';
+    await _db.storage
+        .from(_bucket)
+        .uploadBinary(
           path,
           photo.bytes,
           fileOptions: FileOptions(contentType: type),
         );
     return path;
   }
+
+  /// One Love Note photo, in the same private bucket under
+  /// `<couple_id>/notes/` (the couple-only rules cover that folder).
+  static Future<String> uploadNotePhoto(String coupleId, NewPhoto photo) =>
+      _upload(coupleId, photo, 0, folder: 'notes/');
+
+  /// One-hour links for files in the bucket; missing ones are left out.
+  static Future<Map<String, String>> signedUrls(List<String> paths) async {
+    if (paths.isEmpty) return const {};
+    final signed = await _db.storage
+        .from(_bucket)
+        .createSignedUrls(paths, 60 * 60);
+    return {for (final s in signed) s.path: s.signedUrl};
+  }
+
+  static Future<void> removeFiles(List<String> paths) => _removeFiles(paths);
 
   static Future<void> _removeFiles(List<String> paths) async {
     if (paths.isEmpty) return;
@@ -154,11 +189,19 @@ class MemoryService {
   }
 
   static Future<void> _savePhotoRows(
-      String memoryId, String coupleId, List<String> paths) async {
+    String memoryId,
+    String coupleId,
+    List<String> paths,
+  ) async {
     if (paths.isEmpty) return;
     await _db.from('memory_photos').insert([
       for (var i = 0; i < paths.length; i++)
-        {'memory_id': memoryId, 'couple_id': coupleId, 'path': paths[i], 'position': i},
+        {
+          'memory_id': memoryId,
+          'couple_id': coupleId,
+          'path': paths[i],
+          'position': i,
+        },
     ]);
   }
 
@@ -186,11 +229,12 @@ class MemoryService {
           .insert({
             'couple_id': coupleId,
             ..._fields(
-                title: title,
-                date: date,
-                description: description,
-                location: location,
-                tags: tags),
+              title: title,
+              date: date,
+              description: description,
+              location: location,
+              tags: tags,
+            ),
             'photo_path': uploaded.isEmpty ? null : uploaded.first,
           })
           .select('id')
@@ -229,15 +273,19 @@ class MemoryService {
     }
 
     final order = [...keep.map((p) => p.path), ...uploaded];
-    await _db.from('memories').update({
-      ..._fields(
-          title: title,
-          date: date,
-          description: description,
-          location: location,
-          tags: tags),
-      'photo_path': order.isEmpty ? null : order.first,
-    }).eq('id', memory.id);
+    await _db
+        .from('memories')
+        .update({
+          ..._fields(
+            title: title,
+            date: date,
+            description: description,
+            location: location,
+            tags: tags,
+          ),
+          'photo_path': order.isEmpty ? null : order.first,
+        })
+        .eq('id', memory.id);
 
     await _db.from('memory_photos').delete().eq('memory_id', memory.id);
     await _savePhotoRows(memory.id, memory.coupleId, order);
@@ -257,14 +305,18 @@ class MemoryService {
 
   /// Either partner can move a memory into categories (its tags).
   static Future<void> setTags(String memoryId, List<String> tags) async {
-    await _db.rpc('set_memory_tags',
-        params: {'memory_id': memoryId, 'new_tags': tags});
+    await _db.rpc(
+      'set_memory_tags',
+      params: {'memory_id': memoryId, 'new_tags': tags},
+    );
   }
 
   /// Either partner can favourite. Returns the new value.
   static Future<bool> toggleFavorite(String memoryId) async {
-    final result = await _db
-        .rpc('toggle_memory_favorite', params: {'memory_id': memoryId});
+    final result = await _db.rpc(
+      'toggle_memory_favorite',
+      params: {'memory_id': memoryId},
+    );
     return result as bool;
   }
 }

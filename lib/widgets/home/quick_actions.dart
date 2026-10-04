@@ -354,6 +354,22 @@ class _MorePill extends StatelessWidget {
 
 // ---------------------------------------------------------------- drawings
 
+/// One of the quick-action drawings on its own, e.g. on Love Notes.
+class QuickActionArtView extends StatelessWidget {
+  const QuickActionArtView(this.art, {super.key, this.size = 72});
+
+  final QuickActionArt art;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _ArtPainter(art)),
+    ),
+  );
+}
+
 /// The four card drawings, one family: soft cream / blush / rose objects
 /// with a gloss highlight, a soft shadow under them and a few floating
 /// hearts. Drawn in a 100 x 100 box, centred in the space given.

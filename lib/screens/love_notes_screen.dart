@@ -8,26 +8,23 @@ import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
 import '../services/note_service.dart';
+import '../services/profile_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
-import '../utils/capsule_time.dart';
-import '../utils/daily_content.dart';
 import '../widgets/atoms/app_button.dart';
-import '../widgets/atoms/filter_pill.dart';
-import '../widgets/atoms/seal_badge.dart';
-import '../widgets/atoms/unlock_ring.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/effects/seal_opening.dart';
+import '../widgets/home/quick_actions.dart';
+import '../widgets/notes/note_style.dart';
+import 'love_note_detail_screen.dart';
 import 'time_capsules/time_capsule_screen.dart';
-import 'write_note_sheet.dart';
+import 'write_love_note_screen.dart';
 
-enum _Show { all, capsules, favorites }
-
-/// Love Notes: every note you can read, plus Previous Capsules (the older
-/// notes-based Time Capsules, which still open by themselves at their
-/// moment). New Time Capsules live on their own screen. New notes arrive
-/// live.
+/// Love Notes: every note you can read, filtered by type, plus Previous
+/// Capsules (the older notes-based Time Capsules, which still open by
+/// themselves at their moment). New Time Capsules live on their own screen,
+/// reached from the card under the Write button. New notes arrive live.
 class LoveNotesScreen extends StatefulWidget {
   const LoveNotesScreen({super.key, required this.profile});
 
@@ -40,8 +37,7 @@ class LoveNotesScreen extends StatefulWidget {
 class _LoveNotesScreenState extends State<LoveNotesScreen> {
   List<LoveNote> _notes = [];
   List<SealedNote> _sealed = [];
-  Map<String, String> _names = {};
-  _Show _show = _Show.all;
+  Map<String, Profile> _people = {};
   bool _loading = true;
   String? _error;
   Timer? _tick;
@@ -51,8 +47,8 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
   String get _myId => widget.profile.userId;
 
   String get _partnerName {
-    for (final e in _names.entries) {
-      if (e.key != _myId) return e.value;
+    for (final e in _people.entries) {
+      if (e.key != _myId) return e.value.displayName;
     }
     return 'your partner';
   }
@@ -88,13 +84,15 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
   Future<void> _load() async {
     try {
       final before = {for (final s in _sealed) s.id};
-      final members = await CoupleService.members(_coupleId);
+      final members = await ProfileService.withPhotos(
+        await CoupleService.members(_coupleId),
+      );
       final notes = await NoteService.list(_coupleId);
       final sealed = await NoteService.sealed();
       if (!mounted) return;
       final justOpened = notes.where((n) => before.contains(n.id)).toList();
       setState(() {
-        _names = {for (final m in members) m.userId: m.displayName};
+        _people = {for (final m in members) m.userId: m};
         _notes = notes;
         _sealed = sealed;
         _error = null;
@@ -111,9 +109,11 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
         );
         if (!mounted) return;
         showFloatingHearts(context, emoji: '💌');
-        _showMessage(justOpened.length == 1
-            ? 'A time capsule just opened 💌'
-            : '${justOpened.length} time capsules just opened 💌');
+        _showMessage(
+          justOpened.length == 1
+              ? 'A time capsule just opened 💌'
+              : '${justOpened.length} time capsules just opened 💌',
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -127,383 +127,261 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
   void _showMessage(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
-  String _nameOf(String userId) =>
-      userId == _myId ? 'You' : (_names[userId] ?? 'Your partner');
+  String _nameOf(String userId) => userId == _myId
+      ? 'You'
+      : (_people[userId]?.displayName ?? 'Your partner');
 
   Future<void> _write() async {
-    final sent = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => WriteNoteSheet(coupleId: _coupleId, partnerName: _partnerName),
+    final sent = await openWriteLoveNote(
+      context,
+      coupleId: _coupleId,
+      partnerName: _partnerName,
     );
-    if (sent != true) return;
+    if (!sent) return;
     await _load();
     if (!mounted) return;
     showEnvelopeFly(context, emoji: '💌');
     _showMessage('Sent to $_partnerName');
   }
 
-  Future<void> _openTimeCapsules() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => TimeCapsuleScreen(profile: widget.profile)),
-    );
-  }
-
-  Future<void> _toggleFavorite(LoveNote note) async {
-    final value = !note.isFavorite;
-    setState(() => _notes = [for (final n in _notes) n.id == note.id ? n.withFavorite(value) : n]);
-    if (value) showFloatingHearts(context);
-    try {
-      await NoteService.setFavorite(note.id, value);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _notes = [for (final n in _notes) n.id == note.id ? note : n]);
-      _showMessage(friendlyError(e));
-    }
-  }
-
-  Future<bool> _confirm(String title, String body, String action) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Keep it')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(action)),
-        ],
-      ),
-    );
-    return ok == true;
-  }
-
-  Future<void> _delete(LoveNote note) async {
-    if (!await _confirm('Delete this note?',
-        'It will be removed for both of you.', 'Delete')) {
-      return;
-    }
-    try {
-      await NoteService.delete(note.id);
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage(friendlyError(e));
-    }
-  }
-
-  Future<void> _cancel(SealedNote capsule) async {
-    if (!await _confirm('Cancel this capsule?',
-        'It will be deleted unopened. Nobody will ever read it.', 'Cancel capsule')) {
-      return;
-    }
-    try {
-      await NoteService.cancelCapsule(capsule.id);
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      _showMessage(friendlyError(e));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
-
-    final notes = switch (_show) {
-      _Show.all => _notes,
-      _Show.capsules => _notes.where((n) => n.wasCapsule).toList(),
-      _Show.favorites => _notes.where((n) => n.isFavorite).toList(),
-    };
-    final showSealed = _show != _Show.favorites && _sealed.isNotEmpty;
-    final nothing = _notes.isEmpty && _sealed.isEmpty;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Love notes'),
-        actions: [
-          IconButton(
-            tooltip: 'Time capsules',
-            onPressed: _openTimeCapsules,
-            icon: const Icon(Icons.lock_clock_outlined),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'fab-love-notes',
-        onPressed: _loading ? null : _write,
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
-        icon: const Icon(Icons.edit_outlined),
-        label: const Text('Write a note'),
-      ),
-      body: _loading
-          ? const SkeletonList()
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.screenMargin, AppSpacing.sm, AppSpacing.screenMargin, 96),
-                children: [
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (_error != null) ...[
-                            Text(_error!, style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error)),
-                            const SizedBox(height: AppSpacing.md),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: AppButton(
-                                  label: 'Try again',
-                                  variant: AppButtonVariant.outlined,
-                                  onPressed: _load),
-                            ),
-                          ],
-                          if (nothing && _error == null)
-                            _EmptyNotes(onWrite: _write, onSeal: _openTimeCapsules)
-                          else ...[
-                            Wrap(
-                              spacing: AppSpacing.sm,
-                              children: [
-                                FilterPill(label: 'All', selected: _show == _Show.all,
-                                    count: _notes.length + _sealed.length,
-                                    onTap: () => setState(() => _show = _Show.all)),
-                                FilterPill(label: 'Previous capsules', selected: _show == _Show.capsules,
-                                    count: _sealed.length + _notes.where((n) => n.wasCapsule).length,
-                                    onTap: () => setState(() => _show = _Show.capsules)),
-                                FilterPill(label: 'Favorites', selected: _show == _Show.favorites,
-                                    count: _notes.where((n) => n.isFavorite).length,
-                                    onTap: () => setState(() => _show = _Show.favorites)),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.lg),
-                            if (showSealed) ...[
-                              Text('PREVIOUS CAPSULES · SEALED', style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
-                              const SizedBox(height: AppSpacing.sm),
-                              for (final s in _sealed)
-                                _SealedCard(
-                                  capsule: s,
-                                  fromName: _nameOf(s.authorId),
-                                  isMine: s.authorId == _myId,
-                                  onOpen: _load,
-                                  onCancel: () => _cancel(s),
-                                ),
-                              const SizedBox(height: AppSpacing.md),
-                            ],
-                            if (notes.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: AppSpacing.xl),
-                                child: Text(
-                                  _show == _Show.favorites
-                                      ? 'Tap the heart on a note to keep it here.'
-                                      : 'No opened notes here yet.',
-                                  textAlign: TextAlign.center,
-                                  style: muted,
-                                ),
-                              ),
-                            for (final n in notes)
-                              _NoteBubble(
-                                note: n,
-                                fromName: _nameOf(n.authorId),
-                                isMine: n.authorId == _myId,
-                                onFavorite: () => _toggleFavorite(n),
-                                onDelete: () => _delete(n),
-                              ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
-}
-
-/// A sealed capsule: wax seal, teaser, who it's from, and a countdown ring.
-/// When its moment arrives the seal breaks and tapping opens it.
-class _SealedCard extends StatelessWidget {
-  const _SealedCard({
-    required this.capsule,
-    required this.fromName,
-    required this.isMine,
-    required this.onOpen,
-    required this.onCancel,
-  });
-
-  final SealedNote capsule;
-  final String fromName;
-  final bool isMine;
-  final VoidCallback onOpen;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final ready = capsule.isReady();
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Material(
-        color: scheme.secondary,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: ready ? onOpen : null,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Row(
-              children: [
-                UnlockRing(
-                  elapsedFraction: capsule.progress(),
-                  size: 72,
-                  strokeWidth: 5,
-                  color: scheme.onSecondary,
-                  trackColor: scheme.onSecondary.withValues(alpha: 0.2),
-                  child: SealBadge(
-                    size: 46,
-                    state: ready ? SealState.broken : SealState.sealed,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.lg),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        capsule.capsuleTitle ?? 'A previous time capsule',
-                        style: theme.textTheme.titleMedium?.copyWith(color: scheme.onSecondary),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        ready
-                            ? 'Ready to open! Tap to read 💌'
-                            : 'Opens ${opensIn(capsule.unlockAt)}',
-                        style: theme.textTheme.labelLarge?.copyWith(color: scheme.onSecondary),
-                      ),
-                      Text(
-                        'From ${fromName == 'You' ? 'you' : fromName} \u00B7 '
-                        '${longDate(capsule.unlockAt)}, ${clockTime(capsule.unlockAt)}',
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: scheme.onSecondary.withValues(alpha: 0.8)),
-                      ),
-                    ],
-                  ),
-                ),
-                if (isMine && !ready)
-                  IconButton(
-                    tooltip: 'Cancel capsule',
-                    onPressed: onCancel,
-                    icon: Icon(Icons.close, color: scheme.onSecondary),
-                  ),
-              ],
-            ),
-          ),
+  Future<void> _open(LoveNote note) async {
+    final author = _people[note.authorId];
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => LoveNoteDetailScreen(
+          note: note,
+          authorName:
+              author?.displayName ??
+              (note.authorId == _myId ? 'You' : 'Your partner'),
+          authorAvatarUrl: author?.avatarUrl,
+          isMine: note.authorId == _myId,
         ),
       ),
     );
+    if (changed == true) await _load();
   }
-}
 
-/// A readable note, like a chat bubble: yours on the right, theirs on the
-/// left. Opened capsules say when they were sealed.
-class _NoteBubble extends StatelessWidget {
-  const _NoteBubble({
-    required this.note,
-    required this.fromName,
-    required this.isMine,
-    required this.onFavorite,
-    required this.onDelete,
-  });
-
-  final LoveNote note;
-  final String fromName;
-  final bool isMine;
-  final VoidCallback onFavorite;
-  final VoidCallback onDelete;
+  Future<void> _openTimeCapsules() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TimeCapsuleScreen(profile: widget.profile),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final bg = isMine ? scheme.primaryContainer : scheme.surfaceContainerHighest;
-    final fg = isMine ? scheme.onPrimaryContainer : scheme.onSurface;
-    final small = theme.textTheme.labelSmall?.copyWith(color: fg.withValues(alpha: 0.75));
 
-    return Align(
-      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: AppSpacing.md),
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.xs, AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: bg,
-            border: isMine ? null : Border.all(color: scheme.outline),
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(AppRadius.bubble),
-              topRight: const Radius.circular(AppRadius.bubble),
-              bottomLeft: Radius.circular(isMine ? AppRadius.bubble : 4),
-              bottomRight: Radius.circular(isMine ? 4 : AppRadius.bubble),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (note.wasCapsule)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  child: Row(
+    final notes = _notes;
+    const side = EdgeInsets.symmetric(horizontal: AppSpacing.screenMargin);
+
+    return Scaffold(
+      backgroundColor: NotePalette.background,
+      body: NotesBackground(
+        child: SafeArea(
+          bottom: false,
+          child: _loading
+              ? const SkeletonList()
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(
+                      0,
+                      AppSpacing.xl,
+                      0,
+                      AppSpacing.xxl,
+                    ),
                     children: [
-                      const SealBadge(size: 22, state: SealState.broken),
-                      const SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          '${note.capsuleTitle ?? 'Previous capsule'} \u00B7 sealed ${longDate(note.sentAt)}',
-                          style: small,
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 640),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Padding(
+                                padding: side,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const _Header(),
+                                    const SizedBox(height: AppSpacing.xl),
+                                    NotePrimaryButton(
+                                      label: 'Write a Love Note',
+                                      icon: Icons.add_rounded,
+                                      onPressed: _write,
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    _CapsuleLink(onTap: _openTimeCapsules),
+                                    const SizedBox(height: AppSpacing.xl),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              Padding(
+                                padding: side,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (_error != null) ...[
+                                      Text(
+                                        _error!,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: theme.colorScheme.error,
+                                            ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.md),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: AppButton(
+                                          label: 'Try again',
+                                          variant: AppButtonVariant.outlined,
+                                          onPressed: _load,
+                                        ),
+                                      ),
+                                    ],
+                                    if (notes.isEmpty && _error == null)
+                                      const _EmptyNotes()
+                                    else
+                                      for (final n in notes)
+                                        _NoteCard(
+                                          note: n,
+                                          onTap: () => _open(n),
+                                        ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.only(right: AppSpacing.md),
-                child: Text(note.body, style: theme.textTheme.bodyLarge?.copyWith(color: fg)),
+        ),
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(
+              child: Semantics(
+                header: true,
+                child: Text('Love Notes', style: NotePalette.display(36)),
               ),
-              Row(
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            // Two small hearts beside the title.
+            ExcludeSemantics(
+              child: SizedBox(
+                width: 34,
+                height: 34,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 2,
+                      top: 0,
+                      child: Icon(
+                        Icons.favorite_rounded,
+                        size: 18,
+                        color: NotePalette.rose.withValues(alpha: 0.85),
+                      ),
+                    ),
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Icon(
+                        Icons.favorite_rounded,
+                        size: 12,
+                        color: NotePalette.pink.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Little words worth keeping.',
+          style: theme.textTheme.bodyLarge?.copyWith(color: NotePalette.pink),
+        ),
+      ],
+    );
+  }
+}
+
+/// The way into Time Capsules: a slim plum row under the Write button.
+class _CapsuleLink extends StatelessWidget {
+  const _CapsuleLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      label: 'Time Capsules. Write a letter that opens later',
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: noteCardDecoration(radius: AppRadius.card),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sm,
+                AppSpacing.xs,
+                AppSpacing.md,
+                AppSpacing.xs,
+              ),
+              child: Row(
                 children: [
+                  const QuickActionArtView(QuickActionArt.capsule, size: 50),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: Text(
-                      '$fromName \u00B7 ${timeAgo(note.unlockAt ?? note.sentAt)}',
-                      style: small,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Time Capsules',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: NotePalette.cream,
+                          ),
+                        ),
+                        Text(
+                          'Write a letter that opens later',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: NotePalette.muted,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: note.isFavorite ? 'Remove from favorites' : 'Add to favorites',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: onFavorite,
-                    icon: AnimatedHeartIcon(
-                        filled: note.isFavorite, size: 20, emptyColor: fg),
-                  ),
-                  if (isMine)
-                    IconButton(
-                      tooltip: 'Delete note',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: onDelete,
-                      icon: Icon(Icons.delete_outline, size: 20, color: fg),
-                    ),
+                  const _Chevron(),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -511,43 +389,174 @@ class _NoteBubble extends StatelessWidget {
   }
 }
 
-class _EmptyNotes extends StatelessWidget {
-  const _EmptyNotes({required this.onWrite, required this.onSeal});
+/// One note in the list: its photo (or the love-letter drawing), its type,
+/// title and first line, the date, and a chevron. Tap to open it.
+class _NoteCard extends StatelessWidget {
+  const _NoteCard({required this.note, required this.onTap});
 
-  final VoidCallback onWrite;
-  final VoidCallback onSeal;
+  final LoveNote note;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = note.title;
+    final firstLine = note.body.trim().split('\n').first;
+    final when = note.unlockAt ?? note.sentAt;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Semantics(
+        button: true,
+        label: [
+          note.category?.label ??
+              (note.wasCapsule ? 'Time capsule' : 'Love note'),
+          ?title,
+          firstLine,
+          longDate(when),
+          if (note.isFavorite) 'favorite',
+        ].join('. '),
+        excludeSemantics: true,
+        child: DecoratedBox(
+          decoration: noteCardDecoration(),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.panel),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 80,
+                      height: 90,
+                      child: Center(
+                        child: note.photoPath != null
+                            ? NotePolaroid(
+                                url: note.photoUrl,
+                                width: 70,
+                                turn: -4,
+                              )
+                            : const NoteArtTile(size: 72),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          NoteCategoryBadge(
+                            category: note.category,
+                            capsule: note.wasCapsule,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          if (title != null)
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: NotePalette.cream,
+                              ),
+                            ),
+                          Text(
+                            firstLine,
+                            maxLines: title == null ? 2 : 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: title == null
+                                  ? NotePalette.cream
+                                  : NotePalette.muted,
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  longDate(when),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: NotePalette.muted,
+                                  ),
+                                ),
+                              ),
+                              if (note.isFavorite) ...[
+                                const SizedBox(width: AppSpacing.xs),
+                                const Icon(
+                                  Icons.favorite_rounded,
+                                  size: 14,
+                                  color: NotePalette.rose,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    const _Chevron(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Chevron extends StatelessWidget {
+  const _Chevron();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 32,
+    height: 32,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: Colors.white.withValues(alpha: 0.06),
+      border: Border.all(color: NotePalette.border),
+    ),
+    child: const Icon(
+      Icons.chevron_right_rounded,
+      size: 20,
+      color: NotePalette.cream,
+    ),
+  );
+}
+
+class _EmptyNotes extends StatelessWidget {
+  const _EmptyNotes();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.huge),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
       child: Column(
         children: [
-          const SealBadge(size: 72),
-          const SizedBox(height: AppSpacing.lg),
-          Text('Say it in writing', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.sm),
+          const QuickActionArtView(QuickActionArt.loveNote, size: 96),
+          const SizedBox(height: AppSpacing.md),
           Text(
-            'Leave a love note for today, or write a Time Capsule that opens '
-            'on your anniversary, a birthday, or a year from now.',
+            'Say it in writing',
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: NotePalette.display(22),
           ),
-          const SizedBox(height: AppSpacing.xl),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            alignment: WrapAlignment.center,
-            children: [
-              AppButton(label: 'Write a note', icon: Icons.edit_outlined, onPressed: onWrite),
-              AppButton(
-                label: 'Time capsules',
-                icon: Icons.lock_outline,
-                variant: AppButtonVariant.outlined,
-                onPressed: onSeal,
-              ),
-            ],
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Leave a love note for today. It stays here for both of you.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: NotePalette.muted,
+            ),
           ),
         ],
       ),
