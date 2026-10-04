@@ -13,12 +13,14 @@
 //     itself instead, and never returns a link or a storage path.
 //   * The caller is the verified JWT owner. The body carries only a capsule
 //     id; whether the caller may act on it (they are its sender, and it is a
-//     draft, being edited, or within its ten minutes) is decided in the
-//     database by capsule_photo_access(), with the database clock.
+//     draft or being edited) is decided in the database by
+//     capsule_photo_access(). A sealed capsule, even within its ten minutes,
+//     must be reopened (edit_time_capsule) before its photo can be seen or
+//     changed; once opened, the photo is permanent.
 //   * The folder and photo path come from the database, never the request,
 //     so no other object can be named. Every refusal looks the same.
-//   * Responses are never cached: a preview fetched during the ten minutes
-//     must not be served again once the capsule is sealed for good.
+//   * Responses are never cached: a preview fetched before sealing must not
+//     be served again once the capsule is sealed.
 //   * Logs carry the action, outcome and timing only.
 
 import { corsHeaders } from '../_shared/cors.ts';

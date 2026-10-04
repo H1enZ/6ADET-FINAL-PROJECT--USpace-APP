@@ -422,13 +422,16 @@ grant execute on function public.reply_time_capsule(uuid, text) to authenticated
 --    it before then (signing needs read access), so no link made earlier
 --    can outlive the moment it is sealed for good.
 --
---      draft / editing / grace   the sender uploads with their session;
+--      draft / editing           the sender uploads with their session;
 --                                previews and removals go through the
 --                                capsule-photo Edge Function, which checks
 --                                capsule_photo_access() and serves the
 --                                bytes itself (never a link)
+--      grace (sealed)            nobody: to change or cancel it, the sender
+--                                first reopens it (edit_time_capsule)
 --      sealed / ready            nobody, by any route
---      opened                    sender and receiver read it directly
+--      opened                    sender and receiver read it directly;
+--                                nobody can replace or delete it
 -- ---------------------------------------------------------------------------
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -465,9 +468,10 @@ create policy "capsule photos: add while unsealed" on storage.objects
 
 -- For the capsule-photo Edge Function only (service role): may this person
 -- preview or tidy this capsule's photos right now? Returns the capsule's
--- folder and current photo when they are its sender and it is a draft,
--- being edited, or within its ten minutes; otherwise nothing. The person
--- is the Edge Function's verified caller, never a value from the app.
+-- folder and current photo when they are its sender and it is a draft or
+-- being edited; otherwise nothing (a sealed capsule, even within its ten
+-- minutes, must be reopened first). The person is the Edge Function's
+-- verified caller, never a value from the app.
 create or replace function public.capsule_photo_access(p_capsule uuid, p_user uuid)
 returns table (folder text, photo_path text)
 language sql stable security definer set search_path = public as $$
@@ -477,8 +481,7 @@ language sql stable security definer set search_path = public as $$
     left join time_capsule_contents c on c.capsule_id = t.id
    where t.id = p_capsule
      and t.sender_id = p_user
-     and (t.status in ('draft', 'editing')
-          or (t.status = 'sealed' and now() < t.editable_until))
+     and t.status in ('draft', 'editing')
 $$;
 
 revoke execute on function public.capsule_photo_access(uuid, uuid) from public, anon, authenticated;
