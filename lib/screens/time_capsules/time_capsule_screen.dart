@@ -337,7 +337,10 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     );
     if (ok != true) return;
     try {
-      await TimeCapsuleService.cancel(c.id);
+      await TimeCapsuleService.cancel(
+        c.id,
+        sealed: c.status == CapsuleStatus.sealed,
+      );
       _showMessage('Capsule cancelled.');
     } catch (e) {
       _showMessage(friendlyError(e));

@@ -160,8 +160,11 @@ class TimeCapsuleService {
     await _db.rpc('delete_capsule_draft', params: {'p_id': id});
   }
 
-  /// Withdraws a capsule during its ten minutes (or while editing it).
-  static Future<void> cancel(String id) async {
+  /// Withdraws a capsule during its ten minutes (or while editing it). A
+  /// sealed one is reopened first: its photo can only be removed while it
+  /// is being edited.
+  static Future<void> cancel(String id, {bool sealed = false}) async {
+    if (sealed) await edit(id);
     await _removeAllPhotosQuietly(id);
     await _db.rpc('cancel_time_capsule', params: {'p_id': id});
   }
