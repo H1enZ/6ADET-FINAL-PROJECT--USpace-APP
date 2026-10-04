@@ -1,17 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../models/chat_message.dart';
+import '../models/chat_reaction.dart';
 import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/capsule_time.dart';
 import '../widgets/atoms/avatar_circle.dart';
+import '../widgets/chat/reaction_chips.dart';
+import '../widgets/chat/reaction_tray.dart';
 import '../widgets/effects/motion.dart';
 
 /// The couple's private chat. Messages arrive in real time; your partner's
@@ -49,6 +53,24 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _firstLoadDone = false;
   int _sentCount = 0;
 
+  /// One key per message bubble, so the tray can open right next to it.
+  final Map<String, GlobalKey> _bubbleKeys = {};
+
+  // Loads can overlap (your own action plus the realtime echo, or your
+  // partner's change). Only the newest load's result is applied.
+  int _loadGeneration = 0;
+  bool _wantEnd = false;
+
+  // Your reaction writes still in flight: message id -> the value shown
+  // until the write finishes (null = removed). Laid over every load, so a
+  // load that started before the write can't bring back the old reaction.
+  final Map<String, String?> _pendingMine = {};
+  final Map<String, int> _writeToken = {};
+  int _writeSeq = 0;
+
+  /// While the tray is open the list must not scroll away under it.
+  bool _trayOpen = false;
+
   String get _myId => widget.me.userId;
 
   @override
@@ -76,27 +98,42 @@ class _ChatScreenState extends State<ChatScreen> {
       _scroll.position.maxScrollExtent - _scroll.position.pixels < 160;
 
   Future<void> _load({bool scrollToEnd = false}) async {
-    final stick = scrollToEnd || _nearBottom;
+    final generation = ++_loadGeneration;
+    if (scrollToEnd) _wantEnd = true;
+    final stick = _nearBottom;
     try {
       final messages = await ChatService.recent(widget.coupleId);
       final reactions = await ChatService.reactions(widget.coupleId);
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return; // a newer load won
       final ids = messages.map((m) => m.id).toSet();
+      for (final e in _pendingMine.entries) {
+        final mine = {...?reactions[e.key]};
+        if (e.value == null) {
+          mine.remove(_myId);
+        } else {
+          mine[_myId] = e.value!;
+        }
+        reactions[e.key] = mine;
+      }
       setState(() {
         _fresh = _firstLoadDone ? ids.difference(_seen) : <String>{};
         _seen.addAll(ids);
         _firstLoadDone = true;
         _messages = messages;
         _reactions = reactions;
+        _bubbleKeys.removeWhere((id, _) => !ids.contains(id));
         _error = null;
         _loading = false;
       });
       if (messages.any((m) => m.senderId != _myId && m.readAt == null)) {
         unawaited(ChatService.markRead().catchError((_) {}));
       }
-      if (stick) _jumpToEnd();
+      if ((stick || _wantEnd) && !_trayOpen) {
+        _wantEnd = false;
+        _jumpToEnd();
+      }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = friendlyError(e);
         _loading = false;
@@ -173,110 +210,151 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _openActions(ChatMessage m) async {
+  /// Long-press (or right-click, or the screen reader's "React" action):
+  /// the floating reaction tray next to the message, with the message's
+  /// other actions under it.
+  Future<void> _openActions(ChatMessage m, Rect anchor) async {
     if (m.isDeleted) return;
     final mine = m.senderId == _myId;
-    final myReaction = _reactions[m.id]?[_myId];
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  for (final e in chatReactions)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(24),
-                      onTap: () => Navigator.of(context).pop('react:$e'),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: e == myReaction
-                              ? Theme.of(context).colorScheme.primaryContainer
-                              : null,
-                        ),
-                        child: Text(e, style: const TextStyle(fontSize: 26)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (myReaction != null)
-              ListTile(
-                leading: const Icon(Icons.remove_circle_outline),
-                title: const Text('Remove my reaction'),
-                onTap: () => Navigator.of(context).pop('unreact'),
-              ),
-            if (m.body != null)
-              ListTile(
-                leading: const Icon(Icons.copy_outlined),
-                title: const Text('Copy text'),
-                onTap: () => Navigator.of(context).pop('copy'),
-              ),
-            if (mine && m.body != null)
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Edit'),
-                onTap: () => Navigator.of(context).pop('edit'),
-              ),
-            if (mine)
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Delete for both of us'),
-                onTap: () => Navigator.of(context).pop('delete'),
-              ),
-          ],
-        ),
-      ),
+    final myStored = _reactions[m.id]?[_myId];
+    _trayOpen = true;
+    final choice = await showReactionTray(
+      context,
+      anchor: anchor,
+      alignEnd: mine,
+      // An older emoji reaction highlights its USpace match, if it has one.
+      current: myStored == null ? null : ReactionView.of(myStored)?.reaction,
+      actions: [
+        if (myStored != null) MessageAction.removeReaction,
+        if (m.body != null) MessageAction.copy,
+        if (mine && m.body != null) MessageAction.edit,
+        if (mine) MessageAction.delete,
+      ],
     );
+    _trayOpen = false;
     if (choice == null || !mounted) return;
+
+    final reaction = choice.reaction;
+    if (reaction != null) {
+      // Choosing your current reaction again takes it away (also when it
+      // is an older emoji shown as that reaction). Read it again: it may
+      // have changed while the tray was open.
+      final now = _reactions[m.id]?[_myId];
+      final current = now == null ? null : ReactionView.of(now);
+      if (current?.reaction == reaction) {
+        await _removeReaction(m);
+      } else {
+        await _setReaction(m, reaction);
+      }
+      return;
+    }
+
     try {
-      if (choice.startsWith('react:')) {
-        await ChatService.react(widget.coupleId, m.id, choice.substring(6));
-      } else if (choice == 'unreact') {
-        await ChatService.removeReaction(m.id);
-      } else if (choice == 'copy') {
-        await Clipboard.setData(ClipboardData(text: m.body!));
-        if (!mounted) return;
-        _showMessage('Copied');
-        return;
-      } else if (choice == 'edit') {
-        final text = await showDialog<String>(
-          context: context,
-          builder: (_) => _EditDialog(initial: m.body!),
-        );
-        if (text == null || text.trim() == m.body) return;
-        await ChatService.edit(m.id, text);
-      } else if (choice == 'delete') {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Delete this message?'),
-            content: const Text('It will be removed for both of you.'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel')),
-              TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Delete')),
-            ],
-          ),
-        );
-        if (ok != true) return;
-        await ChatService.delete(m.id);
+      switch (choice.action!) {
+        case MessageAction.removeReaction:
+          await _removeReaction(m);
+          return;
+        case MessageAction.copy:
+          await Clipboard.setData(ClipboardData(text: m.body!));
+          if (!mounted) return;
+          _showMessage('Copied');
+          return;
+        case MessageAction.edit:
+          final text = await showDialog<String>(
+            context: context,
+            builder: (_) => _EditDialog(initial: m.body!),
+          );
+          if (text == null || text.trim() == m.body) return;
+          await ChatService.edit(m.id, text);
+        case MessageAction.delete:
+          final ok = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Delete this message?'),
+              content: const Text('It will be removed for both of you.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel')),
+                TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Delete')),
+              ],
+            ),
+          );
+          if (ok != true) return;
+          await ChatService.delete(m.id);
       }
       await _load();
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));
     }
+  }
+
+  /// Read out shortly after the tray closes, so the screen reader doesn't
+  /// drop it while focus moves back to the chat.
+  void _announce(String message) {
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        message,
+        Directionality.of(context),
+      );
+    });
+  }
+
+  /// Shows your reaction at once, then saves it (replacing any earlier one).
+  Future<void> _setReaction(ChatMessage m, ChatReaction reaction) async {
+    final before = _reactions[m.id]?[_myId];
+    final previous = before == null ? null : ReactionView.of(before);
+    _announce(previous == null
+        ? 'Reacted with ${reaction.label}'
+        : 'Changed your reaction from ${previous.label} to ${reaction.label}');
+    await _write(m.id, reaction.key, before,
+        () => ChatService.react(widget.coupleId, m.id, reaction));
+  }
+
+  Future<void> _removeReaction(ChatMessage m) async {
+    final before = _reactions[m.id]?[_myId];
+    if (before == null) return;
+    final label = ReactionView.of(before)?.label;
+    _announce(label == null ? 'Reaction removed' : 'Removed your $label reaction');
+    await _write(m.id, null, before, () => ChatService.removeReaction(m.id));
+  }
+
+  /// Shows [value] as your reaction (null = none) while [save] runs. If it
+  /// fails and nothing newer was chosen meanwhile, [before] comes back.
+  Future<void> _write(String messageId, String? value, String? before,
+      Future<void> Function() save) async {
+    final token = ++_writeSeq;
+    _writeToken[messageId] = token;
+    _pendingMine[messageId] = value;
+    _showMine(messageId, value);
+    try {
+      await save();
+      if (_writeToken[messageId] == token) _pendingMine.remove(messageId);
+      if (mounted) await _load();
+    } catch (e) {
+      if (_writeToken[messageId] != token) return; // a newer choice stands
+      _pendingMine.remove(messageId);
+      if (!mounted) return;
+      _showMine(messageId, before);
+      _announce("Couldn't save your reaction");
+      _showMessage(friendlyError(e));
+    }
+  }
+
+  /// Sets (or clears, with null) your reaction on one message on screen.
+  void _showMine(String messageId, String? stored) {
+    final next = {...?_reactions[messageId]};
+    if (stored == null) {
+      next.remove(_myId);
+    } else {
+      next[_myId] = stored;
+    }
+    setState(() => _reactions = {..._reactions, messageId: next});
   }
 
   void _viewPhoto(String url) {
@@ -325,7 +403,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final next = i < _messages.length - 1 ? _messages[i + 1] : null;
       final newDay = prev == null ||
           dayLabel(prev.createdAt) != dayLabel(m.createdAt);
-      if (newDay) items.add(_DaySeparator(label: dayLabel(m.createdAt)));
+      if (newDay) {
+        items.add(_DaySeparator(
+            key: ValueKey('day-${dayLabel(m.createdAt)}'),
+            label: dayLabel(m.createdAt)));
+      }
       final mineMsg = m.senderId == _myId;
       final bubble = _Bubble(
         message: m,
@@ -333,17 +415,25 @@ class _ChatScreenState extends State<ChatScreen> {
         startsGroup: prev == null || newDay || !sameGroup(prev, m),
         endsGroup: next == null || !sameGroup(m, next),
         reactions: _reactions[m.id] ?? const {},
+        myId: _myId,
+        partnerName: p.displayName,
+        bubbleKey: _bubbleKeys.putIfAbsent(m.id, GlobalKey.new),
         receipt: m.id == lastMineId ? (m.readAt != null ? 'Seen' : 'Sent') : null,
-        onLongPress: () => _openActions(m),
+        onOpenMenu: (anchor) => _openActions(m, anchor),
         onPhotoTap: m.photoUrl == null ? null : () => _viewPhoto(m.photoUrl!),
       );
-      items.add(_fresh.contains(m.id)
-          ? FadeSlideIn(
-              key: ValueKey('in-${m.id}'),
-              from: Offset(mineMsg ? 28 : -28, 6),
-              child: bubble,
-            )
-          : bubble);
+      // Keyed by message, so each bubble keeps its own state when older
+      // messages drop off the top of the list.
+      items.add(KeyedSubtree(
+        key: ValueKey('msg-${m.id}'),
+        child: _fresh.contains(m.id)
+            ? FadeSlideIn(
+                key: ValueKey('in-${m.id}'),
+                from: Offset(mineMsg ? 28 : -28, 6),
+                child: bubble,
+              )
+            : bubble,
+      ));
     }
 
     return Scaffold(
@@ -489,7 +579,7 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 class _DaySeparator extends StatelessWidget {
-  const _DaySeparator({required this.label});
+  const _DaySeparator({super.key, required this.label});
 
   final String label;
 
@@ -514,7 +604,8 @@ class _DaySeparator extends StatelessWidget {
   }
 }
 
-/// One message bubble. Long-press (or right-click) for reactions, copy,
+/// One message bubble. Long-press (or right-click, Enter when focused, or
+/// the screen reader's "React" action) opens the reaction tray with copy,
 /// edit and delete.
 class _Bubble extends StatelessWidget {
   const _Bubble({
@@ -523,8 +614,11 @@ class _Bubble extends StatelessWidget {
     required this.startsGroup,
     required this.endsGroup,
     required this.reactions,
+    required this.myId,
+    required this.partnerName,
+    required this.bubbleKey,
     required this.receipt,
-    required this.onLongPress,
+    required this.onOpenMenu,
     required this.onPhotoTap,
   });
 
@@ -533,9 +627,23 @@ class _Bubble extends StatelessWidget {
   final bool startsGroup;
   final bool endsGroup;
   final Map<String, String> reactions;
+  final String myId;
+  final String partnerName;
   final String? receipt;
-  final VoidCallback onLongPress;
+
+  /// Opens the tray, given where the bubble is on screen.
+  final ValueChanged<Rect> onOpenMenu;
   final VoidCallback? onPhotoTap;
+
+  /// Kept by the chat screen per message (a key made here would change on
+  /// every rebuild and rebuild the bubble with it).
+  final GlobalKey bubbleKey;
+
+  void _open() {
+    final box = bubbleKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    onOpenMenu(box.localToGlobal(Offset.zero) & box.size);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -590,56 +698,75 @@ class _Bubble extends StatelessWidget {
       );
     }
 
-    final counts = <String, int>{};
-    for (final e in reactions.values) {
-      counts[e] = (counts[e] ?? 0) + 1;
-    }
-
     return Padding(
       padding: EdgeInsets.only(top: startsGroup ? AppSpacing.sm : 2),
       child: Column(
         crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onLongPress: onLongPress,
-            onSecondaryTap: onLongPress,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * 0.75 > 480
-                      ? 480
-                      : MediaQuery.sizeOf(context).width * 0.75),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(
-                  color: bg,
-                  borderRadius: radius,
-                  border: mine ? null : Border.all(color: scheme.outline),
+          // Keyboard: Tab to a message, Enter opens the tray. Screen
+          // readers get a "React" action as well as long-press.
+          Semantics(
+            onTap: m.isDeleted ? null : _open,
+            onTapHint: m.isDeleted ? null : 'show reactions and options',
+            customSemanticsActions: m.isDeleted
+                ? null
+                : {const CustomSemanticsAction(label: 'React'): _open},
+            child: FocusableActionDetector(
+              enabled: !m.isDeleted,
+              actions: {
+                ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
+                  _open();
+                  return null;
+                }),
+              },
+              child: GestureDetector(
+                key: bubbleKey,
+                onLongPress: _open,
+                onSecondaryTap: _open,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width * 0.75 > 480
+                          ? 480
+                          : MediaQuery.sizeOf(context).width * 0.75),
+                  child: Builder(
+                    builder: (context) {
+                      // A visible ring when the bubble has keyboard focus.
+                      final focused = Focus.of(context).hasPrimaryFocus &&
+                          FocusManager.instance.highlightMode ==
+                              FocusHighlightMode.traditional;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: radius,
+                          border: mine ? null : Border.all(color: scheme.outline),
+                        ),
+                        foregroundDecoration: focused
+                            ? BoxDecoration(
+                                borderRadius: radius,
+                                border: Border.all(
+                                    color: mine ? scheme.secondary : scheme.primary,
+                                    width: 2),
+                              )
+                            : null,
+                        child: content,
+                      );
+                    },
+                  ),
                 ),
-                child: content,
               ),
             ),
           ),
-          if (counts.isNotEmpty)
-            PopOnChange(
-              trigger: counts.toString(),
-              child: Transform.translate(
-              offset: const Offset(0, -4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: scheme.outline),
-                ),
-                child: Text(
-                  counts.entries
-                      .map((e) => e.value > 1 ? '${e.key}${e.value}' : e.key)
-                      .join(' '),
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            child: ReactionChips(
+              reactions: reactions,
+              myId: myId,
+              partnerName: partnerName,
+              onTap: _open,
             ),
-            ),
+          ),
           if (endsGroup)
             Padding(
               padding: const EdgeInsets.only(top: 2, left: 4, right: 4),

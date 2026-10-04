@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/chat_message.dart';
+import '../models/chat_reaction.dart';
 import 'auth_service.dart';
 
 /// The couple's private chat. Row-level security means only the two
@@ -47,7 +48,8 @@ class ChatService {
     }
   }
 
-  /// Reactions for this couple: message id -> {user id: emoji}.
+  /// Reactions for this couple: message id -> {user id: stored value}
+  /// (a reaction key, or one of the original emoji in older rows).
   static Future<Map<String, Map<String, String>>> reactions(String coupleId) async {
     final rows = await _db
         .from('message_reactions')
@@ -121,9 +123,10 @@ class ChatService {
   }
 
   /// One reaction per person per message; choosing again replaces it.
-  static Future<void> react(String coupleId, String messageId, String emoji) async {
+  /// Only the USpace reaction keys are written (never the original emoji).
+  static Future<void> react(String coupleId, String messageId, ChatReaction reaction) async {
     await _db.from('message_reactions').upsert(
-      {'message_id': messageId, 'couple_id': coupleId, 'user_id': _me, 'emoji': emoji},
+      {'message_id': messageId, 'couple_id': coupleId, 'user_id': _me, 'emoji': reaction.key},
       onConflict: 'message_id,user_id',
     );
   }

@@ -105,13 +105,20 @@ class PopOnChange extends StatefulWidget {
 }
 
 class _PopOnChangeState extends State<PopOnChange> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 420));
+  // Made in initState, not lazily: with reduce motion build() never touches
+  // it, and a lazy controller first created in dispose() throws.
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+  }
 
   @override
   void didUpdateWidget(PopOnChange old) {
     super.didUpdateWidget(old);
-    if (old.trigger != widget.trigger) _c.forward(from: 0);
+    if (old.trigger != widget.trigger && !motionOff(context)) _c.forward(from: 0);
   }
 
   @override

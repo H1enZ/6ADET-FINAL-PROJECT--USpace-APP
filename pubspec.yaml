@@ -35,5 +35,8 @@ flutter:
   # Home mood artwork: one transparent PNG per Home mood, named by its
   # database value (loved.png, need_a_hug.png, ...). Until a file exists the
   # app draws a placeholder in its place.
+  # Chat reaction artwork works the same way: assets/reactions/<key>.png
+  # (love.png, in_love.png, puppy_eyes.png, ...).
   assets:
     - assets/moods/
+    - assets/reactions/
