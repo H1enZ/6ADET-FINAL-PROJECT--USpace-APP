@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../atoms/seal_badge.dart';
+import '../capsule/wax_seal.dart';
 import 'motion.dart';
 
 /// The moment a Time Capsule opens: the envelope appears, the wax seal
@@ -148,10 +148,7 @@ class _SealOpeningState extends State<_SealOpening> with SingleTickerProviderSta
                                   angle: shake,
                                   child: Transform.scale(
                                     scale: 1 + sealGone * 0.5,
-                                    child: SealBadge(
-                                      size: 68,
-                                      state: cracked ? SealState.broken : SealState.sealed,
-                                    ),
+                                    child: WaxSeal(size: 68, crack: cracked ? 0.5 : 0),
                                   ),
                                 ),
                               ),
