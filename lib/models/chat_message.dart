@@ -52,7 +52,9 @@ class ChatMessage {
       );
 }
 
-/// The six reactions the database allows.
+/// The six original emoji reactions. Still valid in older rows (and shown
+/// read-only, see ReactionView), but no longer offered or written: new
+/// reactions use the keys in ChatReaction (migration 013).
 const chatReactions = ['❤️', '😂', '😮', '😢', '🥰', '👍'];
 
 /// Whether two messages belong in one visual group: same sender, within

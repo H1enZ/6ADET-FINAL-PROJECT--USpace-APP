@@ -2261,3 +2261,18 @@ alter table public.moods add constraint moods_mood_check check (mood in (
   -- History only: allowed so older check-ins stay valid
   'relaxed', 'tired', 'stressed', 'sad', 'anxious', 'lonely', 'upset'
 ));
+
+
+-- ===========================================================================
+-- 19. USpace chat reactions (also in migrations/013)
+-- ===========================================================================
+-- The eleven custom reactions as text keys; the six original emoji stay
+-- allowed so existing reactions remain valid.
+alter table public.message_reactions drop constraint if exists message_reactions_emoji_check;
+alter table public.message_reactions add constraint message_reactions_emoji_check check (emoji in (
+  -- Offered by the app (quick reactions, then "More")
+  'love', 'in_love', 'laugh', 'hug', 'kiss', 'puppy_eyes',
+  'aww', 'sad', 'upset', 'here_for_you', 'proud_of_you',
+  -- Original reactions: allowed so existing ones stay valid
+  '❤️', '😂', '😮', '😢', '🥰', '👍'
+));
