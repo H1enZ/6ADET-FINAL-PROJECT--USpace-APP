@@ -61,6 +61,14 @@ class _ChatScreenState extends State<ChatScreen> {
   int _loadGeneration = 0;
   bool _wantEnd = false;
 
+  // Whether the list follows the newest message: true until you scroll up,
+  // and again once you scroll back down. While true, the list stays at the
+  // bottom whenever its content changes (new messages, photos finishing
+  // loading); while false, your reading position is left alone.
+  bool _pinned = true;
+  int _autoScrolls = 0; // our own scrolls in progress, not yours
+  Size? _lastExtent; // content length and viewport height, last seen
+
   // Your reaction writes still in flight: message id -> the value shown
   // until the write finishes (null = removed). Laid over every load, so a
   // load that started before the write can't bring back the old reaction.
@@ -93,14 +101,40 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  bool get _nearBottom =>
-      !_scroll.hasClients ||
-      _scroll.position.maxScrollExtent - _scroll.position.pixels < 160;
+  bool _onScrolled(ScrollUpdateNotification n) {
+    if (_autoScrolls == 0) {
+      _pinned = n.metrics.maxScrollExtent - n.metrics.pixels < 48;
+    }
+    return false;
+  }
+
+  bool _onContentChanged(ScrollMetricsNotification n) {
+    // Also sent when only the scroll position moved; follow only when the
+    // content or the viewport changed size.
+    final extent = Size(n.metrics.maxScrollExtent, n.metrics.viewportDimension);
+    if (extent == _lastExtent) return false;
+    _lastExtent = extent;
+    _followEnd();
+    return false;
+  }
+
+  /// Keeps the newest message in view, if the list is following it.
+  void _followEnd() {
+    if (!_pinned || _trayOpen || !mounted || !_scroll.hasClients) return;
+    final position = _scroll.position;
+    if (_autoScrolls == 0 && position.isScrollingNotifier.value) return; // you're scrolling
+    if (position.maxScrollExtent - position.pixels < 1) return;
+    _autoScrolls++;
+    try {
+      position.jumpTo(position.maxScrollExtent);
+    } finally {
+      _autoScrolls--;
+    }
+  }
 
   Future<void> _load({bool scrollToEnd = false}) async {
     final generation = ++_loadGeneration;
     if (scrollToEnd) _wantEnd = true;
-    final stick = _nearBottom;
     try {
       final messages = await ChatService.recent(widget.coupleId);
       final reactions = await ChatService.reactions(widget.coupleId);
@@ -128,7 +162,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (messages.any((m) => m.senderId != _myId && m.readAt == null)) {
         unawaited(ChatService.markRead().catchError((_) {}));
       }
-      if ((stick || _wantEnd) && !_trayOpen) {
+      if (_wantEnd && !_trayOpen) {
         _wantEnd = false;
         _jumpToEnd();
       }
@@ -141,16 +175,24 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// Back to the newest message (after you send one), and follow it again.
   void _jumpToEnd() {
+    _pinned = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scroll.hasClients) return;
+      if (!mounted || !_scroll.hasClients) return;
       final still = MediaQuery.of(context).disableAnimations;
       final end = _scroll.position.maxScrollExtent;
       if (still) {
-        _scroll.jumpTo(end);
+        _followEnd();
       } else {
-        _scroll.animateTo(end,
-            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+        _autoScrolls++;
+        _scroll
+            .animateTo(end,
+                duration: const Duration(milliseconds: 250), curve: Curves.easeOut)
+            .whenComplete(() {
+          _autoScrolls--;
+          _followEnd(); // in case more arrived meanwhile
+        });
       }
     });
   }
@@ -213,7 +255,7 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Long-press (or right-click, or the screen reader's "React" action):
   /// the floating reaction tray next to the message, with the message's
   /// other actions under it.
-  Future<void> _openActions(ChatMessage m, Rect anchor) async {
+  Future<void> _openActions(ChatMessage m, Rect anchor, bool viaKeyboard) async {
     if (m.isDeleted) return;
     final mine = m.senderId == _myId;
     final myStored = _reactions[m.id]?[_myId];
@@ -222,6 +264,7 @@ class _ChatScreenState extends State<ChatScreen> {
       context,
       anchor: anchor,
       alignEnd: mine,
+      autofocus: viaKeyboard,
       // An older emoji reaction highlights its USpace match, if it has one.
       current: myStored == null ? null : ReactionView.of(myStored)?.reaction,
       actions: [
@@ -232,6 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ],
     );
     _trayOpen = false;
+    _followEnd(); // catch up on anything that arrived while it was open
     if (choice == null || !mounted) return;
 
     final reaction = choice.reaction;
@@ -427,7 +471,7 @@ class _ChatScreenState extends State<ChatScreen> {
         partnerName: p.displayName,
         bubbleKey: _bubbleKeys.putIfAbsent(m.id, GlobalKey.new),
         receipt: m.id == lastMineId ? (m.readAt != null ? 'Seen' : 'Sent') : null,
-        onOpenMenu: (anchor) => _openActions(m, anchor),
+        onOpenMenu: (anchor, viaKeyboard) => _openActions(m, anchor, viaKeyboard),
         onPhotoTap: m.photoUrl == null ? null : () => _viewPhoto(m.photoUrl!),
       );
       // Keyed by message, so each bubble keeps its own state when older
@@ -492,11 +536,17 @@ class _ChatScreenState extends State<ChatScreen> {
                         : Center(
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 720),
-                              child: ListView(
-                                controller: _scroll,
-                                padding: const EdgeInsets.fromLTRB(AppSpacing.md,
-                                    AppSpacing.md, AppSpacing.md, AppSpacing.md),
-                                children: items,
+                              child: NotificationListener<ScrollMetricsNotification>(
+                                onNotification: _onContentChanged,
+                                child: NotificationListener<ScrollUpdateNotification>(
+                                  onNotification: _onScrolled,
+                                  child: ListView(
+                                    controller: _scroll,
+                                    padding: const EdgeInsets.fromLTRB(AppSpacing.md,
+                                        AppSpacing.md, AppSpacing.md, AppSpacing.md),
+                                    children: items,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -639,19 +689,22 @@ class _Bubble extends StatelessWidget {
   final String partnerName;
   final String? receipt;
 
-  /// Opens the tray, given where the bubble is on screen.
-  final ValueChanged<Rect> onOpenMenu;
+  /// Opens the tray, given where the bubble is on screen and whether it
+  /// was opened from the keyboard (or a screen reader).
+  final void Function(Rect anchor, bool viaKeyboard) onOpenMenu;
   final VoidCallback? onPhotoTap;
 
   /// Kept by the chat screen per message (a key made here would change on
   /// every rebuild and rebuild the bubble with it).
   final GlobalKey bubbleKey;
 
-  void _open() {
+  void _open({bool viaKeyboard = false}) {
     final box = bubbleKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
-    onOpenMenu(box.localToGlobal(Offset.zero) & box.size);
+    onOpenMenu(box.localToGlobal(Offset.zero) & box.size, viaKeyboard);
   }
+
+  void _openFromKeyboard() => _open(viaKeyboard: true);
 
   @override
   Widget build(BuildContext context) {
@@ -695,7 +748,22 @@ class _Bubble extends StatelessWidget {
                             color: scheme.primaryContainer,
                             child: Icon(Icons.photo_outlined, color: scheme.primary),
                           )
-                        : Image.network(m.photoUrl!, fit: BoxFit.cover),
+                        : Image.network(
+                            m.photoUrl!,
+                            fit: BoxFit.cover,
+                            // Keep showing the photo if its link is renewed.
+                            gaplessPlayback: true,
+                            // Hold the placeholder's size until it loads, so
+                            // the conversation doesn't jump as it appears.
+                            frameBuilder: (context, child, frame, sync) =>
+                                frame == null && !sync
+                                    ? Container(
+                                        width: 200,
+                                        height: 140,
+                                        color: scheme.primaryContainer,
+                                      )
+                                    : child,
+                          ),
                   ),
                 ),
               ),
@@ -714,16 +782,22 @@ class _Bubble extends StatelessWidget {
           // Keyboard: Tab to a message, Enter opens the tray. Screen
           // readers get a "React" action as well as long-press.
           Semantics(
-            onTap: m.isDeleted ? null : _open,
+            onTap: m.isDeleted ? null : _openFromKeyboard,
             onTapHint: m.isDeleted ? null : 'show reactions and options',
             customSemanticsActions: m.isDeleted
                 ? null
-                : {const CustomSemanticsAction(label: 'React'): _open},
+                : {const CustomSemanticsAction(label: 'React'): _openFromKeyboard},
             child: FocusableActionDetector(
               enabled: !m.isDeleted,
               actions: {
                 ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
-                  _open();
+                  _openFromKeyboard();
+                  return null;
+                }),
+                // On the web, Enter sends ButtonActivateIntent, not ActivateIntent.
+                ButtonActivateIntent:
+                    CallbackAction<ButtonActivateIntent>(onInvoke: (_) {
+                  _openFromKeyboard();
                   return null;
                 }),
               },

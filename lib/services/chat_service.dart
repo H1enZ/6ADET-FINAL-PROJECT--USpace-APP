@@ -24,6 +24,12 @@ class ChatService {
 
   static String get _me => _db.auth.currentUser!.id;
 
+  // Signed photo links, reused across reloads until they near expiry. A new
+  // link on every reload made each photo download again and briefly lose
+  // its height, which shifted the conversation.
+  static final Map<String, ({String url, DateTime expires})> _signed = {};
+  static const _linkLife = Duration(hours: 1);
+
   /// The latest [limit] messages, oldest first, with photo links signed.
   static Future<List<ChatMessage>> recent(String coupleId, {int limit = 300}) async {
     final rows = await _db
@@ -34,18 +40,30 @@ class ChatService {
         .limit(limit);
     final messages = rows.map(ChatMessage.fromMap).toList().reversed.toList();
 
-    final paths = messages.map((m) => m.photoPath).whereType<String>().toList();
+    final paths = messages.map((m) => m.photoPath).whereType<String>().toSet();
     if (paths.isEmpty) return messages;
-    try {
-      final signed = await _db.storage.from(_bucket).createSignedUrls(paths, 60 * 60);
-      final urls = {for (final s in signed) s.path: s.signedUrl};
-      return [
-        for (final m in messages)
-          m.photoPath == null ? m : m.withPhotoUrl(urls[m.photoPath]),
-      ];
-    } catch (_) {
-      return messages;
+    final now = DateTime.now();
+    final unsigned = [
+      for (final p in paths)
+        if ((_signed[p]?.expires.difference(now) ?? Duration.zero) <
+            const Duration(minutes: 10))
+          p,
+    ];
+    if (unsigned.isNotEmpty) {
+      try {
+        final signed = await _db.storage
+            .from(_bucket)
+            .createSignedUrls(unsigned, _linkLife.inSeconds);
+        final expires = now.add(_linkLife);
+        for (final s in signed) {
+          if (s.signedUrl.isNotEmpty) _signed[s.path] = (url: s.signedUrl, expires: expires);
+        }
+      } catch (_) {}
     }
+    return [
+      for (final m in messages)
+        m.photoPath == null ? m : m.withPhotoUrl(_signed[m.photoPath]?.url),
+    ];
   }
 
   /// Reactions for this couple: message id -> {user id: stored value}

@@ -29,13 +29,17 @@ class MessageMenuChoice {
 /// [anchor] is the message bubble in global coordinates; the tray sits just
 /// above it (or below, near the top of the screen) and always stays on
 /// screen. [current] is your reaction on this message, highlighted; choosing
-/// it again removes it. [actions] are listed under the tray.
+/// it again removes it. [actions] are listed under the tray. [autofocus]
+/// focuses a reaction straight away; pass true only when the tray was
+/// opened from the keyboard, so a mouse user doesn't see a focus ring that
+/// looks like a chosen reaction.
 Future<MessageMenuChoice?> showReactionTray(
   BuildContext context, {
   required Rect anchor,
   required bool alignEnd,
   required ChatReaction? current,
   required List<MessageAction> actions,
+  bool autofocus = false,
 }) {
   final still = motionOff(context);
   return showGeneralDialog<MessageMenuChoice>(
@@ -49,6 +53,7 @@ Future<MessageMenuChoice?> showReactionTray(
       alignEnd: alignEnd,
       current: current,
       actions: actions,
+      autofocus: autofocus,
     ),
     transitionBuilder: (context, animation, _, child) {
       final curved = CurvedAnimation(parent: animation, curve: AppMotion.enter);
@@ -70,12 +75,14 @@ class _MessageMenu extends StatelessWidget {
     required this.alignEnd,
     required this.current,
     required this.actions,
+    required this.autofocus,
   });
 
   final Rect anchor;
   final bool alignEnd;
   final ChatReaction? current;
   final List<MessageAction> actions;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +110,7 @@ class _MessageMenu extends StatelessWidget {
                   ? CrossAxisAlignment.end
                   : CrossAxisAlignment.start,
               children: [
-                _ReactionTray(current: current),
+                _ReactionTray(current: current, autofocus: autofocus),
                 if (actions.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.sm),
                   _ActionsCard(actions: actions),
@@ -176,9 +183,10 @@ class _MenuLayout extends SingleChildLayoutDelegate {
 
 /// The reactions themselves: six quick ones and "More" for the rest.
 class _ReactionTray extends StatefulWidget {
-  const _ReactionTray({required this.current});
+  const _ReactionTray({required this.current, required this.autofocus});
 
   final ChatReaction? current;
+  final bool autofocus;
 
   @override
   State<_ReactionTray> createState() => _ReactionTrayState();
@@ -277,7 +285,7 @@ class _ReactionTrayState extends State<_ReactionTray>
                 reaction: r,
                 cell: cell,
                 selected: r == widget.current,
-                autofocus: r == focusFirst,
+                autofocus: widget.autofocus && r == focusFirst,
                 pop: r == _picked ? _pop : null,
                 onTap: () => _pick(r),
               );
