@@ -35,7 +35,6 @@ import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/home/mood_grid.dart';
 import '../widgets/home/mood_hero.dart';
-import '../widgets/home/partner_mood_chip.dart';
 import '../widgets/home/quick_actions.dart';
 import '../widgets/molecules/special_event_card.dart';
 import 'add_memory_sheet.dart';
@@ -50,7 +49,7 @@ import 'question_archive_screen.dart';
 import 'question_sheet.dart';
 import 'time_capsules/time_capsule_screen.dart';
 import 'work_it_out_screen.dart';
-import 'write_note_sheet.dart';
+import 'write_love_note_screen.dart';
 
 /// Home: how you are feeling today, front and centre, then shortcuts and
 /// the next special day. Recent activity lives behind the bell.
@@ -74,7 +73,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MoodEntry> _moods = [];
   List<QuestionAnswer> _answers = [];
   List<ImportantDate> _dates = [];
-  List<Map<String, dynamic>> _unseen = [];
   bool _partnerAnswered = false;
   int _unread = 0;
 
@@ -161,7 +159,6 @@ class _HomeScreenState extends State<HomeScreen> {
         QuestionService.answersFor(_coupleId, today),
         DatesService.list(_coupleId),
         ActivityService.recent(_coupleId, limit: 40),
-        AffectionService.unseenFromPartner(_coupleId, _myId),
       ]);
       final couple = first[0] as Couple?;
       final members = first[1] as List<Profile>;
@@ -169,7 +166,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final answers = first[3] as List<QuestionAnswer>;
       final dates = first[4] as List<ImportantDate>;
       final activities = first[5] as List<Activity>;
-      final unseen = first[6] as List<Map<String, dynamic>>;
 
       String? partnerId;
       for (final m in members) {
@@ -211,23 +207,18 @@ class _HomeScreenState extends State<HomeScreen> {
       final newNotifications = second[2] as int;
 
       if (!mounted || generation != _loadGeneration) return;
-      final newAffection = unseen.length > _unseen.length;
       setState(() {
         _couple = couple;
         _members = members;
         _moods = moods;
         _answers = answers;
         _dates = dates;
-        _unseen = unseen;
         _partnerAnswered = partnerAnswered;
         _unread = unread;
         _newNotifications = newNotifications;
         _error = null;
         _loading = false;
       });
-      if (newAffection) {
-        showGesturePulse(context, _affectionEmoji(unseen.first['kind']));
-      }
       _celebrateIfToday();
     } catch (e) {
       if (!mounted || generation != _loadGeneration) return;
@@ -249,14 +240,6 @@ class _HomeScreenState extends State<HomeScreen> {
       showFloatingHearts(context);
     }
   }
-
-  static String _affectionEmoji(Object? kind) => switch (kind) {
-    'hug' => '🫂',
-    'kiss' => '💋',
-    'cuddle' => '🤗',
-    'listen' => '👂',
-    _ => '💗',
-  };
 
   void _showMessage(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -387,10 +370,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _writeNote() async {
     if (_partner == null) return;
-    final sent = await _sheet(
-      WriteNoteSheet(coupleId: _coupleId, partnerName: _partnerName),
+    final sent = await openWriteLoveNote(
+      context,
+      coupleId: _coupleId,
+      partnerName: _partnerName,
     );
-    if (sent != true) return;
+    if (!sent) return;
     await _load();
     if (!mounted) return;
     showEnvelopeFly(context, emoji: '💌');
@@ -685,9 +670,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final today = _today;
     final saved = _savedMood;
     final shown = _preview ?? saved;
-    final partnerMood = partner == null
-        ? null
-        : latestMoodOn(_moods, partner.userId, today)?.mood;
     final myAnswered = _answers.any((a) => a.userId == _myId);
     const gap = AppSpacing.xl;
 
@@ -748,16 +730,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           after: AppSpacing.md,
         ),
-        if (partner != null)
-          section(
-            'partner-mood',
-            PartnerMoodChip(
-              partnerName: partnerFirst!,
-              mood: partnerMood,
-              onTap: _openMoodHistory,
-            ),
-            after: AppSpacing.md,
-          ),
         if (partner == null)
           section(
             'invite',
