@@ -3,8 +3,7 @@
 // Start-up order:
 //   1. Read the Supabase settings passed in at build time (lib/config.dart).
 //   2. Connect to Supabase, which also restores a saved session.
-//   3. Load the saved Light / Dark / System choice.
-//   4. Show Splash, which decides: Sign in, Pair, or Home.
+//   3. Show Splash, which decides: Sign in, Pair, or Home.
 
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/gestures.dart';
@@ -14,7 +13,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'screens/config_missing_screen.dart';
 import 'screens/splash_screen.dart';
-import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/organisms/phone_frame.dart';
 
@@ -35,8 +33,6 @@ Future<void> main() async {
     );
   }
 
-  await ThemeService.load();
-
   runApp(
     enableDevicePreview
         ? DevicePreview(builder: (context) => const USpaceApp())
@@ -49,33 +45,30 @@ class USpaceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Rebuilds with the new theme whenever it is changed on Profile.
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: ThemeService.mode,
-      builder: (context, themeMode, _) => MaterialApp(
-        title: 'USpace',
-        debugShowCheckedModeBanner: false,
+    return MaterialApp(
+      title: 'USpace',
+      debugShowCheckedModeBanner: false,
 
-        // On a wide window the app is shown inside a phone (see PhoneFrame:
-        // it wraps the Navigator, so dialogs and sheets open inside it).
-        // With DevicePreview on, its toolbar drives the app instead.
-        locale: enableDevicePreview ? DevicePreview.locale(context) : null,
-        builder: enableDevicePreview
-            ? DevicePreview.appBuilder
-            : (context, child) => PhoneFrame(child: child!),
+      // On a wide window the app is shown inside a phone (see PhoneFrame:
+      // it wraps the Navigator, so dialogs and sheets open inside it).
+      // With DevicePreview on, its toolbar drives the app instead.
+      locale: enableDevicePreview ? DevicePreview.locale(context) : null,
+      builder: enableDevicePreview
+          ? DevicePreview.appBuilder
+          : (context, child) => PhoneFrame(child: child!),
 
-        // Lets a mouse or trackpad drag sideways lists (filter pills, photo
-        // strips) on the web, the same way a finger swipes them on a phone.
-        scrollBehavior: const _DragEverywhereScrollBehavior(),
+      // Lets a mouse or trackpad drag sideways lists (filter pills, photo
+      // strips) on the web, the same way a finger swipes them on a phone.
+      scrollBehavior: const _DragEverywhereScrollBehavior(),
 
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: themeMode,
+      // Dark mode only.
+      theme: AppTheme.dark,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.dark,
 
-        home: AppConfig.isConfigured
-            ? const SplashScreen()
-            : const ConfigMissingScreen(),
-      ),
+      home: AppConfig.isConfigured
+          ? const SplashScreen()
+          : const ConfigMissingScreen(),
     );
   }
 }

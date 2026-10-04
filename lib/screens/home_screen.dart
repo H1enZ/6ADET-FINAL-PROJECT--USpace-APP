@@ -33,7 +33,6 @@ import '../widgets/atoms/header_icon_button.dart';
 import '../widgets/brand/uspace_wordmark.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
-import '../widgets/home/home_card.dart';
 import '../widgets/home/mood_grid.dart';
 import '../widgets/home/mood_hero.dart';
 import '../widgets/home/partner_mood_chip.dart';
@@ -690,10 +689,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ? null
         : latestMoodOn(_moods, partner.userId, today)?.mood;
     final myAnswered = _answers.any((a) => a.userId == _myId);
-    final upcoming = _dates
-        .where((d) => d.daysUntil() != null)
-        .take(3)
-        .toList();
     const gap = AppSpacing.xl;
 
     // Each section is keyed, so when something appears above it after a
@@ -863,48 +858,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // The nearest special day, then the rest of what is coming up.
+        // The nearest special day.
         section(
           'countdown',
           KeyedSubtree(key: _countdownKey, child: _specialEventCard(today)),
-          after: AppSpacing.md,
-        ),
-        section(
-          'coming-up',
-          HomeCard(
-            title: 'Coming up',
-            actionLabel: 'Manage',
-            onAction: () => _push(ImportantDatesScreen(coupleId: _coupleId)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final d in upcoming)
-                  _CountdownRow(
-                    emoji: '📅',
-                    title: d.title,
-                    days: d.daysUntil()!,
-                    date: d.nextOccurrence()!,
-                  ),
-                for (final m in _members)
-                  if (m.birthday != null)
-                    _CountdownRow(
-                      emoji: '🎂',
-                      title: m.userId == _myId
-                          ? 'Your birthday'
-                          : "${_first(m.displayName)}'s birthday",
-                      days: AnniversaryInfo.from(m.birthday!).daysUntilNext,
-                      date: AnniversaryInfo.from(m.birthday!).nextDate,
-                    ),
-                if (upcoming.isEmpty &&
-                    !_members.any((m) => m.birthday != null))
-                  Text(
-                    'Save your first date, a monthsary or a trip, '
-                    'and it will count down here.',
-                    style: muted,
-                  ),
-              ],
-            ),
-          ),
           after: 0,
         ),
       ],
@@ -1018,58 +975,6 @@ class _SectionTitle extends StatelessWidget {
               ),
               child: Text(actionLabel!),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CountdownRow extends StatelessWidget {
-  const _CountdownRow({
-    required this.emoji,
-    required this.title,
-    required this.days,
-    required this.date,
-  });
-
-  final String emoji;
-  final String title;
-  final int days;
-  final DateTime date;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final when = days == 0
-        ? 'Today! 🎉'
-        : days == 1
-        ? 'Tomorrow'
-        : 'in $days days';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                when,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: scheme.primary,
-                ),
-              ),
-              Text(
-                shortDate(date),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
