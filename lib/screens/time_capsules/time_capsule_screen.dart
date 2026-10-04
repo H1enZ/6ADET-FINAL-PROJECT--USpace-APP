@@ -3,17 +3,22 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
+import '../../models/love_note.dart';
 import '../../models/profile.dart';
 import '../../models/time_capsule.dart';
 import '../../services/auth_service.dart';
 import '../../services/couple_service.dart';
+import '../../services/note_service.dart';
 import '../../services/time_capsule_service.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/anniversary.dart';
 import '../../utils/capsule_time.dart';
 import '../../widgets/atoms/filter_pill.dart';
+import '../../widgets/capsule/capsule_summary_card.dart';
 import '../../widgets/capsule/envelope.dart';
 import '../../widgets/effects/motion.dart';
+import '../../widgets/notes/note_style.dart';
+import '../love_note_detail_screen.dart';
 import 'capsule_composer_screen.dart';
 import 'capsule_view_screen.dart';
 
@@ -64,6 +69,12 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
   bool _loading = true;
   String? _error;
   String? _hiddenDraft; // deleted, while Undo is still possible
+
+  // Previous capsules: the older ones written as love notes with an unlock
+  // time. Still sealed (envelope only, never the text), and opened (now
+  // readable notes). Shown here so every capsule lives on one screen.
+  List<SealedNote> _oldSealed = [];
+  List<LoveNote> _oldOpened = [];
 
   Timer? _refresh;
   Timer? _tick;
@@ -176,6 +187,8 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
         const SnackBar(content: Text('Your Time Capsule is now sealed.')),
       );
       _load(); // its contents are no longer yours to read
+    } else if (_oldSealed.any((n) => n.isReady(now: now))) {
+      _load(); // a previous capsule's moment arrived
     }
     setState(() {});
   }
@@ -202,6 +215,18 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
           if (c.isOpened) c.id,
       ]);
       final seen = await TimeCapsuleService.seenSteps(_myId);
+      var oldSealed = _oldSealed;
+      var oldOpened = _oldOpened;
+      try {
+        oldSealed = await NoteService.sealed();
+        oldOpened = [
+          for (final n in await NoteService.list(_coupleId))
+            if (n.wasCapsule) n,
+        ];
+      } catch (_) {} // the new capsules still show without them
+      final justOpened = oldOpened
+          .where((n) => _oldSealed.any((s) => s.id == n.id))
+          .length;
       if (!mounted) return;
       setState(() {
         _names = {for (final m in members) m.userId: m.displayName};
@@ -210,6 +235,8 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
         _contents = contents;
         _replies = replies;
         _seen = seen;
+        _oldSealed = oldSealed;
+        _oldOpened = oldOpened;
         _inGrace = {
           for (final c in capsules)
             if (c.senderId == _myId && c.inGrace(now)) c.id,
@@ -220,6 +247,13 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
         _error = null;
         _loading = false;
       });
+      if (justOpened > 0) {
+        _showMessage(
+          justOpened == 1
+              ? 'A previous capsule just opened. It is under Opened.'
+              : '$justOpened previous capsules just opened. They are under Opened.',
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -357,6 +391,93 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     await _load();
   }
 
+  Future<void> _cancelOld(SealedNote n) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel this capsule?'),
+        content: const Text(
+          'It will be deleted unopened. Nobody will ever read it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep it'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cancel capsule'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await NoteService.cancelCapsule(n.id);
+      _showMessage('Capsule cancelled.');
+    } catch (e) {
+      _showMessage(friendlyError(e));
+    }
+    await _load();
+  }
+
+  Future<void> _viewOld(LoveNote n) => _push<bool>(
+    LoveNoteDetailScreen(
+      note: n,
+      authorName:
+          _names[n.authorId] ?? (n.authorId == _myId ? 'You' : _partnerName),
+      isMine: n.authorId == _myId,
+    ),
+  );
+
+  /// A previous capsule: sealed (envelope only) or opened (a readable note).
+  Widget _oldCard(Object item, DateTime now) {
+    String at(DateTime d) => '${longDate(d)}, ${clockTime(d)}';
+    if (item is SealedNote) {
+      final mine = item.authorId == _myId;
+      final person = mine ? 'To $_partnerName' : 'From $_partnerName';
+      return CapsuleSummaryCard(
+        key: ValueKey('old-${item.id}'),
+        state: CapsuleCardState.sealed,
+        headlineLead: 'Opens',
+        headlineAccent: opensIn(item.unlockAt, now: now),
+        // A previous capsule's teaser was always shown on its envelope.
+        subtitle:
+            item.capsuleTitle ??
+            (mine
+                ? 'A sealed message for $_partnerName'
+                : 'A special message for you'),
+        person: person,
+        when: at(item.unlockAt),
+        trailing: mine
+            ? IconButton(
+                tooltip: 'Cancel capsule',
+                onPressed: () => _cancelOld(item),
+                icon: const Icon(Icons.close_rounded, color: NotePalette.cream),
+              )
+            : null,
+        semanticLabel:
+            'Sealed time capsule $person. Opens ${at(item.unlockAt)}',
+      );
+    }
+    final n = item as LoveNote;
+    final mine = n.authorId == _myId;
+    final person = mine ? 'To $_partnerName' : 'From $_partnerName';
+    final first = n.body.trim().split('\n').first;
+    return CapsuleSummaryCard(
+      key: ValueKey('old-${n.id}'),
+      state: CapsuleCardState.opened,
+      headlineLead: 'Opened',
+      headlineAccent: 'on ${longDate(n.unlockAt!)}',
+      subtitle: n.capsuleTitle ?? first,
+      person: person,
+      when: at(n.unlockAt!),
+      onTap: () => _viewOld(n),
+      semanticLabel:
+          'Opened time capsule $person. ${n.capsuleTitle ?? ''} $first',
+    );
+  }
+
   Future<void> _view(TimeCapsule c) => _push<void>(
     CapsuleViewScreen(
       capsule: c,
@@ -400,7 +521,14 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     final openedReceived = theirs.where((c) => c.isOpened).toList()
       ..sort(byOpened);
 
+    final oldSealed = _oldSealed.where((n) => !n.isReady(now: now)).toList();
+    final oldOpened = _oldOpened;
     final filter = _filter ?? _Filter.sealed;
+    final oldList = switch (filter) {
+      _Filter.sealed => <Object>[...oldSealed],
+      _Filter.ready => const <Object>[],
+      _Filter.opened => <Object>[...oldOpened],
+    };
     final (
       firstLabel,
       firstList,
@@ -545,7 +673,9 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
                                 label: 'Sealed',
                                 selected: filter == _Filter.sealed,
                                 count:
-                                    sealedSent.length + sealedReceived.length,
+                                    sealedSent.length +
+                                    sealedReceived.length +
+                                    oldSealed.length,
                                 onTap: () => _choose(_Filter.sealed),
                               ),
                               FilterPill(
@@ -559,16 +689,41 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
                                 label: 'Opened',
                                 selected: filter == _Filter.opened,
                                 count:
-                                    openedSent.length + openedReceived.length,
+                                    openedSent.length +
+                                    openedReceived.length +
+                                    oldOpened.length,
                                 onTap: () => _choose(_Filter.opened),
                               ),
                             ],
                           ),
-                          if (firstList.isEmpty && secondList.isEmpty)
+                          if (firstList.isEmpty &&
+                              secondList.isEmpty &&
+                              oldList.isEmpty)
                             _Empty(text: empty)
                           else ...[
-                            ...section(firstLabel, firstList),
-                            ...section(secondLabel, secondList),
+                            if (firstList.isNotEmpty ||
+                                secondList.isNotEmpty) ...[
+                              ...section(firstLabel, firstList),
+                              ...section(secondLabel, secondList),
+                            ],
+                            if (oldList.isNotEmpty) ...[
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: AppSpacing.lg,
+                                  bottom: AppSpacing.sm,
+                                ),
+                                child: Semantics(
+                                  header: true,
+                                  child: Text(
+                                    'PREVIOUS CAPSULES',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              for (final o in oldList) _oldCard(o, now),
+                            ],
                           ],
                         ],
                       ),
@@ -692,24 +847,18 @@ class _CapsuleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final c = capsule;
-    final muted = theme.textTheme.bodySmall?.copyWith(
-      color: scheme.onSurfaceVariant,
-    );
     final grace = c.inGrace(now);
     final ready = c.isReady(now);
-    final whoLine = mine ? 'To $partnerName' : 'From $partnerName';
-
-    final EnvelopeLook look;
-    final List<Widget> lines;
-    Widget? actions;
-    VoidCallback? onTap;
-    String? semantic;
+    final person = mine ? 'To $partnerName' : 'From $partnerName';
+    String at(DateTime d) => '${longDate(d)}, ${clockTime(d)}';
+    // A sealed capsule's title stays hidden: only its sender, during the
+    // ten editable minutes, and anyone once it's opened may see it.
+    final safeLine = mine
+        ? 'A sealed message for $partnerName'
+        : 'A special message for you';
 
     if (c.isOpened) {
-      look = EnvelopeLook.opened;
       final title = contents?.title;
       final first = contents?.firstLine ?? '';
       final receiverReplied = replies.any((r) => r.authorId == c.receiverId);
@@ -721,163 +870,101 @@ class _CapsuleCard extends StatelessWidget {
                 ? '$partnerName replied'
                 : "They've opened your capsule")
           : (receiverReplied ? 'You replied' : "Reply when you're ready");
-      lines = [
-        Text(
-          title ?? whoLine,
-          style: theme.textTheme.titleMedium,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        if (title != null) Text(whoLine, style: muted),
-        if (first.isNotEmpty)
-          Text(
-            first,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium,
-          ),
-        Text('Opened ${longDate(c.openedAt!)} · $status', style: muted),
-      ];
-      onTap = onOpen;
-      semantic =
-          'Opened time capsule. ${title ?? ''} $whoLine. $first. $status';
-    } else if (grace) {
-      look = EnvelopeLook.sealed;
-      final left = c.editableUntil!.difference(now);
-      lines = [
-        Text(whoLine, style: theme.textTheme.titleMedium),
-        Text(
-          'Opens ${longDate(c.unlockAt!)} at ${clockTime(c.unlockAt!)}',
-          style: muted,
-        ),
-        Semantics(
-          liveRegion: false,
-          child: Text(
-            'Editable for ${_mmss(left)}',
-            style: theme.textTheme.labelLarge?.copyWith(color: scheme.primary),
-          ),
-        ),
-      ];
-      actions = Wrap(
-        spacing: AppSpacing.sm,
-        children: [
-          OutlinedButton.icon(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            label: const Text('Edit'),
-          ),
-          TextButton(onPressed: onCancel, child: const Text('Cancel')),
-        ],
+      return CapsuleSummaryCard(
+        key: key,
+        state: CapsuleCardState.opened,
+        headlineLead: 'Opened',
+        headlineAccent: 'on ${longDate(c.openedAt!)}',
+        subtitle:
+            title ??
+            (first.isNotEmpty
+                ? first
+                : (mine
+                      ? 'Your message to $partnerName'
+                      : 'A message from $partnerName')),
+        person: person,
+        when: at(c.unlockAt!),
+        note: status,
+        noteColor: NotePalette.muted,
+        unread: unread,
+        highlighted: highlighted,
+        onTap: onOpen,
+        semanticLabel:
+            'Opened time capsule. ${title ?? ''} $person. $first. $status',
       );
-      semantic =
-          'Sealed time capsule to $partnerName, editable for ${left.inMinutes} more minutes';
-    } else if (ready) {
-      look = mine ? EnvelopeLook.sealed : EnvelopeLook.ready;
-      lines = [
-        Text(whoLine, style: theme.textTheme.titleMedium),
-        Text(
-          'Ready since ${longDate(c.readySince)} at ${clockTime(c.readySince)}',
-          style: muted,
-        ),
-        Text(
-          mine ? 'Ready when they are.' : 'Ready to open',
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: mine ? scheme.onSurfaceVariant : scheme.primary,
-          ),
-        ),
-      ];
-      if (!mine) {
-        actions = FilledButton.icon(
-          onPressed: onOpen,
-          icon: const Icon(Icons.drafts_outlined, size: 18),
-          label: const Text('Open now'),
-        );
-        onTap = onOpen;
-      }
-      semantic = mine
-          ? 'Your time capsule to $partnerName is ready. Ready when they are.'
-          : 'A time capsule from $partnerName is ready to open';
-    } else {
-      look = EnvelopeLook.sealed;
-      lines = [
-        Text(whoLine, style: theme.textTheme.titleMedium),
-        Text(
-          'Opens ${longDate(c.unlockAt!)} at ${clockTime(c.unlockAt!)}',
-          style: muted,
-        ),
-        Text(
-          opensIn(c.unlockAt!, now: now),
-          style: theme.textTheme.labelLarge?.copyWith(color: scheme.secondary),
-        ),
-        // Shown on this visit once its ten minutes run out on screen.
-        if (mine && pressKey != null)
-          Text(
-            'Your Time Capsule is now sealed.',
-            style: theme.textTheme.bodySmall?.copyWith(color: scheme.tertiary),
-          ),
-      ];
-      semantic =
-          'Sealed time capsule $whoLine. Opens ${longDate(c.unlockAt!)} at ${clockTime(c.unlockAt!)}';
     }
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Material(
-        color: scheme.surfaceContainerHighest,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          side: highlighted
-              ? BorderSide(color: scheme.primary, width: 2)
-              : BorderSide(color: scheme.outline),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Semantics(
-            label: semantic + (unread ? '. New' : ''),
-            excludeSemantics: actions == null,
-            container: true,
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      MiniEnvelope(look: look, width: 64, pressKey: pressKey),
-                      const SizedBox(width: AppSpacing.lg),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: lines,
-                        ),
-                      ),
-                      if (unread)
-                        Container(
-                          width: 10,
-                          height: 10,
-                          margin: const EdgeInsets.only(
-                            left: AppSpacing.sm,
-                            top: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: scheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (actions != null) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Align(alignment: Alignment.centerRight, child: actions),
-                  ],
-                ],
-              ),
-            ),
+    if (grace) {
+      final left = c.editableUntil!.difference(now);
+      return CapsuleSummaryCard(
+        key: key,
+        state: CapsuleCardState.grace,
+        headlineLead: 'Opens',
+        headlineAccent: opensIn(c.unlockAt!, now: now),
+        subtitle: contents?.title ?? safeLine,
+        person: person,
+        when: at(c.unlockAt!),
+        note: 'Editable for ${_mmss(left)}',
+        unread: unread,
+        highlighted: highlighted,
+        actions: [
+          CapsuleCardButton(label: 'Cancel', onPressed: onCancel),
+          CapsuleCardButton(
+            label: 'Edit',
+            icon: Icons.edit_outlined,
+            primary: true,
+            onPressed: onEdit,
           ),
-        ),
-      ),
+        ],
+        semanticLabel:
+            'Sealed time capsule to $partnerName, editable for ${left.inMinutes} more minutes',
+      );
+    }
+
+    if (ready) {
+      return CapsuleSummaryCard(
+        key: key,
+        state: CapsuleCardState.ready,
+        headlineLead: 'Ready',
+        headlineAccent: mine ? 'when they are' : 'to open',
+        subtitle: safeLine,
+        person: person,
+        when: 'Ready since ${at(c.readySince)}',
+        unread: unread,
+        highlighted: highlighted,
+        onTap: mine ? null : onOpen,
+        actions: [
+          if (!mine)
+            CapsuleCardButton(
+              label: 'Open now',
+              icon: Icons.drafts_outlined,
+              primary: true,
+              onPressed: onOpen,
+            ),
+        ],
+        semanticLabel: mine
+            ? 'Your time capsule to $partnerName is ready. Ready when they are.'
+            : 'A time capsule from $partnerName is ready to open',
+      );
+    }
+
+    return CapsuleSummaryCard(
+      key: key,
+      state: CapsuleCardState.sealed,
+      headlineLead: 'Opens',
+      headlineAccent: opensIn(c.unlockAt!, now: now),
+      subtitle: safeLine,
+      person: person,
+      when: at(c.unlockAt!),
+      // Shown on this visit once its ten minutes run out on screen.
+      note: mine && pressKey != null
+          ? 'Your Time Capsule is now sealed.'
+          : null,
+      noteColor: const Color(0xFF7FBFA0),
+      unread: unread,
+      highlighted: highlighted,
+      semanticLabel:
+          'Sealed time capsule $person. Opens ${longDate(c.unlockAt!)} at ${clockTime(c.unlockAt!)}',
     );
   }
 }
