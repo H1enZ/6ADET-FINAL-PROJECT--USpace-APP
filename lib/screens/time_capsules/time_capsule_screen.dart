@@ -32,9 +32,14 @@ class TimeCapsuleScreen extends StatefulWidget {
     required this.profile,
     this.openReady = false,
     this.highlightId,
+    this.startComposing = false,
   });
 
   final Profile profile;
+
+  /// Opened from the Home "Time Capsule" card: go straight to writing one
+  /// (your draft, if you have one) once the list has loaded.
+  final bool startComposing;
 
   /// Opened from a "ready" notification: show Ready (this visit only; the
   /// remembered filter is left as it was).
@@ -91,7 +96,11 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
       if (saved != null) setState(() => _filter = saved);
     });
     _start();
-    _load();
+    _load().then((_) {
+      if (mounted && widget.startComposing && _error == null) {
+        _compose(capsule: _draft);
+      }
+    });
   }
 
   @override

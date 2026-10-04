@@ -791,23 +791,47 @@ class _HomeScreenState extends State<HomeScreen> {
               QuickActions(
                 actions: [
                   QuickAction(
-                    'Add memory',
-                    Icons.add_photo_alternate_outlined,
-                    _addMemory,
-                  ),
-                  QuickAction(
-                    'Love note',
-                    Icons.mail_outline_rounded,
-                    partner == null ? null : _writeNote,
+                    title: 'Love Note',
+                    subtitle: 'Say something sweet',
+                    art: QuickActionArt.loveNote,
+                    onTap: partner == null ? null : _writeNote,
                     disabledReason: _needsPartner,
                   ),
                   QuickAction(
-                    'Send a hug',
-                    Icons.volunteer_activism_outlined,
-                    partner == null ? null : _sendHug,
-                    disabledReason: _needsPartner,
+                    title: 'Add Memory',
+                    subtitle: 'Save this moment',
+                    art: QuickActionArt.memory,
+                    onTap: _addMemory,
+                  ),
+                  // There is no separate date planner: the bucket list is
+                  // where the two of you keep the things you want to do.
+                  QuickAction(
+                    title: 'Plan a Date',
+                    subtitle: 'Make time together',
+                    art: QuickActionArt.date,
+                    onTap: () => _push(
+                      BucketListScreen(profile: widget.profile),
+                      reload: true,
+                    ),
                   ),
                   QuickAction(
+                    title: 'Time Capsule',
+                    subtitle: 'Send something for later',
+                    art: QuickActionArt.capsule,
+                    onTap: partner == null
+                        ? null
+                        : () => _push(
+                            TimeCapsuleScreen(
+                              profile: widget.profile,
+                              startComposing: true,
+                            ),
+                            reload: true,
+                          ),
+                    disabledReason: _needsPartner,
+                  ),
+                ],
+                more: [
+                  MoreAction(
                     'Daily question',
                     Icons.forum_outlined,
                     _answerQuestion,
@@ -816,7 +840,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? '$partnerFirst answered'
                         : null,
                   ),
-                  QuickAction(
+                  MoreAction(
                     'Our questions',
                     Icons.history_edu_outlined,
                     () => _push(
@@ -827,29 +851,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  QuickAction(
+                  MoreAction(
                     'Work it out',
                     Icons.handshake_outlined,
                     partner == null ? null : _openWorkItOut,
-                    disabledReason: _needsPartner,
-                  ),
-                  QuickAction(
-                    'Bucket list',
-                    Icons.checklist_rounded,
-                    () => _push(
-                      BucketListScreen(profile: widget.profile),
-                      reload: true,
-                    ),
-                  ),
-                  QuickAction(
-                    'Time capsules',
-                    Icons.lock_clock_outlined,
-                    partner == null
-                        ? null
-                        : () => _push(
-                            TimeCapsuleScreen(profile: widget.profile),
-                            reload: true,
-                          ),
                     disabledReason: _needsPartner,
                   ),
                 ],
