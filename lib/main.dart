@@ -16,6 +16,7 @@ import 'screens/config_missing_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/organisms/phone_frame.dart';
 
 /// The DevicePreview phone frame is for responsive-layout work only. It is
 /// off unless the build asks for it:
@@ -55,9 +56,13 @@ class USpaceApp extends StatelessWidget {
         title: 'USpace',
         debugShowCheckedModeBanner: false,
 
-        // These two lines make the DevicePreview toolbar change the app.
+        // On a wide window the app is shown inside a phone (see PhoneFrame:
+        // it wraps the Navigator, so dialogs and sheets open inside it).
+        // With DevicePreview on, its toolbar drives the app instead.
         locale: enableDevicePreview ? DevicePreview.locale(context) : null,
-        builder: enableDevicePreview ? DevicePreview.appBuilder : null,
+        builder: enableDevicePreview
+            ? DevicePreview.appBuilder
+            : (context, child) => PhoneFrame(child: child!),
 
         // Lets a mouse or trackpad drag sideways lists (filter pills, photo
         // strips) on the web, the same way a finger swipes them on a phone.

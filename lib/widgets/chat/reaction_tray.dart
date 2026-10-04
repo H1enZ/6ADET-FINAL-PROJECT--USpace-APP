@@ -42,6 +42,14 @@ Future<MessageMenuChoice?> showReactionTray(
   bool autofocus = false,
 }) {
   final still = motionOff(context);
+  // The tray is laid out in the Navigator's overlay, which is not at the
+  // window's origin when the app is shown inside the desktop phone frame.
+  final overlay =
+      Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
+  final local = Rect.fromPoints(
+    overlay.globalToLocal(anchor.topLeft),
+    overlay.globalToLocal(anchor.bottomRight),
+  );
   return showGeneralDialog<MessageMenuChoice>(
     context: context,
     barrierDismissible: true,
@@ -49,7 +57,7 @@ Future<MessageMenuChoice?> showReactionTray(
     barrierColor: Colors.black.withValues(alpha: 0.12),
     transitionDuration: still ? Duration.zero : AppMotion.quick,
     pageBuilder: (context, _, _) => _MessageMenu(
-      anchor: anchor,
+      anchor: local,
       alignEnd: alignEnd,
       current: current,
       actions: actions,
