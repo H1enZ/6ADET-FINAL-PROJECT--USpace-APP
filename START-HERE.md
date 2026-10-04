@@ -46,14 +46,17 @@ flutter pub get
 flutter run -d web-server --web-port 8080
 ```
 
-You should see the "It works" screen inside a phone frame. That frame is
-`device_preview`, the same one from Modules 4 and 5.
+The app runs on its own, with no phone frame. The `device_preview` frame (the
+same one from Modules 4 and 5) is opt-in, for checking layouts on other
+screen sizes:
 
-**It stays on in the deployed build too**, on purpose: your live link gets opened
-on a desktop browser, and a phone layout stretched across a wide window looks
-broken when it is not framed. The toolbar also lets whoever opens it switch
-device and orientation. If you would rather ship the clean app with no frame,
-`lib/main.dart` says exactly which line to change.
+```bash
+flutter run -d edge --dart-define=ENABLE_DEVICE_PREVIEW=true
+```
+
+**The deployed build never includes it.** The frame moves the whole app
+between parents after it loads, which breaks menus and tooltips that are
+open at that moment.
 
 **Want to see where this ends up?** This template's own build is deployed at
 https://hau-6adet.github.io/final-project-template/ by the workflow in step 3.

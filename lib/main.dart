@@ -17,6 +17,13 @@ import 'screens/splash_screen.dart';
 import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
 
+/// The DevicePreview phone frame is for responsive-layout work only. It is
+/// off unless the build asks for it:
+///   flutter run -d edge --dart-define=ENABLE_DEVICE_PREVIEW=true
+/// Normal runs and the deployed build never include the wrapper (it moves
+/// the whole app between parents after it loads, which breaks open overlays).
+const bool enableDevicePreview = bool.fromEnvironment('ENABLE_DEVICE_PREVIEW');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -30,11 +37,9 @@ Future<void> main() async {
   await ThemeService.load();
 
   runApp(
-    // Phone frame, kept on in the deployed build on purpose (see START-HERE.md).
-    DevicePreview(
-      enabled: true,
-      builder: (context) => const USpaceApp(),
-    ),
+    enableDevicePreview
+        ? DevicePreview(builder: (context) => const USpaceApp())
+        : const USpaceApp(),
   );
 }
 
@@ -51,8 +56,8 @@ class USpaceApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
 
         // These two lines make the DevicePreview toolbar change the app.
-        locale: DevicePreview.locale(context),
-        builder: DevicePreview.appBuilder,
+        locale: enableDevicePreview ? DevicePreview.locale(context) : null,
+        builder: enableDevicePreview ? DevicePreview.appBuilder : null,
 
         // Lets a mouse or trackpad drag sideways lists (filter pills, photo
         // strips) on the web, the same way a finger swipes them on a phone.
@@ -78,9 +83,9 @@ class _DragEverywhereScrollBehavior extends MaterialScrollBehavior {
 
   @override
   Set<PointerDeviceKind> get dragDevices => {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
-        PointerDeviceKind.trackpad,
-        PointerDeviceKind.stylus,
-      };
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
 }
