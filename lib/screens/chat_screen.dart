@@ -321,7 +321,15 @@ class _ChatScreenState extends State<ChatScreen> {
     if (before == null) return;
     final label = ReactionView.of(before)?.label;
     _announce(label == null ? 'Reaction removed' : 'Removed your $label reaction');
-    await _write(m.id, null, before, () => ChatService.removeReaction(m.id));
+    await _write(m.id, null, before, () async {
+      await ChatService.removeReaction(m.id);
+      // The removal itself is saved; if the nudge to your partner fails,
+      // they still see it on their next reload.
+      final live = _live;
+      if (live != null) {
+        ChatService.announceReactionsChanged(live).catchError((_) {});
+      }
+    });
   }
 
   /// Shows [value] as your reaction (null = none) while [save] runs. If it

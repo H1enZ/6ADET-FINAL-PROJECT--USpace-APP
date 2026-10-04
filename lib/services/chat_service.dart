@@ -151,8 +151,11 @@ class ChatService {
     return rows.length;
   }
 
+  /// Broadcast on the couple's chat channel after a reaction is removed.
+  static const _reactionsChanged = 'reactions_changed';
+
   /// Calls [onChange] when a message is sent, edited, deleted or read, or
-  /// a reaction is added or changed.
+  /// a reaction is added, changed or removed.
   static RealtimeChannel listen(String coupleId, void Function() onChange) {
     final filter = PostgresChangeFilter(
       type: PostgresChangeFilterType.eq,
@@ -175,7 +178,17 @@ class ChatService {
           filter: filter,
           callback: (_) => onChange(),
         )
+        // Realtime doesn't deliver DELETE events through a filtered
+        // subscription, so a removed reaction is announced here instead.
+        .onBroadcast(event: _reactionsChanged, callback: (_) => onChange())
         .subscribe();
+  }
+
+  /// Tells your partner's open chat to reload reactions after you removed
+  /// one. The message carries nothing: they re-read reactions themselves,
+  /// through the usual row-level security.
+  static Future<void> announceReactionsChanged(RealtimeChannel channel) async {
+    await channel.sendBroadcastMessage(event: _reactionsChanged, payload: {});
   }
 
   static Future<void> stopListening(RealtimeChannel channel) async {
