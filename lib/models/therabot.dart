@@ -285,6 +285,7 @@ class SharedReflection {
     required this.possibleMisunderstandings,
     required this.commonGround,
     required this.discussionQuestions,
+    this.somethingToTry = const [],
   });
 
   final List<Perspective> perspectives;
@@ -294,6 +295,9 @@ class SharedReflection {
   /// Often empty. When it is, the screen shows nothing, never filler.
   final List<String> commonGround;
   final List<String> discussionQuestions;
+
+  /// Gentle ideas to try together (newer reflections; older ones have none).
+  final List<String> somethingToTry;
 
   Perspective? perspectiveOf(int partner) {
     for (final p in perspectives) {
@@ -323,6 +327,7 @@ class SharedReflection {
       possibleMisunderstandings: _strings(m['possible_misunderstandings']),
       commonGround: _strings(m['common_ground']),
       discussionQuestions: _strings(m['discussion_questions']),
+      somethingToTry: _strings(m['something_to_try']),
     );
   }
 }

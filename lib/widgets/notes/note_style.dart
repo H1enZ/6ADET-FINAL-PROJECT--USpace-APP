@@ -307,12 +307,16 @@ class NotePrimaryButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.loading = false,
+    this.iconAfter = false,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
   final bool loading;
+
+  /// Puts the icon after the label, for a "go on" arrow.
+  final bool iconAfter;
 
   @override
   Widget build(BuildContext context) {
@@ -355,12 +359,14 @@ class NotePrimaryButton extends StatelessWidget {
                       : Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              icon,
-                              size: 22,
-                              color: const Color(0xFF3A0A19),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
+                            if (!iconAfter) ...[
+                              Icon(
+                                icon,
+                                size: 22,
+                                color: const Color(0xFF3A0A19),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                            ],
                             Text(
                               label,
                               style: Theme.of(context).textTheme.labelLarge
@@ -369,6 +375,14 @@ class NotePrimaryButton extends StatelessWidget {
                                     color: const Color(0xFF3A0A19),
                                   ),
                             ),
+                            if (iconAfter) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Icon(
+                                icon,
+                                size: 22,
+                                color: const Color(0xFF3A0A19),
+                              ),
+                            ],
                           ],
                         ),
                 ),

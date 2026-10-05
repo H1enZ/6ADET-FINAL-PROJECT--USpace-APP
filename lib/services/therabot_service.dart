@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config.dart';
 import '../models/therabot.dart';
+import '../models/therabot_chat.dart';
 
 /// Therabot: "A private relationship reflection assistant".
 ///
@@ -148,6 +149,163 @@ class TherabotService {
     final data = await _invoke({'action': 'reflect', 'session_id': sessionId});
     final status = data['status'];
     return status is String ? status : 'unknown';
+  });
+
+  // ------------------------------------------------------- guided chat (016)
+
+  static ChatResult _chatResult(Map<String, dynamic> data, {String? talkId}) {
+    if (data['status'] == 'safety') {
+      final safety = data['safety'];
+      final message = safety is Map ? safety['message'] : null;
+      return ChatSafety(
+        message is String && message.isNotEmpty
+            ? message
+            : therabotSafetyFallback,
+      );
+    }
+    if (data['stage'] == 'done' && data.containsKey('both_finished')) {
+      return ChatFinished(bothFinished: data['both_finished'] == true);
+    }
+    return ChatUpdated(ChatView.fromResponse(data, talkId: talkId));
+  }
+
+  /// Starts a Private Talk. [reasonText] only with the key "custom".
+  static Future<ChatResult> talkStart(String reasonKey, {String? reasonText}) =>
+      _guard(() async {
+        final data = await _invoke({
+          'action': 'talk_start',
+          'reason_key': reasonKey,
+          'reason_text': ?reasonText,
+        });
+        return _chatResult(data);
+      });
+
+  static Future<ChatResult> talkMessage(String talkId, String text) =>
+      _guard(() async {
+        final data = await _invoke({
+          'action': 'talk_message',
+          'talk_id': talkId,
+          'text': text,
+        });
+        return _chatResult(data, talkId: talkId);
+      });
+
+  static Future<ChatResult> talkGoal(String talkId, String goal) =>
+      _guard(() async {
+        final data = await _invoke({
+          'action': 'talk_goal',
+          'talk_id': talkId,
+          'goal': goal,
+        });
+        return _chatResult(data, talkId: talkId);
+      });
+
+  static Future<ChatResult> talkSummary(String talkId) => _guard(() async {
+    final data = await _invoke({'action': 'talk_summary', 'talk_id': talkId});
+    return _chatResult(data, talkId: talkId);
+  });
+
+  /// Your edit of a Private Talk summary (kept privately).
+  static Future<void> talkSaveSummary(String talkId, String text) =>
+      _guard(() async {
+        await _db.rpc(
+          'therabot_talk_save_summary',
+          params: {'p_talk_id': talkId, 'p_summary': text.trim()},
+        );
+      });
+
+  static Future<void> talkFinish(String talkId) => _guard(() async {
+    await _db.rpc('therabot_talk_finish', params: {'p_talk_id': talkId});
+  });
+
+  static Future<void> talkDelete(String talkId) => _guard(() async {
+    await _db.rpc('therabot_talk_delete', params: {'p_talk_id': talkId});
+  });
+
+  /// Your newest Private Talk still open (under 24 hours, not finished).
+  static Future<ChatView?> openTalk() => _guard(() async {
+    final rows = await _db
+        .from('therabot_private_talks')
+        .select('id, goal, stage, messages, summary, ai_turns')
+        .neq('stage', 'done')
+        .neq('stage', 'safety')
+        .order('created_at', ascending: false)
+        .limit(1);
+    if (rows.isEmpty) return null;
+    final r = rows.first;
+    return ChatView.fromRow(r, stageKey: 'stage', talkId: r['id'] as String);
+  });
+
+  /// Opens your part of a Couple Reflection after you agreed (consent).
+  /// The partner who started passes the reason; the one who joins doesn't.
+  static Future<ChatResult> chatOpen(
+    String sessionId, {
+    String? reasonKey,
+    String? reasonText,
+  }) => _guard(() async {
+    final data = await _invoke({
+      'action': 'chat_open',
+      'session_id': sessionId,
+      'reason_key': ?reasonKey,
+      'reason_text': ?reasonText,
+    });
+    return _chatResult(data);
+  });
+
+  static Future<ChatResult> chatPick(
+    String sessionId,
+    String key, {
+    String? text,
+  }) => _guard(() async {
+    final data = await _invoke({
+      'action': 'chat_pick',
+      'session_id': sessionId,
+      'reason_key': key,
+      'reason_text': ?text,
+    });
+    return _chatResult(data);
+  });
+
+  static Future<ChatResult> chatMessage(String sessionId, String text) =>
+      _guard(() async {
+        final data = await _invoke({
+          'action': 'chat_message',
+          'session_id': sessionId,
+          'text': text,
+        });
+        return _chatResult(data);
+      });
+
+  static Future<ChatResult> chatGoal(String sessionId, String goal) =>
+      _guard(() async {
+        final data = await _invoke({
+          'action': 'chat_goal',
+          'session_id': sessionId,
+          'goal': goal,
+        });
+        return _chatResult(data);
+      });
+
+  static Future<ChatResult> chatFinish(String sessionId) => _guard(() async {
+    final data = await _invoke({
+      'action': 'chat_finish',
+      'session_id': sessionId,
+    });
+    return _chatResult(data);
+  });
+
+  /// Your own Couple Reflection chat in [sessionId] (null before you agreed).
+  static Future<ChatView?> myChat(String sessionId) => _guard(() async {
+    final userId = _db.auth.currentUser?.id;
+    if (userId == null) throw const TherabotException('not_signed_in', _signIn);
+    final row = await _db
+        .from('therabot_submissions')
+        .select('chat_stage, goal, messages, chat_turns, consented_at')
+        .eq('session_id', sessionId)
+        .eq('user_id', userId)
+        .maybeSingle();
+    if (row == null || row['consented_at'] == null) return null;
+    return ChatView.fromRow(row, stageKey: 'chat_stage');
   });
 
   /// The function's AI calls time out after 20 to 25 seconds and retry at

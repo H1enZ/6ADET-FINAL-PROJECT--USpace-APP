@@ -1,18 +1,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/profile.dart';
 import '../../models/therabot.dart';
+import '../../models/therabot_chat.dart';
 import '../../services/therabot_service.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/atoms/app_button.dart';
 import '../../widgets/effects/floating_hearts.dart';
+import '../../widgets/effects/soft_hearts_background.dart';
 import '../../widgets/effects/motion.dart';
+import '../../widgets/atoms/avatar_circle.dart';
+import '../../widgets/notes/note_style.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
 import '../chat_screen.dart';
 import 'next_step_pages.dart';
 import 'private_reflection_page.dart';
+import 'therabot_chat_screen.dart';
 import 'shared_reflection_view.dart';
 import 'therabot_history_screen.dart';
 
@@ -48,6 +54,11 @@ class TherabotScreen extends StatefulWidget {
 class _TherabotScreenState extends State<TherabotScreen> {
   TherabotSession? _session;
   MySubmission? _submission;
+
+  /// Your own Couple Reflection chat (null before you agreed to take part),
+  /// and your open Private Talk, if any. Only ever your own.
+  ChatView? _chat;
+  ChatView? _talk;
   bool _loading = true;
   bool _busy = false;
   bool _reflecting = false;
@@ -60,11 +71,6 @@ class _TherabotScreenState extends State<TherabotScreen> {
   /// you are offered Try again instead of waiting until the session ends.
   DateTime? _partnerWritingSince;
   Timer? _poll;
-
-  /// Set ONLY when the server refused to start a session because of the
-  /// daily limit (it alone knows the count): shown in place of the Start
-  /// button until you try again or the session changes.
-  String? _dailyLimit;
 
   String get _partner => widget.partnerName;
 
@@ -106,11 +112,22 @@ class _TherabotScreenState extends State<TherabotScreen> {
       final submission = session == null
           ? null
           : await TherabotService.mySubmission(session.id);
+      final chat =
+          session != null && session.status == TherabotStatus.collecting
+          ? await TherabotService.myChat(session.id)
+          : null;
+      // A Private Talk is a bonus here: if it can't load, the hub still works.
+      ChatView? talk;
+      try {
+        talk = await TherabotService.openTalk();
+      } catch (_) {}
       if (!mounted || generation != _generation) return;
       setState(() {
         if (session?.id != _session?.id) _resetSessionState();
         _session = session;
         _submission = submission;
+        _chat = chat;
+        _talk = talk;
         _error = null;
         _loading = false;
       });
@@ -137,12 +154,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
     _reflectError = null;
     _reflectErrorCode = null;
     _partnerWritingSince = null;
-    _dailyLimit = null;
   }
-
-  static bool _isDailyLimit(TherabotException e) =>
-      e.code == 'invalid_state' &&
-      e.message.contains('Therabot sessions a day');
 
   /// While waiting on your partner (or on the reflection), checks again
   /// quietly every 20 seconds. Progress only, never their content.
@@ -212,42 +224,6 @@ class _TherabotScreenState extends State<TherabotScreen> {
     }
   }
 
-  /// Starts a NEW session and opens its blank questions straight away.
-  /// The questions page is created fresh, with no answers from before.
-  Future<void> _start() async {
-    setState(() => _busy = true);
-    try {
-      await TherabotService.start();
-    } catch (e) {
-      if (!mounted) return;
-      final error = therabotError(e);
-      setState(() {
-        _busy = false;
-        // The server's answer stays on screen instead of a passing toast.
-        if (_isDailyLimit(error)) _dailyLimit = error.message;
-      });
-      if (!_isDailyLimit(error)) therabotToast(context, error.message);
-      await _load();
-      return;
-    }
-    if (!mounted) return;
-    await _load();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    final s = _session;
-    if (s != null &&
-        s.status == TherabotStatus.collecting &&
-        _submission == null) {
-      await _openPrivate();
-    }
-  }
-
-  /// Clears a limit message and tries again (time may have passed).
-  Future<void> _retryStart() async {
-    setState(() => _dailyLimit = null);
-    await _start();
-  }
-
   Future<bool> _confirm(String title, String body, String yes) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -296,6 +272,39 @@ class _TherabotScreenState extends State<TherabotScreen> {
         done: 'Your answers were deleted',
       );
     }
+  }
+
+  /// Couple Reflection: start a new one (choose a topic, agree, talk), or
+  /// continue / join the current one.
+  Future<void> _openCouple() async {
+    final s = _session;
+    final open = s != null && s.status == TherabotStatus.collecting;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => TherabotChatScreen(
+          mode: ChatMode.couple,
+          partnerName: _partner,
+          sessionId: open ? s.id : null,
+          initial: open ? _chat : null,
+          expiresAt: open ? s.expiresAt : null,
+        ),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  /// Private Talk: continue your open one, or start a new one.
+  Future<void> _openTalk() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => TherabotChatScreen(
+          mode: ChatMode.talk,
+          partnerName: _partner,
+          initial: _talk,
+        ),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _openPrivate() async {
@@ -489,6 +498,22 @@ class _TherabotScreenState extends State<TherabotScreen> {
 
   // ------------------------------------------------------------------ views
 
+  /// The shared reflection on this screen, so "View shared reflection" can
+  /// glide down to it.
+  final _reflectionKey = GlobalKey();
+
+  void _showReflection() {
+    final target = _reflectionKey.currentContext;
+    if (target == null) return;
+    Scrollable.ensureVisible(
+      target,
+      duration: motionOff(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = _session;
@@ -499,54 +524,97 @@ class _TherabotScreenState extends State<TherabotScreen> {
     final canDelete = s != null && _submission != null;
     final safetyMode =
         s?.status == TherabotStatus.closed && (_submission?.isSafety ?? false);
-    return TherabotPage(
-      title: 'Therabot',
-      onRefresh: _load,
-      actions: [
-        IconButton(
-          tooltip: 'Past reflections',
-          icon: const Icon(Icons.history),
-          onPressed: _openHistory,
-        ),
-        PopupMenuButton<String>(
-          tooltip: 'More',
-          onSelected: (v) => switch (v) {
-            'insights' => _push(const TherabotInsightsScreen()),
-            'end' => _end(),
-            'delete' => _deleteMine(),
-            _ => null,
-          },
-          itemBuilder: (_) => [
-            const PopupMenuItem(value: 'insights', child: Text('My insights')),
-            if (canEnd)
-              const PopupMenuItem(
-                value: 'end',
-                child: Text('End this session'),
-              ),
-            if (canDelete)
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Delete my answers'),
-              ),
-          ],
-        ),
+
+    final menu = PopupMenuButton<String>(
+      tooltip: 'More',
+      icon: const Icon(Icons.more_vert_rounded, color: NotePalette.cream),
+      onSelected: (v) => switch (v) {
+        'history' => _openHistory(),
+        'insights' => _push(const TherabotInsightsScreen()),
+        'end' => _end(),
+        'delete' => _deleteMine(),
+        _ => null,
+      },
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: 'history', child: Text('Past reflections')),
+        const PopupMenuItem(value: 'insights', child: Text('My insights')),
+        if (canEnd)
+          const PopupMenuItem(value: 'end', child: Text('End this session')),
+        if (canDelete)
+          const PopupMenuItem(
+            value: 'delete',
+            child: Text('Delete my answers'),
+          ),
       ],
-      children: _loading
-          ? const [SizedBox(height: 480, child: SkeletonList(count: 3))]
-          : staggered([
-              // In safety mode the usual "shared reflection" intro is left out.
-              TherabotHeader(
-                caption: safetyMode
-                    ? null
-                    : 'A private space for both of you to reflect separately before '
-                          'seeing a shared reflection.',
+    );
+
+    final children = _loading
+        ? const <Widget>[SizedBox(height: 480, child: SkeletonList(count: 3))]
+        : staggered([
+            if (!safetyMode) ...[
+              Text(
+                'A quiet space to reflect before you come back together.',
+                style: GoogleFonts.poppins(
+                  fontSize: MediaQuery.sizeOf(context).width < 360 ? 23 : 27,
+                  fontWeight: FontWeight.w400,
+                  height: 1.25,
+                  color: NotePalette.cream,
+                ),
               ),
-              const SizedBox(height: AppSpacing.xl),
-              if (_error != null)
-                TherabotErrorView(message: _error!, onRetry: _load)
-              else
-                _stage(context),
-            ]),
+              const SizedBox(height: AppSpacing.xxl),
+            ],
+            if (_error != null)
+              TherabotErrorView(message: _error!, onRetry: _load)
+            else
+              _stage(context),
+            // One privacy line for the whole screen (safety mode has its own).
+            if (!safetyMode && _error == null) ...[
+              const SizedBox(height: AppSpacing.xxl),
+              _PrivacyBlock(partnerName: _partner),
+            ],
+          ]);
+
+    return Scaffold(
+      backgroundColor: NotePalette.background,
+      body: SoftHeartsBackground(
+        // Calmer than Home: the same slow hearts, fainter.
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [NotePalette.backgroundTop, NotePalette.background],
+        ),
+        heartColor: NotePalette.rose.withValues(alpha: 0.045),
+        child: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenMargin,
+                AppSpacing.lg,
+                AppSpacing.screenMargin,
+                AppSpacing.xxl,
+              ),
+              children: [
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _HubHeader(menu: menu),
+                        const SizedBox(height: AppSpacing.xxl),
+                        ...children,
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -557,11 +625,33 @@ class _TherabotScreenState extends State<TherabotScreen> {
       case TherabotStatus.collecting:
         return _collecting(context, s);
       case TherabotStatus.reflecting:
-        return _reflectingView(context);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _sessionCard(s, mine: 'Finished', partner: 'Finished'),
+            const SizedBox(height: AppSpacing.lg),
+            _reflectingView(context),
+          ],
+        );
       case TherabotStatus.reflectionReady:
-        return s.reflection == null
-            ? _intro(context, ended: true)
-            : _reflection(context, s);
+        if (s.reflection == null) return _intro(context, ended: true);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ActionCard(
+              icon: Icons.favorite_rounded,
+              title: 'Your shared reflection is ready',
+              body: 'You both finished reflecting.',
+              button: 'View shared reflection',
+              onPressed: _showReflection,
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            KeyedSubtree(key: _reflectionKey, child: _reflection(context, s)),
+            const SizedBox(height: AppSpacing.xxl),
+            // Private Talk stays available, separate from the reflection.
+            _talkCard(context),
+          ],
+        );
       case TherabotStatus.completed:
         // Finished: it lives in Past reflections now, not on the hub.
         return _completed(context, s);
@@ -580,189 +670,126 @@ class _TherabotScreenState extends State<TherabotScreen> {
     }
   }
 
+  /// Both of you side by side, with where each of you is (couple-visible
+  /// progress only: finished or not), and the time left.
+  Widget _sessionCard(
+    TherabotSession s, {
+    required String mine,
+    required String partner,
+    bool mineActive = false,
+  }) {
+    return _SessionCard(
+      title: s.title,
+      me: widget.me,
+      partner: widget.partner,
+      partnerName: _partner,
+      myStatus: mine,
+      myActive: mineActive,
+      myDone: mine == 'Finished',
+      partnerStatus: partner,
+      partnerDone: partner == 'Finished',
+      expiresAt: s.expiresAt,
+    );
+  }
+
+  /// No reflection open: "What do you need today?" and the two ways in.
   Widget _intro(BuildContext context, {required bool ended}) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (ended) ...[
-          TherabotCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'This session has ended',
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  "When you're both ready, either of you can start a new one.",
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+          Text(
+            "That session has ended. Whenever you're ready, you can start again.",
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: NotePalette.muted,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
         ],
-        TherabotCard(
-          label: 'How it works',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final (i, step) in const [
-                'Each of you answers four questions, privately.',
-                'Therabot writes you a private summary. You check it, correct it, and approve it.',
-                'Once you both approve, you see a shared reflection together.',
-                'Each of you chooses what would help next. You decide; Therabot never picks.',
-              ].indexed)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: 11,
-                        backgroundColor: scheme.primaryContainer,
-                        child: Text(
-                          '${i + 1}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Text(step, style: theme.textTheme.bodyLarge),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        PrivacyNote(
-          "$_partner never sees your answers or your private summary, and you never "
-          'see theirs. Private answers are cleared after 24 hours.',
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        _startSection(
-          context,
-          label: ended ? 'Start a new reflection' : 'Start a reflection',
-        ),
+        _modeChoice(context),
       ],
     );
   }
 
-  /// The Start button, or the daily-limit message in its place.
-  Widget _startSection(BuildContext context, {required String label}) {
+  /// The two Therabot modes, side by side in purpose.
+  Widget _modeChoice(BuildContext context, {bool coupleAvailable = true}) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final muted = theme.textTheme.bodyMedium?.copyWith(
-      color: scheme.onSurfaceVariant,
-    );
-    final limit = _dailyLimit;
-    if (limit != null) {
-      return TherabotCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Taking a pause for today',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Semantics(liveRegion: true, child: Text(limit, style: muted)),
-            const SizedBox(height: AppSpacing.sm),
-            TextButton(
-              onPressed: _busy ? null : _retryStart,
-              child: const Text('Try again'),
-            ),
-          ],
-        ),
-      );
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppButton(
-          label: label,
-          icon: Icons.auto_awesome_outlined,
-          isLoading: _busy,
-          onPressed: _start,
-          fullWidth: true,
-        ),
-        const SizedBox(height: AppSpacing.sm),
         Text(
-          "Either of you can start. Therabot isn't therapy, and it never decides who is right.",
-          textAlign: TextAlign.center,
-          style: muted,
+          'What do you need today?',
+          style: theme.textTheme.titleLarge?.copyWith(color: NotePalette.cream),
         ),
+        const SizedBox(height: AppSpacing.md),
+        if (coupleAvailable)
+          _ActionCard(
+            icon: Icons.favorite_rounded,
+            title: 'Reflect on something together',
+            body:
+                'Each of you talks privately with Therabot about the same thing. Then you both see one '
+                'neutral, shared reflection, made only from short summaries of your two perspectives.',
+            button: 'Reflect together',
+            onPressed: _busy ? null : _openCouple,
+          ),
+        if (coupleAvailable) const SizedBox(height: AppSpacing.lg),
+        _talkCard(context),
       ],
+    );
+  }
+
+  /// Private Talk: always available, never shared.
+  Widget _talkCard(BuildContext context) {
+    final resume = _talk != null;
+    return _ActionCard(
+      icon: Icons.lock_outline_rounded,
+      title: resume
+          ? 'Continue your private talk'
+          : 'Talk privately with Therabot',
+      body: resume
+          ? 'Pick up where you left off. Only you can see it.'
+          : 'Just you and Therabot: vent, think something through, or get advice. Nothing goes to '
+                '$_partner, and it never becomes a couple reflection.',
+      button: resume ? 'Continue talking' : 'Talk privately',
+      onPressed: _busy ? null : _openTalk,
+      quiet: true,
     );
   }
 
   /// A finished session: both of you chose a next step. The reflection
-  /// itself lives in Past reflections; here you can start a new one, or
+  /// itself lives in Past reflections; here you can start something new, or
   /// quietly reopen a next-step page.
   Widget _completed(BuildContext context, TherabotSession s) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final muted = theme.textTheme.bodyMedium?.copyWith(
-      color: scheme.onSurfaceVariant,
-    );
     final mine = s.myChoice;
     final theirs = s.partnerChoice;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TherabotCard(
-          tinted: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Reflection complete 💗',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '${s.title == null ? 'Your reflection is' : '"${s.title}" is'} '
-                'saved in Past reflections, where you can read it again any time.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
-              if (mine != null && theirs != null) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'You chose ${mine.label} · $_partner chose ${theirs.label}',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                  ),
-                ),
-              ],
-            ],
+        _ActionCard(
+          icon: Icons.check_circle_outline_rounded,
+          title: 'Reflection complete',
+          body:
+              '${s.title == null ? 'Your reflection is' : '"${s.title}" is'} '
+              'saved in Past reflections, where you can read it again any time.'
+              '${mine != null && theirs != null ? '\n\nYou chose ${mine.label} · $_partner chose ${theirs.label}' : ''}',
+          secondary: TextButton.icon(
+            onPressed: _openHistory,
+            style: TextButton.styleFrom(foregroundColor: NotePalette.pink),
+            icon: const Icon(Icons.history_rounded, size: 18),
+            label: const Text('See Past reflections'),
           ),
         ),
-        const SizedBox(height: AppSpacing.lg),
-        // Primary action first: a finished session never blocks a new one.
-        _startSection(context, label: 'Start a new reflection'),
-        const SizedBox(height: AppSpacing.md),
-        AppButton(
-          label: 'See Past reflections',
-          icon: Icons.history,
-          variant: AppButtonVariant.outlined,
-          onPressed: _openHistory,
-          fullWidth: true,
-        ),
         const SizedBox(height: AppSpacing.xxl),
-        Text('Revisit a next step', style: muted),
+        // A finished session never blocks a new one.
+        _modeChoice(context),
+        const SizedBox(height: AppSpacing.xl),
+        Text(
+          'Revisit a next step',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: NotePalette.muted),
+        ),
         const SizedBox(height: AppSpacing.xs),
         Wrap(
           spacing: AppSpacing.xs,
@@ -771,6 +798,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
             for (final c in TherabotChoice.values)
               TextButton(
                 onPressed: () => _revisit(c, s),
+                style: TextButton.styleFrom(foregroundColor: NotePalette.pink),
                 child: Text('${c.emoji} ${c.label}'),
               ),
           ],
@@ -779,208 +807,128 @@ class _TherabotScreenState extends State<TherabotScreen> {
     );
   }
 
-  Widget _progressRow(
-    BuildContext context,
-    String who,
-    bool done,
-    String text,
-  ) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
-        children: [
-          Icon(
-            done ? Icons.favorite : Icons.favorite_border,
-            size: 18,
-            color: done ? scheme.primary : scheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Flexible(
-            child: Text(
-              who,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _collecting(BuildContext context, TherabotSession s) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final sub = _submission;
+    final chat = _chat;
     final mine = s.myProgress;
     final partnerDone = s.partnerProgress == TherabotProgress.approved;
+    // An older-style session (four questions), started before the guided
+    // chat: kept working as it was.
+    final legacy = sub != null && chat == null;
 
     final myText = switch (mine) {
       TherabotProgress.approved => 'Finished',
-      TherabotProgress.submitted => 'Summary ready to review',
+      TherabotProgress.submitted => 'Summary to review',
       TherabotProgress.pending => sub == null ? 'Not started' : 'In progress',
     };
+
+    final Widget action;
+    if (mine == TherabotProgress.approved) {
+      action = _waiting(context, partnerDone);
+    } else if (legacy && mine == TherabotProgress.submitted) {
+      action = _ActionCard(
+        icon: Icons.fact_check_outlined,
+        title: 'Your private summary is ready',
+        body:
+            'Read it, correct anything that is not quite right, and approve it when it feels true.',
+        button: 'Review my summary',
+        onPressed: _busy ? null : _openPrivate,
+      );
+    } else if (legacy) {
+      action = _ActionCard(
+        icon: Icons.edit_note_rounded,
+        title: 'Continue your reflection',
+        body: 'Pick up where you left off.',
+        button: 'Continue reflection',
+        onPressed: _busy ? null : _openPrivate,
+      );
+    } else if (chat != null) {
+      action = _ActionCard(
+        icon: Icons.chat_bubble_outline_rounded,
+        title: 'Continue your reflection',
+        body: 'Pick up your private conversation with Therabot.',
+        button: 'Continue reflection',
+        onPressed: _busy ? null : _openCouple,
+      );
+    } else if (!s.iStarted) {
+      // Neutral: never how your partner described it, not even the topic.
+      action = _ActionCard(
+        icon: Icons.favorite_border_rounded,
+        title: 'Your partner started a reflection for the two of you.',
+        body: 'Take your time and share your side privately.',
+        button: 'Share my side',
+        onPressed: _busy ? null : _openCouple,
+      );
+    } else {
+      action = _ActionCard(
+        icon: Icons.auto_awesome_rounded,
+        title: 'Start your reflection',
+        body: 'Take a little time for yourself before you come back together.',
+        button: 'Start reflection',
+        onPressed: _busy ? null : _openCouple,
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TherabotCard(
-          label: s.title ?? 'This session',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _progressRow(
-                context,
-                'You',
-                mine == TherabotProgress.approved,
-                myText,
-              ),
-              // Couple-visible progress only: finished or not. Nothing else.
-              _progressRow(
-                context,
-                _partner,
-                partnerDone,
-                partnerDone ? 'Finished' : 'Not finished yet',
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              ExpiryNote(expiresAt: s.expiresAt),
-            ],
-          ),
+        _sessionCard(
+          s,
+          mine: myText,
+          mineActive: mine != TherabotProgress.approved,
+          partner: partnerDone ? 'Finished' : 'Not finished yet',
         ),
         const SizedBox(height: AppSpacing.lg),
-        if (mine == TherabotProgress.approved)
-          _waiting(context, partnerDone)
-        else ...[
-          if (!s.iStarted && sub == null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Text(
-                "$_partner started a reflection. Join whenever you're ready. There's no rush.",
-                style: theme.textTheme.bodyLarge,
-              ),
-            ),
-          TherabotCard(
-            tinted: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  mine == TherabotProgress.submitted
-                      ? 'Your private summary is ready'
-                      : sub == null
-                      ? 'Your private reflection'
-                      : 'Pick up where you left off',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  mine == TherabotProgress.submitted
-                      ? 'Read it, correct anything that is not quite right, and approve it when it feels true.'
-                      : 'Four gentle questions, just for you. Take your time.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                AppButton(
-                  label: mine == TherabotProgress.submitted
-                      ? 'Review my summary'
-                      : sub == null
-                      ? 'Begin my reflection'
-                      : 'Continue my reflection',
-                  onPressed: _busy ? null : _openPrivate,
-                  fullWidth: true,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          PrivacyNote(
-            "$_partner never sees your answers. You never see theirs.",
-          ),
-        ],
+        action,
+        const SizedBox(height: AppSpacing.xl),
+        // Private Talk stays available, separate from the reflection.
+        _talkCard(context),
       ],
     );
   }
 
   Widget _waiting(BuildContext context, bool partnerDone) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    Widget note(String label, IconData icon, bool draft) => OutlinedButton.icon(
+      onPressed: () => _push(
+        TherabotPrivateNotePage(
+          coupleId: widget.coupleId,
+          partnerName: _partner,
+          draft: draft,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: NotePalette.pink,
+        side: BorderSide(color: NotePalette.pink.withValues(alpha: 0.4)),
+        minimumSize: const Size(0, 44),
+      ),
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TherabotCard(
-          tinted: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Your reflection is complete 💗',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                partnerDone
-                    ? 'You have both finished. Your shared reflection is on its way.'
-                    : "Your partner hasn't finished their reflection yet.",
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
-            ],
-          ),
+        _ActionCard(
+          icon: Icons.check_circle_outline_rounded,
+          title: 'Your reflection is complete',
+          body: partnerDone
+              ? 'You have both finished. Your shared reflection is on its way.'
+              : "Waiting for $_partner to finish theirs.\n\nYou'll both see the "
+                    "shared reflection once you've both finished.",
         ),
         const SizedBox(height: AppSpacing.xl),
         Text(
-          'While you wait, just for you',
-          style: theme.textTheme.titleMedium,
+          'While you wait, just for you (never sent)',
+          style: theme.textTheme.bodyMedium?.copyWith(color: NotePalette.muted),
         ),
         const SizedBox(height: AppSpacing.sm),
-        AppButton(
-          label: 'Clarify my thoughts',
-          icon: Icons.edit_note,
-          variant: AppButtonVariant.outlined,
-          onPressed: () => _push(
-            TherabotPrivateNotePage(
-              coupleId: widget.coupleId,
-              partnerName: _partner,
-              draft: false,
-            ),
-          ),
-          fullWidth: true,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        AppButton(
-          label: 'Draft something for later',
-          icon: Icons.drafts_outlined,
-          variant: AppButtonVariant.outlined,
-          onPressed: () => _push(
-            TherabotPrivateNotePage(
-              coupleId: widget.coupleId,
-              partnerName: _partner,
-              draft: true,
-            ),
-          ),
-          fullWidth: true,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        const PrivacyNote(
-          'These stay private. They are never sent, and Therabot does not read them.',
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            note('Clarify my thoughts', Icons.edit_note_rounded, false),
+            note('Draft something for later', Icons.drafts_outlined, true),
+          ],
         ),
       ],
     );
@@ -1101,7 +1049,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
           ],
         ),
         Text(
-          'Written only from the two summaries you each approved.',
+          'Written only from short summaries of your two perspectives, never your private chats.',
           style: muted,
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -1192,6 +1140,462 @@ class _NameDialogState extends State<_NameDialog> {
         TextButton(
           onPressed: () => Navigator.of(context).pop(_controller.text),
           child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// "Therabot" and its line, a small glowing reflection mark, and the menu.
+class _HubHeader extends StatelessWidget {
+  const _HubHeader({required this.menu});
+
+  final Widget menu;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          margin: const EdgeInsets.only(top: 2, right: AppSpacing.md),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: NotePalette.rose.withValues(alpha: 0.16),
+            border: Border.all(color: NotePalette.pink.withValues(alpha: 0.35)),
+            boxShadow: [
+              BoxShadow(
+                color: NotePalette.rose.withValues(alpha: 0.35),
+                blurRadius: 16,
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.auto_awesome_rounded,
+            size: 20,
+            color: NotePalette.pink,
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                header: true,
+                child: Text(
+                  'Therabot',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 26,
+                    color: NotePalette.cream,
+                  ),
+                ),
+              ),
+              Text(
+                'Private relationship reflection',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: NotePalette.muted,
+                ),
+              ),
+            ],
+          ),
+        ),
+        menu,
+      ],
+    );
+  }
+}
+
+/// THIS SESSION: you and your partner side by side, joined by a small
+/// heart, with each of your statuses and the time left underneath.
+class _SessionCard extends StatelessWidget {
+  const _SessionCard({
+    required this.title,
+    required this.me,
+    required this.partner,
+    required this.partnerName,
+    required this.myStatus,
+    required this.myActive,
+    required this.myDone,
+    required this.partnerStatus,
+    required this.partnerDone,
+    required this.expiresAt,
+  });
+
+  final String? title;
+  final Profile? me;
+  final Profile? partner;
+  final String partnerName;
+  final String myStatus;
+  final bool myActive;
+  final bool myDone;
+  final String partnerStatus;
+  final bool partnerDone;
+  final DateTime expiresAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final narrow = MediaQuery.sizeOf(context).width < 360;
+    final avatar = narrow ? 56.0 : 66.0;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.md,
+      ),
+      decoration: noteCardDecoration(radius: AppRadius.panel + 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            (title ?? 'This session').toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: NotePalette.muted,
+              letterSpacing: 1.6,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _Person(
+                  name: 'You',
+                  realName: me?.displayName ?? 'You',
+                  imageUrl: me?.avatarUrl,
+                  status: myStatus,
+                  active: myActive && !myDone,
+                  done: myDone,
+                  size: avatar,
+                ),
+              ),
+              // The heart between you, at avatar height.
+              SizedBox(
+                height: avatar,
+                width: narrow ? 56 : 76,
+                child: const _HeartLink(),
+              ),
+              Expanded(
+                child: _Person(
+                  name: partnerName,
+                  realName: partner?.displayName ?? partnerName,
+                  imageUrl: partner?.avatarUrl,
+                  status: partnerStatus,
+                  active: false,
+                  done: partnerDone,
+                  size: avatar,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Divider(height: 1, color: NotePalette.pink.withValues(alpha: 0.15)),
+          const SizedBox(height: AppSpacing.md),
+          ExpiryNote(expiresAt: expiresAt),
+        ],
+      ),
+    );
+  }
+}
+
+class _Person extends StatelessWidget {
+  const _Person({
+    required this.name,
+    required this.realName,
+    required this.imageUrl,
+    required this.status,
+    required this.active,
+    required this.done,
+    required this.size,
+  });
+
+  final String name;
+  final String realName;
+  final String? imageUrl;
+  final String status;
+  final bool active;
+  final bool done;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      label: '$name: $status',
+      excludeSemantics: true,
+      child: Column(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: NotePalette.pink.withValues(
+                      alpha: done || active ? 0.75 : 0.3,
+                    ),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: NotePalette.rose.withValues(
+                        alpha: done || active ? 0.35 : 0.1,
+                      ),
+                      blurRadius: 16,
+                    ),
+                  ],
+                ),
+                child: AvatarCircle(
+                  name: realName,
+                  imageUrl: imageUrl,
+                  size: size,
+                  background: const Color(0xFF4A1D42),
+                ),
+              ),
+              if (done)
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: NotePalette.background,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      size: 18,
+                      color: NotePalette.pink,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: NotePalette.cream,
+            ),
+          ),
+          Text(
+            status,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: active || done ? NotePalette.pink : NotePalette.muted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Two thin lines with a small glowing heart between them.
+class _HeartLink extends StatelessWidget {
+  const _HeartLink();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget line() => Expanded(
+      child: Container(
+        height: 1,
+        color: NotePalette.pink.withValues(alpha: 0.35),
+      ),
+    );
+    return ExcludeSemantics(
+      child: Row(
+        children: [
+          line(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Icon(
+              Icons.favorite_rounded,
+              size: 16,
+              color: NotePalette.rose,
+              shadows: [
+                Shadow(
+                  color: NotePalette.rose.withValues(alpha: 0.8),
+                  blurRadius: 10,
+                ),
+              ],
+            ),
+          ),
+          line(),
+        ],
+      ),
+    );
+  }
+}
+
+/// The one main thing to do now: a burgundy card with a title, a line or
+/// two, and the big pink button.
+class _ActionCard extends StatelessWidget {
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.button,
+    this.onPressed,
+    this.secondary,
+    this.quiet = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final String? button;
+  final VoidCallback? onPressed;
+  final Widget? secondary;
+
+  /// A secondary card: plain plum, outlined button, so the main action
+  /// stays the strongest thing on the screen.
+  final bool quiet;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: quiet
+          ? noteCardDecoration(radius: AppRadius.panel + 2)
+          : BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.panel + 2),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF4A1C3A), Color(0xFF2E1226)],
+              ),
+              border: Border.all(
+                color: NotePalette.pink.withValues(alpha: 0.35),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: NotePalette.rose.withValues(alpha: 0.18),
+                  blurRadius: 24,
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: NotePalette.cream,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(icon, size: 22, color: NotePalette.pink),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            body,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: NotePalette.muted,
+            ),
+          ),
+          if (button != null) ...[
+            const SizedBox(height: AppSpacing.xl),
+            if (quiet)
+              OutlinedButton.icon(
+                onPressed: onPressed,
+                iconAlignment: IconAlignment.end,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: NotePalette.pink,
+                  side: BorderSide(
+                    color: NotePalette.pink.withValues(alpha: 0.55),
+                  ),
+                  minimumSize: const Size.fromHeight(50),
+                  shape: const StadiumBorder(),
+                ),
+                icon: const Icon(Icons.chevron_right_rounded),
+                label: Text(button!),
+              )
+            else
+              NotePrimaryButton(
+                label: button!,
+                icon: Icons.chevron_right_rounded,
+                iconAfter: true,
+                onPressed: onPressed,
+              ),
+          ],
+          if (secondary != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Align(alignment: Alignment.centerLeft, child: secondary),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The one privacy line on the hub, matching what Therabot really does:
+/// neither of you ever sees the other's answers or private summary.
+class _PrivacyBlock extends StatelessWidget {
+  const _PrivacyBlock({required this.partnerName});
+
+  final String partnerName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 2, right: AppSpacing.md),
+          child: Icon(
+            Icons.lock_outline_rounded,
+            size: 22,
+            color: NotePalette.muted,
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your answers stay private.',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: NotePalette.cream,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$partnerName never sees your answers or your private summary, '
+                'and you never see theirs. A shared reflection is written only '
+                'from short summaries of your two perspectives, and Private Talk is never shared.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: NotePalette.muted,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

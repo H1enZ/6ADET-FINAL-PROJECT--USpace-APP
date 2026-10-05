@@ -6,8 +6,8 @@ import '../../widgets/effects/motion.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
 
 /// The couple's shared reflection, exactly as Therabot returned it. It is
-/// built only from the two approved summaries: no raw answers, no private
-/// drafts. Sections that came back empty are left out, never filled in.
+/// built only from the two perspective summaries: never anyone's private
+/// chat, answers or drafts. Sections that came back empty are left out, never filled in.
 class SharedReflectionView extends StatelessWidget {
   const SharedReflectionView({
     super.key,
@@ -70,18 +70,46 @@ class SharedReflectionView extends StatelessWidget {
       );
     }
 
+    Widget heading(String text) => Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Semantics(
+        header: true,
+        child: Text(
+          text.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+
     final children = <Widget>[
-      // Partner 1 first, then Partner 2, the same order for both of you.
+      // 1. What you both seem to be experiencing (and what each may need):
+      //    Partner 1 first, then Partner 2, the same order for both of you.
+      heading('What you both seem to be experiencing'),
       perspective(1),
       perspective(2),
+      // 2. Where your perspectives overlap.
+      if (reflection.commonGround.isNotEmpty) ...[
+        TherabotCard(
+          label: 'Where your perspectives overlap',
+          child: SoftList(
+            items: reflection.commonGround,
+            marker: '♡',
+            names: names,
+          ),
+        ),
+        gap,
+      ],
+      // 3. Where you experienced things differently.
       if (reflection.differences.isNotEmpty) ...[
         TherabotCard(
-          label: 'Where you see it differently',
+          label: 'Where you experienced things differently',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'How Therabot understood your two summaries. You can '
+                'How Therabot understood your two perspectives. You can '
                 'correct it together.',
                 style: muted,
               ),
@@ -115,20 +143,18 @@ class SharedReflectionView extends StatelessWidget {
         ),
         gap,
       ],
-      if (reflection.commonGround.isNotEmpty) ...[
+      // 4. Something you could try together.
+      if (reflection.somethingToTry.isNotEmpty) ...[
         TherabotCard(
-          label: 'Common ground',
-          child: SoftList(
-            items: reflection.commonGround,
-            marker: '♡',
-            names: names,
-          ),
+          label: 'Something you could try together',
+          child: SoftList(items: reflection.somethingToTry, names: names),
         ),
         gap,
       ],
+      // 5. A gentle conversation starter.
       if (reflection.discussionQuestions.isNotEmpty) ...[
         TherabotCard(
-          label: 'Questions you could talk about',
+          label: 'Gentle conversation starters',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
