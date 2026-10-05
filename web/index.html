@@ -14,8 +14,65 @@
   <!-- Change this: it is the browser tab title of your deployed app. -->
   <title>My Final Project</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- The app always fills the screen exactly: the page itself never
+       scrolls, bounces or zooms (no double-tap zoom, no text resizing). -->
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: manipulation;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+  </style>
 </head>
 <body>
+  <!-- iPhone and iPad (every browser there is Safari underneath) ignore
+       "user-scalable=no": a pinch zooms the whole app, and after the
+       keyboard closes the page can stay zoomed in or scrolled down, which
+       pushes the bottom bar off screen. This stops the pinch and puts the
+       page back to normal size and position whenever that happens. -->
+  <script>
+    (function () {
+      var ios = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (!ios) return;
+
+      // No pinch zoom of the page (the app's own zoomable views still work:
+      // they get the touches, only the browser's page zoom is stopped).
+      ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+        document.addEventListener(type, function (e) { e.preventDefault(); },
+          { passive: false });
+      });
+
+      var meta = document.querySelector('meta[name=viewport]');
+      var normal = meta.getAttribute('content');
+      function reset() {
+        // Setting the viewport again makes iOS zoom back out to 1.
+        meta.setAttribute('content', normal + ', minimum-scale=1.0');
+        meta.setAttribute('content', normal);
+        window.scrollTo(0, 0);
+      }
+
+      // When the keyboard closes (focus leaves a text box) or the visible
+      // area changes, undo any zoom or scroll iOS left behind.
+      document.addEventListener('focusout', function () {
+        setTimeout(reset, 100);
+      });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', function () {
+          var vv = window.visualViewport;
+          var keyboardOpen = vv.height < window.innerHeight * 0.75;
+          if (!keyboardOpen && (vv.scale > 1.01 || window.scrollY !== 0)) {
+            reset();
+          }
+        });
+      }
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

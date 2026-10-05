@@ -484,6 +484,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
       coupleId: _coupleId,
       myId: _myId,
       partnerName: _partnerName,
+      myName: widget.profile.displayName.split(' ').first,
     ),
   );
 

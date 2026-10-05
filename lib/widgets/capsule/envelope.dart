@@ -27,6 +27,10 @@ class PaperColors {
 /// out about half its height. The wax seal sits on the flap's tip while
 /// the flap is closed: [seal] 0 = none, 1 = pressed; [sealCrack] breaks it.
 /// The space above the envelope is reserved for the flap and letter.
+///
+/// With a [photo], more room is kept above for it: [photoOut] 0 = inside,
+/// 1 = risen out on its own, above where the letter will be, so the two
+/// never overlap.
 class CapsuleEnvelope extends StatelessWidget {
   const CapsuleEnvelope({
     super.key,
@@ -37,6 +41,7 @@ class CapsuleEnvelope extends StatelessWidget {
     this.sealScale = 1,
     this.sealCrack = 0,
     this.photo,
+    this.photoOut = 0,
     this.onLetterTap,
     this.letterLabel,
   });
@@ -48,18 +53,25 @@ class CapsuleEnvelope extends StatelessWidget {
   final double sealScale;
   final double sealCrack;
 
-  /// A photo peeking out behind the letter (opening only).
+  /// A photo that rises out before the letter (opening only).
   final Uint8List? photo;
+  final double photoOut;
   final VoidCallback? onLetterTap;
   final String? letterLabel;
 
   static double heightFor(double width) => width * 0.66 * 1.6;
 
+  /// The photo's size, and the room kept above the envelope for it.
+  static double _photoSize(double width) => width * 0.5;
+  static double _photoRoom(double width) => _photoSize(width) + width * 0.05;
+
   @override
   Widget build(BuildContext context) {
     final w = width;
     final h = w * 0.66; // the envelope itself
-    final head = h * 0.6; // room above it
+    final photoBytes = photo;
+    final room = photoBytes == null ? 0.0 : _photoRoom(w);
+    final head = room + h * 0.6; // room above it
     final fold = math.cos(
       math.pi * flap.clamp(0.0, 1.0),
     ); // 1 closed .. -1 open
@@ -93,7 +105,10 @@ class CapsuleEnvelope extends StatelessWidget {
       ),
     );
 
-    final photoBytes = photo;
+    final photoSize = _photoSize(w);
+    // Starts tucked inside the envelope, ends at the top of the room.
+    final photoStart = head + h * 0.12;
+    final photoTop = photoStart + (0 - photoStart) * photoOut.clamp(0.0, 1.0);
     return SizedBox(
       width: w,
       height: head + h,
@@ -109,14 +124,14 @@ class CapsuleEnvelope extends StatelessWidget {
               painter: _BackPainter(fold: fold, apexDepth: apexDepth),
             ),
           ),
-          if (photoBytes != null && letterOut > 0)
+          if (photoBytes != null && photoOut > 0)
             Positioned(
-              left: w * 0.54,
-              width: w * 0.34,
-              top: head + h * 0.1 - letterOut * h * 1.05,
-              height: w * 0.34,
+              left: (w - photoSize) / 2,
+              width: photoSize,
+              top: photoTop,
+              height: photoSize,
               child: Transform.rotate(
-                angle: 0.09,
+                angle: -0.05 * photoOut.clamp(0.0, 1.0),
                 child: Container(
                   padding: EdgeInsets.all(w * 0.012),
                   decoration: BoxDecoration(
@@ -440,7 +455,7 @@ class _EnvelopeOpeningState extends State<EnvelopeOpening>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 3000),
+    duration: Duration(milliseconds: widget.photo == null ? 3000 : 3800),
   );
   bool _started = false;
 
@@ -479,6 +494,9 @@ class _EnvelopeOpeningState extends State<EnvelopeOpening>
             ? math.sin(_c.value * 120) * (1 - _c.value / 0.16) * 0.06
             : 0.0;
         final done = _c.isCompleted;
+        // With a photo: seal, flap, then the photo rises out on its own,
+        // and only then the letter slides out below it.
+        final withPhoto = widget.photo != null;
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -486,10 +504,17 @@ class _EnvelopeOpeningState extends State<EnvelopeOpening>
               angle: shake,
               child: CapsuleEnvelope(
                 width: widget.width,
-                sealCrack: _span(0.12, 0.28, Curves.easeOut),
-                seal: 1 - _span(0.26, 0.4),
-                flap: _span(0.3, 0.58),
-                letterOut: 0.8 * _span(0.58, 0.92, Curves.easeOutCubic),
+                sealCrack: withPhoto
+                    ? _span(0.1, 0.22, Curves.easeOut)
+                    : _span(0.12, 0.28, Curves.easeOut),
+                seal: 1 - (withPhoto ? _span(0.2, 0.3) : _span(0.26, 0.4)),
+                flap: withPhoto ? _span(0.24, 0.44) : _span(0.3, 0.58),
+                photoOut: withPhoto ? _span(0.44, 0.7, Curves.easeOutCubic) : 0,
+                letterOut:
+                    0.8 *
+                    (withPhoto
+                        ? _span(0.74, 0.97, Curves.easeOutCubic)
+                        : _span(0.58, 0.92, Curves.easeOutCubic)),
                 photo: widget.photo,
                 onLetterTap: done ? widget.onReveal : null,
                 letterLabel: 'Read the letter',

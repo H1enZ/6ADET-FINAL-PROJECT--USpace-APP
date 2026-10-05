@@ -10,9 +10,10 @@ import '../../services/time_capsule_service.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/anniversary.dart';
 import '../../utils/capsule_time.dart';
-import '../../widgets/capsule/capsule_letter.dart';
 import '../../widgets/capsule/envelope.dart';
+import '../../widgets/capsule/opened_capsule.dart';
 import '../../widgets/effects/motion.dart';
+import '../../widgets/notes/note_style.dart';
 
 /// One capsule, for reading. The receiver of a ready capsule opens it here
 /// (the full envelope opening, once); an opened capsule goes straight to
@@ -24,12 +25,16 @@ class CapsuleViewScreen extends StatefulWidget {
     required this.coupleId,
     required this.myId,
     required this.partnerName,
+    this.myName,
   });
 
   final TimeCapsule capsule;
   final String coupleId;
   final String myId;
   final String partnerName;
+
+  /// Your own name, for the letter's sign-off when you wrote it.
+  final String? myName;
 
   @override
   State<CapsuleViewScreen> createState() => _CapsuleViewScreenState();
@@ -166,31 +171,80 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
       _Stage.reading => _reading(theme),
     };
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _iAmSender ? 'Your time capsule' : 'From ${widget.partnerName}',
+    final list = RefreshIndicator(
+      onRefresh: _stage == _Stage.reading ? _load : () async {},
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenMargin,
+          AppSpacing.md,
+          AppSpacing.screenMargin,
+          64,
         ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _stage == _Stage.reading ? _load : () async {},
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenMargin,
-            AppSpacing.md,
-            AppSpacing.screenMargin,
-            64,
-          ),
-          children: [
-            Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: body,
-              ),
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: body,
             ),
+          ),
+        ],
+      ),
+    );
+
+    if (_stage != _Stage.reading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            _iAmSender ? 'Your time capsule' : 'From ${widget.partnerName}',
+          ),
+        ),
+        body: list,
+      );
+    }
+
+    final narrow = MediaQuery.sizeOf(context).width < 360;
+
+    // Opened: the dark plum page, just the back button and the title.
+    // The background sits behind the whole screen, so the header is part of
+    // the page rather than a separate strip.
+    return NotesBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          scrolledUnderElevation: 0,
+          elevation: 0,
+          foregroundColor: NotePalette.pink,
+          centerTitle: true,
+          leading: IconButton(
+            tooltip: 'Back',
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          title: Text(
+            'Your time capsule',
+            style: NotePalette.display(narrow ? 21 : 24),
+            overflow: TextOverflow.ellipsis,
+          ),
+          actions: [
+            // A small decorative heart, left out where the title needs
+            // the room.
+            if (!narrow)
+              ExcludeSemantics(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.lg),
+                  child: Icon(
+                    Icons.favorite_border_rounded,
+                    size: 22,
+                    color: NotePalette.rose.withValues(alpha: 0.55),
+                  ),
+                ),
+              ),
           ],
         ),
+        body: list,
       ),
     );
   }
@@ -271,14 +325,10 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
         ),
       );
     }
-    final muted = theme.textTheme.bodySmall?.copyWith(
-      color: scheme.onSurfaceVariant,
-    );
-    final opened = _capsule.openedAt;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CapsuleLetter(
+        OpenedCapsule(
           reveal: _revealAnimation,
           title: contents.title,
           letter: contents.letter,
@@ -287,39 +337,12 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
           photo: _photo,
           photoFailed: _photoFailed,
           onRetryPhoto: _loadPhoto,
-          header: Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-            child: Row(
-              children: [
-                const MiniEnvelope(look: EnvelopeLook.opened, width: 56),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _iAmSender
-                            ? 'From you to ${widget.partnerName}'
-                            : 'From ${widget.partnerName}',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      Text(
-                        'Sealed for ${longDate(_capsule.unlockAt!)} at ${clockTime(_capsule.unlockAt!)}',
-                        style: muted,
-                      ),
-                      if (opened != null)
-                        Text(
-                          'Opened ${longDate(opened)} at ${clockTime(opened)}',
-                          style: muted,
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          signature: (
+            name: _iAmSender ? (widget.myName ?? 'You') : widget.partnerName,
+            written: _capsule.sealedAt ?? _capsule.createdAt,
           ),
         ),
-        const SizedBox(height: AppSpacing.xxl),
+        const SizedBox(height: 48),
         _Replies(
           key: ValueKey('replies-${_replies.length}'),
           capsule: _capsule,
@@ -329,6 +352,63 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
           senderName: _senderName,
           onChanged: _load,
         ),
+        const SizedBox(height: AppSpacing.xxl),
+        _Details(capsule: _capsule),
+      ],
+    );
+  }
+}
+
+/// When it was sealed for and opened: small, and only when asked for.
+class _Details extends StatefulWidget {
+  const _Details({required this.capsule});
+
+  final TimeCapsule capsule;
+
+  @override
+  State<_Details> createState() => _DetailsState();
+}
+
+class _DetailsState extends State<_Details> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final small = theme.textTheme.bodySmall?.copyWith(color: NotePalette.muted);
+    final unlock = widget.capsule.unlockAt;
+    final opened = widget.capsule.openedAt;
+    return Column(
+      children: [
+        Semantics(
+          expanded: _open,
+          child: TextButton.icon(
+            onPressed: () => setState(() => _open = !_open),
+            style: TextButton.styleFrom(
+              foregroundColor: NotePalette.muted,
+              minimumSize: const Size(0, 44),
+            ),
+            icon: Icon(
+              _open ? Icons.expand_less_rounded : Icons.info_outline_rounded,
+              size: 18,
+            ),
+            label: const Text('Details'),
+          ),
+        ),
+        if (_open) ...[
+          if (unlock != null)
+            Text(
+              'Sealed for ${longDate(unlock)} at ${clockTime(unlock)}',
+              style: small,
+              textAlign: TextAlign.center,
+            ),
+          if (opened != null)
+            Text(
+              'Opened ${longDate(opened)} at ${clockTime(opened)}',
+              style: small,
+              textAlign: TextAlign.center,
+            ),
+        ],
       ],
     );
   }
