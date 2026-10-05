@@ -57,6 +57,56 @@ class AppTheme {
           borderSide: BorderSide(color: scheme.error, width: 2),
         ),
       ),
+      // Dialogs, sheets and snackbars share the app's soft radii and warm
+      // surfaces instead of Material's stock grey, so a confirm or a toast
+      // feels like part of USpace rather than the platform.
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surfaceContainerHighest,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.panel),
+        ),
+        titleTextStyle: AppTypography.textTheme(scheme).titleLarge,
+        contentTextStyle: AppTypography.textTheme(scheme).bodyMedium
+            ?.copyWith(color: scheme.onSurfaceVariant),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        surfaceTintColor: Colors.transparent,
+        dragHandleColor: scheme.outline,
+        // A plum-tinted scrim reads warmer than flat black on cream.
+        modalBarrierColor: (scheme.brightness == Brightness.dark
+                ? Colors.black
+                : scheme.secondary)
+            .withValues(alpha: 0.32),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadius.hero),
+          ),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: scheme.brightness == Brightness.dark
+            ? scheme.surfaceContainerHighest
+            : scheme.secondary,
+        contentTextStyle: AppTypography.textTheme(scheme).bodyMedium?.copyWith(
+          color: scheme.brightness == Brightness.dark
+              ? scheme.onSurface
+              : scheme.onSecondary,
+        ),
+        actionTextColor: scheme.brightness == Brightness.dark
+            ? scheme.primary
+            : scheme.primaryContainer,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.input),
+        ),
+        insetPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          0,
+          AppSpacing.lg,
+          AppSpacing.lg,
+        ),
+      ),
       navigationBarTheme: NavigationBarThemeData(
         height: AppSpacing.navBarHeight,
         indicatorColor: scheme.primaryContainer,

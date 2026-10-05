@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 
+import '../../theme/app_effects.dart';
 import 'floating_hearts.dart';
 
 // USpace motion: "playful but quick". Everyday movement is short and calm
@@ -92,13 +94,82 @@ List<Widget> staggered(List<Widget> children) => [
         ),
     ];
 
-/// A quick bouncy "pop" every time [trigger] changes (not on first build).
+/// Shrinks its child a little while a finger or mouse is pressed on it, so
+/// a tap feels heard the moment it lands. It only listens to the pointer and
+/// never takes part in the gesture, so taps, long-presses and scrolling
+/// underneath work exactly as before. Still with reduced motion.
+class PressScale extends StatefulWidget {
+  const PressScale({super.key, required this.child, this.enabled = true, this.scale = 0.97});
+
+  final Widget child;
+
+  /// False for a disabled control: no feedback for a press that does nothing.
+  final bool enabled;
+  final double scale;
+
+  @override
+  State<PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<PressScale> {
+  bool _down = false;
+  Offset? _origin;
+
+  void _set(bool down) {
+    if (_down != down) setState(() => _down = down);
+  }
+
+  // Once the finger travels it is a scroll or a drag, not a press: let go,
+  // so a card doesn't stay shrunk while the list scrolls under it.
+  void _moved(PointerMoveEvent e) {
+    final origin = _origin;
+    if (_down && origin != null && (e.position - origin).distance > kTouchSlop) {
+      _set(false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.enabled && !motionOff(context);
+    final pressed = active && _down;
+    return Listener(
+      onPointerDown: active
+          ? (e) {
+              _origin = e.position;
+              _set(true);
+            }
+          : null,
+      onPointerMove: _moved,
+      onPointerUp: (_) => _set(false),
+      onPointerCancel: (_) => _set(false),
+      child: AnimatedScale(
+        scale: pressed ? widget.scale : 1,
+        // Down quickly, release a little slower: the press feels immediate,
+        // the settle feels soft.
+        duration: pressed ? AppMotion.pressIn : AppMotion.pressOut,
+        curve: AppMotion.snappy,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// A quick "pop" every time [trigger] changes (not on first build). With
+/// [bounce] it settles with a little wobble, for rare happy moments; without
+/// it, a calm settle that suits something you do many times a day.
 class PopOnChange extends StatefulWidget {
-  const PopOnChange({super.key, required this.trigger, required this.child, this.scale = 1.3});
+  const PopOnChange({
+    super.key,
+    required this.trigger,
+    required this.child,
+    this.scale = 1.3,
+    this.bounce = true,
+  });
 
   final Object? trigger;
   final Widget child;
   final double scale;
+  final bool bounce;
 
   @override
   State<PopOnChange> createState() => _PopOnChangeState();
@@ -134,11 +205,12 @@ class _PopOnChangeState extends State<PopOnChange> with SingleTickerProviderStat
       animation: _c,
       child: widget.child,
       builder: (context, child) {
-        // up quickly, then settle back with a little bounce
+        // up quickly, then settle back
         final t = _c.value;
+        final settle = widget.bounce ? Curves.elasticOut : AppMotion.snappy;
         final s = t < 0.35
             ? 1 + (widget.scale - 1) * Curves.easeOut.transform(t / 0.35)
-            : 1 + (widget.scale - 1) * (1 - Curves.elasticOut.transform((t - 0.35) / 0.65));
+            : 1 + (widget.scale - 1) * (1 - settle.transform((t - 0.35) / 0.65));
         return Transform.scale(scale: _c.isAnimating ? s : 1, child: child);
       },
     );

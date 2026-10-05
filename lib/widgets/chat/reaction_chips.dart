@@ -122,7 +122,9 @@ class _Chip extends StatelessWidget {
             child: Center(
               widthFactor: 1,
               heightFactor: 1,
-              child: Material(
+              child: PressScale(
+                scale: 0.9,
+                child: Material(
                 color: g.mine
                     ? scheme.primaryContainer
                     : scheme.surfaceContainerHighest,
@@ -171,6 +173,7 @@ class _Chip extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
               ),
             ),
           ),

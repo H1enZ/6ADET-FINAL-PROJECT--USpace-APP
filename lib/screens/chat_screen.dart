@@ -11,11 +11,13 @@ import '../models/chat_reaction.dart';
 import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
+import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
 import '../utils/capsule_time.dart';
 import '../widgets/atoms/avatar_circle.dart';
 import '../widgets/chat/reaction_chips.dart';
 import '../widgets/chat/reaction_tray.dart';
+import '../widgets/effects/heartbeat.dart';
 import '../widgets/effects/motion.dart';
 
 /// The couple's private chat. Messages arrive in real time; your partner's
@@ -188,7 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _autoScrolls++;
         _scroll
             .animateTo(end,
-                duration: const Duration(milliseconds: 250), curve: Curves.easeOut)
+                duration: const Duration(milliseconds: 250), curve: AppMotion.snappy)
             .whenComplete(() {
           _autoScrolls--;
           _followEnd(); // in case more arrived meanwhile
@@ -319,7 +321,12 @@ class _ChatScreenState extends State<ChatScreen> {
                 TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
                     child: const Text('Cancel')),
-                TextButton(
+                // Destructive, so it reads as one: filled in the error colour.
+                FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Theme.of(context).colorScheme.onError,
+                    ),
                     onPressed: () => Navigator.of(context).pop(true),
                     child: const Text('Delete')),
               ],
@@ -416,7 +423,19 @@ class _ChatScreenState extends State<ChatScreen> {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            InteractiveViewer(child: Image.network(url, fit: BoxFit.contain)),
+            InteractiveViewer(
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                // A soft spinner while the full photo loads, not an empty box.
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : const SizedBox.square(
+                        dimension: 240,
+                        child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+                      ),
+              ),
+            ),
             Positioned(
               right: 4,
               top: 4,
@@ -550,8 +569,18 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                           ),
           ),
-          if (_showEmojis)
-            Container(
+          // The emoji drawer slides open above the composer instead of
+          // popping in, so the conversation shifts up smoothly with it.
+          AnimatedSize(
+            duration: motionOff(context)
+                ? const Duration(milliseconds: 1) // AnimatedSize asserts on zero
+                : AppMotion.quick,
+            curve: AppMotion.snappy,
+            alignment: Alignment.bottomCenter,
+            child: !_showEmojis
+                ? const SizedBox(width: double.infinity)
+                : Container(
+              width: double.infinity,
               color: scheme.surfaceContainerHighest,
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
               child: Wrap(
@@ -559,13 +588,17 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   for (final e in const ['❤️', '🥰', '😘', '🤗', '😂', '🥺', '😊',
                     '😢', '🙏', '👍', '🎉', '🌙', '☀️', '🌸', '💌', '🫂'])
-                    IconButton(
-                      onPressed: () => _insertEmoji(e),
-                      icon: Text(e, style: const TextStyle(fontSize: 22)),
+                    PressScale(
+                      scale: 0.85,
+                      child: IconButton(
+                        onPressed: () => _insertEmoji(e),
+                        icon: Text(e, style: const TextStyle(fontSize: 22)),
+                      ),
                     ),
                 ],
               ),
             ),
+          ),
           SafeArea(
             top: false,
             child: Container(
@@ -584,9 +617,22 @@ class _ChatScreenState extends State<ChatScreen> {
                       IconButton(
                         tooltip: 'Emoji',
                         onPressed: () => setState(() => _showEmojis = !_showEmojis),
-                        icon: Icon(_showEmojis
-                            ? Icons.keyboard_outlined
-                            : Icons.emoji_emotions_outlined),
+                        icon: AnimatedSwitcher(
+                          duration: motionOff(context) ? Duration.zero : AppMotion.quick,
+                          transitionBuilder: (child, a) => FadeTransition(
+                            opacity: a,
+                            child: ScaleTransition(
+                              scale: Tween(begin: 0.8, end: 1.0).animate(a),
+                              child: child,
+                            ),
+                          ),
+                          child: Icon(
+                            _showEmojis
+                                ? Icons.keyboard_outlined
+                                : Icons.emoji_emotions_outlined,
+                            key: ValueKey(_showEmojis),
+                          ),
+                        ),
                       ),
                       IconButton(
                         tooltip: 'Send a photo',
@@ -610,18 +656,49 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ),
                       const SizedBox(width: AppSpacing.xs),
-                      PopOnChange(
-                        trigger: _sentCount,
-                        child: IconButton.filled(
-                        tooltip: 'Send',
-                        onPressed: _sending ? null : () => _send(),
-                        icon: _sending
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.send),
-                      ),
+                      // Rose and ready only once there is something to send;
+                      // a calm pop when it goes (you send many a day, so no
+                      // wobble), and the spinner cross-fades with the icon.
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _input,
+                        builder: (context, value, _) {
+                          final canSend = value.text.trim().isNotEmpty && !_sending;
+                          return PopOnChange(
+                            trigger: _sentCount,
+                            scale: 1.12,
+                            bounce: false,
+                            child: PressScale(
+                              enabled: canSend,
+                              scale: 0.9,
+                              child: IconButton.filled(
+                                tooltip: 'Send',
+                                onPressed: canSend ? () => _send() : null,
+                                icon: AnimatedSwitcher(
+                                  duration: motionOff(context)
+                                      ? Duration.zero
+                                      : AppMotion.quick,
+                                  transitionBuilder: (child, a) => FadeTransition(
+                                    opacity: a,
+                                    child: ScaleTransition(
+                                      scale: Tween(begin: 0.7, end: 1.0).animate(a),
+                                      child: child,
+                                    ),
+                                  ),
+                                  child: _sending
+                                      ? SizedBox(
+                                          key: const ValueKey('sending'),
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: scheme.onSurfaceVariant))
+                                      : const Icon(Icons.send_rounded,
+                                          key: ValueKey('send')),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -804,7 +881,12 @@ class _Bubble extends StatelessWidget {
                 key: bubbleKey,
                 onLongPress: _open,
                 onSecondaryTap: _open,
-                child: ConstrainedBox(
+                // Sinks a touch while held, so the long-press feels like it
+                // is working before the tray appears.
+                child: PressScale(
+                  enabled: !m.isDeleted,
+                  scale: 0.98,
+                  child: ConstrainedBox(
                   constraints: BoxConstraints(
                       maxWidth: MediaQuery.sizeOf(context).width * 0.75 > 480
                           ? 480
@@ -836,6 +918,7 @@ class _Bubble extends StatelessWidget {
                     },
                   ),
                 ),
+                ),
               ),
             ),
           ),
@@ -857,8 +940,10 @@ class _Bubble extends StatelessWidget {
                   if (m.isEdited) 'edited',
                   ?receipt,
                 ].join(' \u00B7 '),
+                // labelSmall's wide tracking is for small-caps labels; a
+                // time reads better set close.
                 style: theme.textTheme.labelSmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
+                    ?.copyWith(color: scheme.onSurfaceVariant, letterSpacing: 0.2),
               ),
             ),
         ],
@@ -876,32 +961,56 @@ class _EmptyChat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     const starters = ['Good morning ❤️', 'Thinking of you', 'I miss you 🥺', 'How was your day?'];
+    // A first-time moment, so it may arrive gently: heart, words, then the
+    // starters, one after another.
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.huge),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.forum_outlined, size: 56, color: theme.colorScheme.primary),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Say hi to $partnerName', style: theme.textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.sm),
-            Text('Only the two of you can ever read this chat.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: AppSpacing.lg),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              alignment: WrapAlignment.center,
-              children: [
-                for (final s in starters)
-                  ActionChip(label: Text(s), onPressed: () => onPick(s)),
-              ],
+          children: staggered([
+            // The app's own heart on a blush disc, not a generic chat icon.
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: scheme.primaryContainer,
+                boxShadow: AppShadows.glow(scheme.primary),
+              ),
+              child: Heartbeat(
+                child: Icon(Icons.favorite_rounded, size: 40, color: scheme.primary),
+              ),
             ),
-          ],
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xxl),
+              child: Text('Say hi to $partnerName',
+                  textAlign: TextAlign.center, style: theme.textTheme.titleLarge),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Text('Only the two of you can ever read this chat.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: scheme.onSurfaceVariant)),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xxl),
+              child: Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final s in starters)
+                    PressScale(
+                      child: ActionChip(label: Text(s), onPressed: () => onPick(s)),
+                    ),
+                ],
+              ),
+            ),
+          ]),
         ),
       ),
     );

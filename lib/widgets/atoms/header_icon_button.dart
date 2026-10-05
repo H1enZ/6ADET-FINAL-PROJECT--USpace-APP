@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_effects.dart';
 import '../../theme/app_spacing.dart';
+import '../effects/motion.dart';
 
 /// A round header button (Chat, Notifications) with an optional unread
 /// marker: a small dot, or a count when [count] is given. Screen readers
@@ -50,34 +51,38 @@ class HeaderIconButton extends StatelessWidget {
       child: Tooltip(
         message: semantic,
         // The filled circle carries the shadow, behind the ink.
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest,
-            shape: BoxShape.circle,
-            boxShadow: AppShadows.soft(scheme),
-          ),
-          child: Material(
-            type: MaterialType.transparency,
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: onPressed,
-              child: SizedBox.square(
-                dimension: AppSpacing.touchTarget,
-                child: Center(
-                  // The marker hugs the icon, not the corner of the
-                  // touch target, so it reads as part of the bell/bubble.
-                  child: Badge(
-                    isLabelVisible: unread,
-                    backgroundColor: scheme.primary,
-                    textColor: scheme.onPrimary,
-                    label: n > 0 ? Text(n > 99 ? '99+' : '$n') : null,
-                    child: Icon(
-                      icon,
-                      size: _iconSize,
-                      color: onPressed == null
-                          ? scheme.outline
-                          : scheme.onSurface,
+        child: PressScale(
+          enabled: onPressed != null,
+          scale: 0.94,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              shape: BoxShape.circle,
+              boxShadow: AppShadows.soft(scheme),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onPressed,
+                child: SizedBox.square(
+                  dimension: AppSpacing.touchTarget,
+                  child: Center(
+                    // The marker hugs the icon, not the corner of the
+                    // touch target, so it reads as part of the bell/bubble.
+                    child: Badge(
+                      isLabelVisible: unread,
+                      backgroundColor: scheme.primary,
+                      textColor: scheme.onPrimary,
+                      label: n > 0 ? Text(n > 99 ? '99+' : '$n') : null,
+                      child: Icon(
+                        icon,
+                        size: _iconSize,
+                        color: onPressed == null
+                            ? scheme.outline
+                            : scheme.onSurface,
+                      ),
                     ),
                   ),
                 ),

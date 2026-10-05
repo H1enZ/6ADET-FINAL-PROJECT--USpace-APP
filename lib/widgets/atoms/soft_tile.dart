@@ -67,32 +67,37 @@ class SoftTile extends StatelessWidget {
       // provided here; otherwise TalkBack cannot activate the tile.
       onTap: onTap,
       excludeSemantics: true,
-      child: AnimatedContainer(
-        duration: duration,
-        curve: AppMotion.enter,
-        decoration: BoxDecoration(
-          // A light tint as well as the ring, so selection does not rely
-          // on the outline colour alone.
-          color: selected
-              ? Color.alphaBlend(
-                  ring.withValues(alpha: 0.08),
-                  scheme.surfaceContainerHighest,
-                )
-              : scheme.surfaceContainerHighest,
-          borderRadius: shape,
-          // Same width selected or not, so nothing shifts when it animates.
-          border: Border.all(
-            color: selected ? ring : scheme.outline.withValues(alpha: 0.6),
-            width: borderWidth,
-          ),
-          boxShadow: selected ? AppShadows.glow(ring) : AppShadows.soft(scheme),
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
+      child: PressScale(
+        enabled: onTap != null,
+        child: AnimatedContainer(
+          duration: duration,
+          curve: AppMotion.enter,
+          decoration: BoxDecoration(
+            // A light tint as well as the ring, so selection does not rely
+            // on the outline colour alone.
+            color: selected
+                ? Color.alphaBlend(
+                    ring.withValues(alpha: 0.08),
+                    scheme.surfaceContainerHighest,
+                  )
+                : scheme.surfaceContainerHighest,
             borderRadius: shape,
-            onTap: onTap,
-            child: Padding(padding: padding, child: child),
+            // Same width selected or not, so nothing shifts when it animates.
+            border: Border.all(
+              color: selected ? ring : scheme.outline.withValues(alpha: 0.6),
+              width: borderWidth,
+            ),
+            boxShadow: selected
+                ? AppShadows.glow(ring)
+                : AppShadows.soft(scheme),
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: shape,
+              onTap: onTap,
+              child: Padding(padding: padding, child: child),
+            ),
           ),
         ),
       ),

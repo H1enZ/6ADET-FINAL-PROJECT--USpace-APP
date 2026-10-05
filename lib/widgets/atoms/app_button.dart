@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_effects.dart';
 import '../../theme/app_spacing.dart';
+import '../effects/motion.dart';
 
 enum AppButtonVariant { filled, outlined }
 
@@ -27,13 +29,27 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final action = isLoading ? null : onPressed;
-    final Widget content = isLoading
-        ? const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
-          )
-        : Text(label);
+    // The label and the spinner cross-fade instead of swapping in one
+    // frame, so a save that starts loading doesn't flicker.
+    final Widget content = AnimatedSwitcher(
+      duration: motionOff(context) ? Duration.zero : AppMotion.quick,
+      switchInCurve: AppMotion.snappy,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween(begin: 0.9, end: 1.0).animate(animation),
+          child: child,
+        ),
+      ),
+      child: isLoading
+          ? const SizedBox(
+              key: ValueKey('loading'),
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            )
+          : Text(label, key: const ValueKey('label')),
+    );
 
     final style = ButtonStyle(
       minimumSize: const WidgetStatePropertyAll(
@@ -67,6 +83,11 @@ class AppButton extends StatelessWidget {
             );
     }
 
-    return fullWidth ? SizedBox(width: double.infinity, child: button) : button;
+    return PressScale(
+      enabled: action != null,
+      child: fullWidth
+          ? SizedBox(width: double.infinity, child: button)
+          : button,
+    );
   }
 }

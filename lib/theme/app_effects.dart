@@ -81,12 +81,20 @@ class AppGradients {
 class AppMotion {
   AppMotion._();
 
+  /// Press feedback: down fast, release a touch slower.
+  static const Duration pressIn = Duration(milliseconds: 90);
+  static const Duration pressOut = Duration(milliseconds: 160);
+
   static const Duration quick = Duration(milliseconds: 200);
   static const Duration medium = Duration(milliseconds: 450);
   static const Duration slow = Duration(milliseconds: 600);
 
   static const Curve enter = Curves.easeOutCubic;
   static const Curve exit = Curves.easeInCubic;
+
+  /// A strong ease-out for things that respond to a touch: moves at once,
+  /// then settles softly. Reads more decisive than easeOutCubic.
+  static const Curve snappy = Cubic(0.23, 1, 0.32, 1);
 }
 
 /// One mood's colours: the hero background, its accent and its particles.
