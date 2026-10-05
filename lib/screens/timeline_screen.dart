@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../models/memory.dart';
 import '../models/profile.dart';
+import '../models/scrapbook.dart';
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
 import '../services/memory_service.dart';
+import '../services/scrapbook_service.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/effects/floating_hearts.dart';
@@ -14,17 +18,23 @@ import '../widgets/effects/motion.dart';
 import '../widgets/home/quick_actions.dart';
 import '../widgets/notes/note_style.dart';
 import '../widgets/timeline/scrapbook_canvas.dart';
+import '../widgets/timeline/scrapbook_editor.dart';
 import '../widgets/timeline/scrapbook_layout.dart';
 import 'add_memory_sheet.dart';
 import 'memory_detail_screen.dart';
 
 /// The couple's story as one big scrapbook: newest month at the top, each
-/// month a cluster of taped Polaroids, paper notes and date cards. Pinch,
+/// month a cluster of framed photos, paper notes and tickets. Pinch,
 /// scroll-wheel or the controls zoom it; drag to move around. Zoomed far
 /// out, it reads as the whole story from above, with month labels on top.
 ///
-/// Only the scrapbook zooms: the header, Add, zoom controls and the
-/// minimap stay normal size.
+/// Edit turns it into a scrapbook you arrange yourselves: move, resize and
+/// tilt memories, choose their frames and layers, and join them with little
+/// lines. That arrangement is shared by both of you and saved separately
+/// from the memories (a memory's date and content never change).
+///
+/// Only the scrapbook zooms: the header, Add, zoom controls, the minimap
+/// and the editing toolbar stay normal size.
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key, required this.profile});
 
@@ -34,8 +44,24 @@ class TimelineScreen extends StatefulWidget {
   State<TimelineScreen> createState() => _TimelineScreenState();
 }
 
+/// One step that Undo can take back.
+class _Undo {
+  _Undo({
+    this.items = const {},
+    this.addedLinkId,
+    this.removedLink,
+    this.restyled,
+  });
+
+  /// Each changed memory's placement before the step (null = none saved).
+  final Map<String, LayoutItem?> items;
+  final String? addedLinkId;
+  final ScrapConnection? removedLink;
+  final ScrapConnection? restyled;
+}
+
 class _TimelineScreenState extends State<TimelineScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   List<Memory> _memories = [];
   Map<String, String> _names = {};
   bool _searching = false;
@@ -44,8 +70,8 @@ class _TimelineScreenState extends State<TimelineScreen>
   bool _loading = true;
   String? _error;
 
-  /// Worked out only when the memories or the search change, never while
-  /// zooming, so pieces never move under your fingers.
+  /// Worked out only when the memories, search or arrangement change, never
+  /// while zooming, so pieces never move under your fingers.
   ScrapbookLayout? _layout;
 
   final _view = TransformationController();
@@ -55,13 +81,62 @@ class _TimelineScreenState extends State<TimelineScreen>
   )..addListener(_step);
   Animation<Matrix4>? _tween;
   Size? _viewport;
+  bool _lowRes = false;
+
+  // ------------------------------------------------ the shared arrangement
+
+  /// Saved placements (what both of you see). Empty = never arranged by
+  /// hand: the automatic date layout.
+  Map<String, LayoutItem> _saved = {};
+  List<ScrapConnection> _links = [];
+
+  /// False when the arrangement can't be loaded (e.g. a database without
+  /// migration 018): the Timeline works as before, without Edit.
+  bool _layoutReady = false;
+  bool get _customized => _saved.isNotEmpty;
+
+  bool _editing = false;
+  String? _selected;
+  String? _connectFrom;
+
+  /// The memory being moved / resized / turned right now.
+  final _live = ValueNotifier<ScrapLive?>(null);
+  ({ScrapPiece piece, ScrapGesture kind, LayoutItem start, Offset from})?
+  _gesture;
+
+  final _undo = <_Undo>[];
+  static const _undoLimit = 30;
+
+  // Saving: changes collect here and go out in one request.
+  final _dirty = <String>{};
+  final _removed = <String>{};
+  Timer? _saveTimer;
+  bool _saving = false;
+
+  RealtimeChannel? _channel;
+  Timer? _remoteTimer;
+
+  // Organize / reset: everything glides to its new place.
+  late final AnimationController _arrange = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 650),
+  )..addListener(_arrangeStep);
+  Map<String, LayoutItem>? _arrangeFrom;
+  Map<String, LayoutItem>? _arrangeTo;
 
   String get _coupleId => widget.profile.coupleId!;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _view.addListener(_watchZoom);
     _load();
+    try {
+      _channel = ScrapbookService.listen(_coupleId, _remoteChanged);
+    } catch (_) {
+      // Live updates are a bonus.
+    }
     _search.addListener(() {
       final q = _search.text.trim().toLowerCase();
       if (q == _query) return;
@@ -74,10 +149,26 @@ class _TimelineScreenState extends State<TimelineScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _flush(); // anything not saved yet goes now
+    _saveTimer?.cancel();
+    _remoteTimer?.cancel();
+    final channel = _channel;
+    if (channel != null) ScrapbookService.stopListening(channel);
     _anim.dispose();
+    _arrange.dispose();
     _view.dispose();
+    _live.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _flush();
+    }
   }
 
   /// Your own tags (not built-ins), offered as chips when tagging.
@@ -100,18 +191,40 @@ class _TimelineScreenState extends State<TimelineScreen>
     ].any((field) => field.toLowerCase().contains(_query));
   }
 
-  void _relayout() {
-    _layout = ScrapbookLayout.build(_memories.where(_matches).toList());
+  void _relayout({Map<String, LayoutItem>? saved}) {
+    final s = saved ?? _saved;
+    _layout = ScrapbookLayout.compose(
+      memories: _memories.where(_matches).toList(),
+      saved: s,
+      customized: s.isNotEmpty,
+    );
   }
 
   Future<void> _load() async {
     try {
-      final members = await CoupleService.members(_coupleId);
-      final memories = await MemoryService.list(_coupleId);
+      final results = await Future.wait<Object?>([
+        CoupleService.members(_coupleId),
+        MemoryService.list(_coupleId),
+        ScrapbookService.load(
+          _coupleId,
+        ).then<Object?>((v) => v, onError: (_) => null),
+      ]);
       if (!mounted) return;
+      final members = results[0] as List<Profile>;
+      final memories = results[1] as List<Memory>;
+      final scrap =
+          results[2]
+              as ({
+                Map<String, LayoutItem> items,
+                List<ScrapConnection> links,
+              })?;
       setState(() {
         _names = {for (final m in members) m.userId: m.displayName};
         _memories = memories;
+        if (scrap != null) {
+          _layoutReady = true;
+          _mergeRemote(scrap.items, scrap.links);
+        }
         _relayout();
         _error = null;
         _loading = false;
@@ -123,6 +236,43 @@ class _TimelineScreenState extends State<TimelineScreen>
         _loading = false;
       });
     }
+  }
+
+  /// Takes the saved arrangement, except for anything changed here and not
+  /// saved yet (that wins until it is saved).
+  void _mergeRemote(
+    Map<String, LayoutItem> items,
+    List<ScrapConnection> links,
+  ) {
+    final liveId = _live.value?.item.memoryId;
+    final merged = <String, LayoutItem>{
+      for (final e in items.entries)
+        if (!_removed.contains(e.key)) e.key: e.value,
+    };
+    for (final id in _dirty) {
+      final mine = _saved[id];
+      if (mine != null) merged[id] = mine;
+    }
+    if (liveId != null) {
+      if (_saved[liveId] case final mine?) merged[liveId] = mine;
+    }
+    _saved = merged;
+    _links = links;
+  }
+
+  void _remoteChanged() {
+    _remoteTimer?.cancel();
+    _remoteTimer = Timer(const Duration(milliseconds: 400), () async {
+      if (!mounted || _gesture != null || _arrange.isAnimating) return;
+      try {
+        final scrap = await ScrapbookService.load(_coupleId);
+        if (!mounted || _gesture != null) return;
+        setState(() {
+          _mergeRemote(scrap.items, scrap.links);
+          _relayout();
+        });
+      } catch (_) {}
+    });
   }
 
   String _authorName(Memory m) => m.authorId == widget.profile.userId
@@ -180,6 +330,13 @@ class _TimelineScreenState extends State<TimelineScreen>
   /// Zoomed out past this, a tap zooms in first instead of opening, and
   /// the month labels float on top.
   bool get _farOut => _scale < _defaultScale * 0.6;
+
+  /// Zoomed far out, photos are decoded small. Only crossing this point
+  /// rebuilds the scrapbook, never zooming itself.
+  void _watchZoom() {
+    final low = _scale < _defaultScale * 0.35;
+    if (low != _lowRes) setState(() => _lowRes = low);
+  }
 
   Offset get _translation {
     final t = _view.value.getTranslation();
@@ -264,10 +421,447 @@ class _TimelineScreenState extends State<TimelineScreen>
 
   void _tapPiece(ScrapPiece piece) {
     if (_anim.isAnimating) return;
+    if (_editing) {
+      if (_connectFrom != null) {
+        _finishConnect(piece);
+      } else {
+        setState(
+          () =>
+              _selected = _selected == piece.memory.id ? null : piece.memory.id,
+        );
+      }
+      return;
+    }
     if (_farOut) {
       _zoomToRect(piece.rect);
     } else {
       _open(piece.memory);
+    }
+  }
+
+  // ------------------------------------------------------------ editing
+
+  void _startEditing() {
+    setState(() {
+      _editing = true;
+      _selected = null;
+      _connectFrom = null;
+      if (_searching) {
+        _searching = false;
+        _search.clear();
+      }
+    });
+  }
+
+  Future<void> _done() async {
+    setState(() {
+      _editing = false;
+      _selected = null;
+      _connectFrom = null;
+      _undo.clear();
+    });
+    await _flush();
+  }
+
+  /// Every memory's placement as drawn right now (saved, automatic or
+  /// waiting in the New strip).
+  Map<String, LayoutItem> get _drawn => {
+    for (final p in _layout?.pieces ?? const <ScrapPiece>[])
+      p.memory.id: p.item,
+  };
+
+  int get _topZ => _saved.values.fold<int>(0, (z, i) => math.max(z, i.z));
+
+  /// Applies placement changes (null = forget the placement), remembers
+  /// how to undo them, and saves them shortly.
+  void _apply(Map<String, LayoutItem?> changes, {bool record = true}) {
+    if (changes.isEmpty) return;
+    final before = <String, LayoutItem?>{};
+    // The first change to an automatic scrapbook pins every memory where it
+    // is, so nothing else moves by itself afterwards.
+    if (!_customized && changes.values.any((v) => v != null)) {
+      final drawn = _drawn;
+      for (final e in drawn.entries) {
+        before[e.key] = null;
+        _saved[e.key] = e.value;
+        _dirty.add(e.key);
+        _removed.remove(e.key);
+      }
+    }
+    for (final e in changes.entries) {
+      before.putIfAbsent(e.key, () => _saved[e.key]);
+      final v = e.value;
+      if (v == null) {
+        _saved.remove(e.key);
+        _dirty.remove(e.key);
+        _removed.add(e.key);
+      } else {
+        _saved[e.key] = v;
+        _dirty.add(e.key);
+        _removed.remove(e.key);
+      }
+    }
+    if (record) {
+      _undo.add(_Undo(items: before));
+      if (_undo.length > _undoLimit) _undo.removeAt(0);
+    }
+    setState(_relayout);
+    _scheduleSave();
+  }
+
+  ScrapPiece? get _selectedPiece {
+    final id = _selected;
+    return id == null ? null : _layout?.pieceOf(id);
+  }
+
+  void _gestureStart(ScrapPiece piece, ScrapGesture kind, Offset at) {
+    if (_arrange.isAnimating || _connectFrom != null) return;
+    _gesture = (piece: piece, kind: kind, start: piece.item, from: at);
+    _live.value = ScrapLive(piece.item);
+    if (_selected != piece.memory.id) {
+      setState(() => _selected = piece.memory.id);
+    }
+  }
+
+  void _gestureUpdate(Offset at) {
+    final g = _gesture;
+    if (g == null) return;
+    final s = g.start;
+    final d = at - g.from;
+    const w = ScrapbookLayout.canvasWidth;
+    switch (g.kind) {
+      case ScrapGesture.move:
+        var x = s.x + d.dx;
+        final y = s.y + d.dy;
+        double? guide;
+        // Gentle snapping to the middle and the page edges.
+        if ((x + s.width / 2 - w / 2).abs() < 6) {
+          x = w / 2 - s.width / 2;
+          guide = w / 2;
+        } else if ((x - 18).abs() < 6) {
+          x = 18;
+          guide = 18;
+        } else if ((x + s.width - (w - 18)).abs() < 6) {
+          x = w - 18 - s.width;
+          guide = w - 18;
+        }
+        x = x.clamp(-40.0, w - s.width + 40);
+        _live.value = ScrapLive(
+          s.copyWith(x: x, y: y),
+          guideX: guide,
+        );
+      case ScrapGesture.resize:
+        final width = (s.width + d.dx).clamp(
+          ScrapbookLayout.minWidth(g.piece.kind),
+          ScrapbookLayout.maxWidth,
+        );
+        _live.value = ScrapLive(s.copyWith(width: width.toDouble()));
+      case ScrapGesture.rotate:
+        final c = g.piece.rect.center;
+        final v = at - c;
+        var deg = math.atan2(v.dx, -v.dy) * 180 / math.pi;
+        deg = deg.clamp(LayoutItem.minRotation, LayoutItem.maxRotation);
+        if (deg.abs() < 0.75) deg = 0;
+        _live.value = ScrapLive(s.copyWith(rotation: deg));
+    }
+  }
+
+  void _gestureEnd() {
+    final g = _gesture;
+    final l = _live.value;
+    _gesture = null;
+    if (g == null || l == null) {
+      _live.value = null;
+      return;
+    }
+    var item = l.item;
+    if (item != g.start) {
+      // A memory placed from the New strip comes to the top.
+      if (g.piece.isNew) item = item.copyWith(z: _topZ + 1);
+      _apply({item.memoryId: item});
+    }
+    _live.value = null;
+  }
+
+  void _undoLast() {
+    if (_undo.isEmpty) return;
+    final step = _undo.removeLast();
+    if (step.items.isNotEmpty) _apply(step.items, record: false);
+    if (step.addedLinkId case final id?) {
+      setState(
+        () => _links = [
+          for (final l in _links)
+            if (l.id != id) l,
+        ],
+      );
+      ScrapbookService.disconnect(id).catchError((_) {});
+    }
+    if (step.removedLink case final link?) {
+      ScrapbookService.connect(
+            _coupleId,
+            link.sourceId,
+            link.targetId,
+            link.style,
+          )
+          .then((made) {
+            if (mounted) setState(() => _links = [..._links, made]);
+          })
+          .catchError((_) {});
+    }
+    if (step.restyled case final link?) {
+      setState(
+        () => _links = [for (final l in _links) l.id == link.id ? link : l],
+      );
+      ScrapbookService.restyle(link.id, link.style).catchError((_) {});
+    }
+    setState(() {});
+  }
+
+  Future<void> _frame() async {
+    final p = _selectedPiece;
+    if (p == null) return;
+    final pick = await pickFrame(context, p);
+    if (pick == null || !mounted) return;
+    final f = pick.frame;
+    _apply({
+      p.memory.id: f == null
+          ? p.item.copyWith(clearFrame: true)
+          : p.item.copyWith(frame: f),
+    });
+  }
+
+  Future<void> _size() async {
+    final p = _selectedPiece;
+    if (p == null) return;
+    final w = await pickSize(context, p);
+    if (w == null || !mounted) return;
+    _apply({p.memory.id: p.item.copyWith(width: w)});
+  }
+
+  Future<void> _turn() async {
+    final p = _selectedPiece;
+    if (p == null) return;
+    final angle = await pickTurn(
+      context,
+      p.item.rotation,
+      (v) => _live.value = ScrapLive(p.item.copyWith(rotation: v)),
+    );
+    _live.value = null;
+    if (angle == null || !mounted || angle == p.item.rotation) return;
+    _apply({p.memory.id: p.item.copyWith(rotation: angle)});
+  }
+
+  Future<void> _layer() async {
+    final p = _selectedPiece;
+    if (p == null) return;
+    final action = await pickLayer(context);
+    if (action == null || !mounted) return;
+    final drawn = _drawn;
+    final order = drawn.values.toList()..sort((a, b) => a.z.compareTo(b.z));
+    final me = drawn[p.memory.id]!;
+    final i = order.indexWhere((x) => x.memoryId == me.memoryId);
+    final changes = <String, LayoutItem>{};
+    switch (action) {
+      case LayerAction.front:
+        changes[me.memoryId] = me.copyWith(z: order.last.z + 1);
+      case LayerAction.back:
+        changes[me.memoryId] = me.copyWith(z: order.first.z - 1);
+      case LayerAction.forward when i < order.length - 1:
+        final other = order[i + 1];
+        changes[me.memoryId] = me.copyWith(z: other.z);
+        changes[other.memoryId] = other.copyWith(
+          z: me.z == other.z ? me.z - 1 : me.z,
+        );
+      case LayerAction.backward when i > 0:
+        final other = order[i - 1];
+        changes[me.memoryId] = me.copyWith(z: other.z);
+        changes[other.memoryId] = other.copyWith(
+          z: me.z == other.z ? me.z + 1 : me.z,
+        );
+      default:
+        return;
+    }
+    _apply(changes);
+  }
+
+  void _toggleConnect() {
+    setState(() => _connectFrom = _connectFrom != null ? null : _selected);
+  }
+
+  Future<void> _finishConnect(ScrapPiece target) async {
+    final from = _connectFrom;
+    setState(() {
+      _connectFrom = null;
+      _selected = target.memory.id;
+    });
+    if (from == null || from == target.memory.id) return;
+    if (_links.any((l) => l.joins(from, target.memory.id))) {
+      _showMessage('These two are already connected');
+      return;
+    }
+    try {
+      final link = await ScrapbookService.connect(
+        _coupleId,
+        from,
+        target.memory.id,
+        ConnectionStyle.dotted,
+      );
+      if (!mounted) return;
+      setState(() {
+        _links = [..._links, link];
+        _undo.add(_Undo(addedLinkId: link.id));
+      });
+    } catch (e) {
+      if (mounted) _showMessage(friendlyError(e));
+    }
+  }
+
+  Future<void> _tapLink(ScrapConnection link) async {
+    final pick = await pickLink(context, link);
+    if (pick == null || !mounted) return;
+    try {
+      if (pick.remove) {
+        await ScrapbookService.disconnect(link.id);
+        if (!mounted) return;
+        setState(() {
+          _links = [
+            for (final l in _links)
+              if (l.id != link.id) l,
+          ];
+          _undo.add(_Undo(removedLink: link));
+        });
+      } else if (pick.style case final style? when style != link.style) {
+        await ScrapbookService.restyle(link.id, style);
+        if (!mounted) return;
+        setState(() {
+          _links = [
+            for (final l in _links)
+              l.id == link.id ? l.copyWith(style: style) : l,
+          ];
+          _undo.add(_Undo(restyled: link));
+        });
+      }
+    } catch (e) {
+      if (mounted) _showMessage(friendlyError(e));
+    }
+  }
+
+  Future<void> _arrangeMenu() async {
+    final action = await pickArrange(context, hasSelection: _selected != null);
+    if (action == null || !mounted) return;
+    if (!await confirmArrange(context, action) || !mounted) return;
+    final frames = {for (final e in _saved.entries) e.key: e.value.frame};
+    switch (action) {
+      case ArrangeAction.organize:
+      case ArrangeAction.resetPositions:
+        // Date order with each memory's chosen frame kept.
+        final org = ScrapbookLayout.organize(_memories, frames: frames);
+        _arrangeInto(org.items);
+      case ArrangeAction.resetAll:
+        // Back to the automatic scrapbook: frames forgotten too.
+        final org = ScrapbookLayout.organize(_memories);
+        _arrangeInto(org.items, forgetAll: true);
+      case ArrangeAction.resetItem:
+        final id = _selected;
+        if (id == null) return;
+        final org = ScrapbookLayout.organize(
+          _memories,
+          frames: {...frames, id: null},
+        );
+        final item = org.items[id];
+        if (item == null) return;
+        _apply({id: item.copyWith(z: _saved[id]?.z ?? item.z)});
+    }
+  }
+
+  /// Everything glides from where it is to [target]; then it is saved.
+  void _arrangeInto(Map<String, LayoutItem> target, {bool forgetAll = false}) {
+    if (_query.isNotEmpty) _search.clear();
+    final from = _drawn;
+    void finish() {
+      if (forgetAll) {
+        _apply({
+          for (final id in {..._saved.keys}) id: null,
+        });
+      } else {
+        _apply(target);
+      }
+    }
+
+    if (motionOff(context)) {
+      finish();
+      return;
+    }
+    _arrangeFrom = from;
+    _arrangeTo = target;
+    _arrange.forward(from: 0).whenComplete(() {
+      _arrangeFrom = _arrangeTo = null;
+      if (mounted) finish();
+    });
+  }
+
+  void _arrangeStep() {
+    final from = _arrangeFrom, to = _arrangeTo;
+    if (from == null || to == null) return;
+    final t = Curves.easeInOutCubic.transform(_arrange.value);
+    double lerp(double a, double b) => a + (b - a) * t;
+    final mid = <String, LayoutItem>{
+      for (final e in to.entries)
+        e.key: from[e.key] == null
+            ? e.value
+            : LayoutItem(
+                memoryId: e.key,
+                x: lerp(from[e.key]!.x, e.value.x),
+                y: lerp(from[e.key]!.y, e.value.y),
+                width: lerp(from[e.key]!.width, e.value.width),
+                rotation: lerp(from[e.key]!.rotation, e.value.rotation),
+                frame: e.value.frame,
+                z: e.value.z,
+              ),
+    };
+    setState(() => _relayout(saved: mid));
+  }
+
+  // ------------------------------------------------------------ saving
+
+  void _scheduleSave() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 1500), _flush);
+  }
+
+  /// Sends what changed, in as few requests as possible.
+  Future<void> _flush() async {
+    _saveTimer?.cancel();
+    if (_saving || (_dirty.isEmpty && _removed.isEmpty)) return;
+    final toSave = [for (final id in _dirty) ?_saved[id]];
+    final toRemove = {..._removed};
+    _saving = true;
+    if (mounted) setState(() {});
+    try {
+      if (toRemove.isNotEmpty) {
+        if (_saved.isEmpty) {
+          await ScrapbookService.removeAllItems(_coupleId);
+        } else {
+          await ScrapbookService.removeItems(_coupleId, toRemove);
+        }
+      }
+      await ScrapbookService.saveItems(_coupleId, toSave);
+      _removed.removeAll(toRemove);
+      for (final i in toSave) {
+        if (_saved[i.memoryId] == i) _dirty.remove(i.memoryId);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showMessage(
+          "Couldn't save the scrapbook just now. It will try again.",
+        );
+      }
+    } finally {
+      _saving = false;
+      if (mounted) {
+        setState(() {});
+        if (_dirty.isNotEmpty || _removed.isNotEmpty) _scheduleSave();
+      }
     }
   }
 
@@ -343,9 +937,28 @@ class _TimelineScreenState extends State<TimelineScreen>
             minScale: _minScale,
             maxScale: _maxScale,
             defaultScale: _defaultScale,
-            photoScale:
-                MediaQuery.devicePixelRatioOf(context) * _defaultScale * 1.6,
-            onTapPiece: _tapPiece,
+            editing: _editing,
+            canvas: ScrapbookCanvas(
+              layout: layout,
+              links: _links,
+              photoScale:
+                  MediaQuery.devicePixelRatioOf(context) * _defaultScale * 1.6,
+              lowRes: _lowRes,
+              onTapPiece: _tapPiece,
+              editing: _editing,
+              selectedId: _selected,
+              connectFromId: _connectFrom,
+              live: _live,
+              view: _view,
+              onTapEmpty: () => setState(() {
+                _selected = null;
+                _connectFrom = null;
+              }),
+              onTapLink: _tapLink,
+              onGestureStart: _gestureStart,
+              onGestureUpdate: _gestureUpdate,
+              onGestureEnd: _gestureEnd,
+            ),
             onInteractionStart: _anim.stop,
             onInteractionEnd: _settle,
             onMonth: (m) => _zoomToRect(
@@ -357,6 +970,40 @@ class _TimelineScreenState extends State<TimelineScreen>
             onZoomIn: () => _zoomBy(1.6),
             onZoomOut: () => _zoomBy(1 / 1.6),
             onSeeAll: _seeAll,
+            overlay: !_editing
+                ? null
+                : Stack(
+                    children: [
+                      if (_connectFrom != null)
+                        Positioned(
+                          top: 10,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: _ConnectBanner(
+                              onCancel: () =>
+                                  setState(() => _connectFrom = null),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        left: 10,
+                        right: 10,
+                        bottom: 12,
+                        child: ScrapEditToolbar(
+                          hasSelection: _selected != null,
+                          connecting: _connectFrom != null,
+                          saving: _saving,
+                          onFrame: _frame,
+                          onSize: _size,
+                          onTurn: _turn,
+                          onLayer: _layer,
+                          onConnect: _toggleConnect,
+                          onDone: _done,
+                        ),
+                      ),
+                    ],
+                  ),
           );
         },
       );
@@ -372,11 +1019,16 @@ class _TimelineScreenState extends State<TimelineScreen>
             children: [
               _Header(
                 searching: _searching,
+                editing: _editing,
+                canEdit: _layoutReady && _memories.isNotEmpty && !_loading,
                 onSearch: () => setState(() {
                   _searching = !_searching;
                   if (!_searching) _search.clear();
                 }),
+                onEdit: _startEditing,
                 onAdd: _loading ? null : _add,
+                onUndo: _undo.isEmpty ? null : _undoLast,
+                onArrange: _arrangeMenu,
               ),
               if (_searching)
                 Padding(
@@ -412,16 +1064,62 @@ class _TimelineScreenState extends State<TimelineScreen>
   }
 }
 
+class _ConnectBanner extends StatelessWidget {
+  const _ConnectBanner({required this.onCancel});
+
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.only(left: 14, right: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xF22A1426),
+      borderRadius: BorderRadius.circular(99),
+      border: Border.all(color: NotePalette.rose.withValues(alpha: 0.6)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.timeline_rounded, size: 16, color: NotePalette.rose),
+        const SizedBox(width: 8),
+        Text(
+          'Tap another memory to connect',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: NotePalette.cream),
+        ),
+        TextButton(
+          onPressed: onCancel,
+          style: TextButton.styleFrom(foregroundColor: NotePalette.pink),
+          child: const Text('Cancel'),
+        ),
+      ],
+    ),
+  );
+}
+
 class _Header extends StatelessWidget {
   const _Header({
     required this.searching,
+    required this.editing,
+    required this.canEdit,
     required this.onSearch,
+    required this.onEdit,
     required this.onAdd,
+    this.onUndo,
+    this.onArrange,
   });
 
   final bool searching;
+  final bool editing;
+  final bool canEdit;
   final VoidCallback onSearch;
+  final VoidCallback onEdit;
   final VoidCallback? onAdd;
+
+  /// While editing: Undo (null when there is nothing to undo) and Arrange.
+  final VoidCallback? onUndo;
+  final VoidCallback? onArrange;
 
   @override
   Widget build(BuildContext context) {
@@ -448,24 +1146,32 @@ class _Header extends StatelessWidget {
                         child: Text(
                           'Our Timeline',
                           style: NotePalette.display(
-                            MediaQuery.sizeOf(context).width < 360 ? 24 : 30,
+                            MediaQuery.sizeOf(context).width < 360 || editing
+                                ? 24
+                                : 30,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      Icons.favorite_border_rounded,
-                      size: 20,
-                      color: NotePalette.rose,
-                    ),
+                    // The heart makes room for the title on narrow phones.
+                    if (!editing &&
+                        MediaQuery.sizeOf(context).width >= 360) ...[
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.favorite_border_rounded,
+                        size: 20,
+                        color: NotePalette.rose,
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'The little moments that became us.',
+                  editing
+                      ? 'Tap to select, hold to move.'
+                      : 'The little moments that became us.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: NotePalette.muted,
                   ),
@@ -473,43 +1179,86 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            tooltip: searching ? 'Close search' : 'Find a memory',
-            onPressed: onSearch,
-            icon: Icon(
-              searching ? Icons.search_off_rounded : Icons.search_rounded,
-              color: NotePalette.cream,
+          if (editing) ...[
+            IconButton(
+              tooltip: 'Undo',
+              onPressed: onUndo,
+              icon: Icon(
+                Icons.undo_rounded,
+                color: onUndo == null
+                    ? NotePalette.muted.withValues(alpha: 0.35)
+                    : NotePalette.cream,
+              ),
             ),
-          ),
-          const SizedBox(width: 4),
-          Tooltip(
-            message: 'Add a memory',
-            child: Semantics(
-              button: true,
-              label: 'Add a memory',
-              excludeSemantics: true,
-              child: Material(
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: Ink(
-                  decoration: const BoxDecoration(
-                    gradient: NotePalette.buttonGradient,
+            // Narrow phones: just the icon, so the title keeps its room.
+            if (MediaQuery.sizeOf(context).width < 360)
+              IconButton(
+                tooltip: 'Arrange',
+                onPressed: onArrange,
+                icon: const Icon(
+                  Icons.auto_awesome_mosaic_outlined,
+                  color: NotePalette.cream,
+                ),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: onArrange,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: NotePalette.cream,
+                  side: BorderSide(
+                    color: NotePalette.pink.withValues(alpha: 0.45),
                   ),
-                  child: InkWell(
-                    onTap: onAdd,
-                    child: const SizedBox.square(
-                      dimension: 48,
-                      child: Icon(
-                        Icons.add_rounded,
-                        color: Color(0xFF3A0A19),
-                        size: 28,
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                icon: const Icon(Icons.auto_awesome_mosaic_outlined, size: 18),
+                label: const Text('Arrange'),
+              ),
+          ] else ...[
+            if (canEdit)
+              IconButton(
+                tooltip: 'Edit scrapbook',
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, color: NotePalette.cream),
+              ),
+            IconButton(
+              tooltip: searching ? 'Close search' : 'Find a memory',
+              onPressed: onSearch,
+              icon: Icon(
+                searching ? Icons.search_off_rounded : Icons.search_rounded,
+                color: NotePalette.cream,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Tooltip(
+              message: 'Add a memory',
+              child: Semantics(
+                button: true,
+                label: 'Add a memory',
+                excludeSemantics: true,
+                child: Material(
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: Ink(
+                    decoration: const BoxDecoration(
+                      gradient: NotePalette.buttonGradient,
+                    ),
+                    child: InkWell(
+                      onTap: onAdd,
+                      child: const SizedBox.square(
+                        dimension: 48,
+                        child: Icon(
+                          Icons.add_rounded,
+                          color: Color(0xFF3A0A19),
+                          size: 28,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -526,8 +1275,8 @@ class _ScrapbookViewport extends StatelessWidget {
     required this.minScale,
     required this.maxScale,
     required this.defaultScale,
-    required this.photoScale,
-    required this.onTapPiece,
+    required this.editing,
+    required this.canvas,
     required this.onInteractionStart,
     required this.onInteractionEnd,
     required this.onMonth,
@@ -536,6 +1285,7 @@ class _ScrapbookViewport extends StatelessWidget {
     required this.onZoomIn,
     required this.onZoomOut,
     required this.onSeeAll,
+    this.overlay,
   });
 
   final ScrapbookLayout layout;
@@ -544,8 +1294,8 @@ class _ScrapbookViewport extends StatelessWidget {
   final double minScale;
   final double maxScale;
   final double defaultScale;
-  final double photoScale;
-  final void Function(ScrapPiece) onTapPiece;
+  final bool editing;
+  final Widget canvas;
   final VoidCallback onInteractionStart;
   final VoidCallback onInteractionEnd;
   final void Function(ScrapMonth) onMonth;
@@ -554,6 +1304,9 @@ class _ScrapbookViewport extends StatelessWidget {
   final VoidCallback onZoomIn;
   final VoidCallback onZoomOut;
   final VoidCallback onSeeAll;
+
+  /// The editing toolbar and banners, on top of everything.
+  final Widget? overlay;
 
   @override
   Widget build(BuildContext context) {
@@ -572,13 +1325,7 @@ class _ScrapbookViewport extends StatelessWidget {
           clipBehavior: Clip.none,
           onInteractionStart: (_) => onInteractionStart(),
           onInteractionEnd: (_) => onInteractionEnd(),
-          child: RepaintBoundary(
-            child: ScrapbookCanvas(
-              layout: layout,
-              onTapPiece: onTapPiece,
-              photoScale: photoScale,
-            ),
-          ),
+          child: RepaintBoundary(child: canvas),
         ),
         // Everything below listens to the view and redraws on its own;
         // the scrapbook itself is never rebuilt while you zoom.
@@ -605,13 +1352,15 @@ class _ScrapbookViewport extends StatelessWidget {
         ),
         Positioned(
           right: 12,
-          bottom: 16,
+          // Above the editing toolbar while editing.
+          bottom: editing ? 96 : 16,
           child: _ZoomControls(
             onZoomIn: onZoomIn,
             onZoomOut: onZoomOut,
             onSeeAll: onSeeAll,
           ),
         ),
+        ?overlay,
       ],
     );
   }
