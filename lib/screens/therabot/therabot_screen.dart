@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/profile.dart';
 import '../../models/therabot.dart';
 import '../../models/therabot_chat.dart';
+import '../../services/auth_service.dart';
 import '../../services/therabot_service.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/atoms/app_button.dart';
@@ -16,6 +17,7 @@ import '../../widgets/atoms/avatar_circle.dart';
 import '../../widgets/notes/note_style.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
 import '../chat_screen.dart';
+import '../work_it_out_screen.dart' show ResolutionNotesPage;
 import 'next_step_pages.dart';
 import 'next_steps_screen.dart';
 import 'private_reflection_page.dart';
@@ -447,6 +449,19 @@ class _TherabotScreenState extends State<TherabotScreen> {
     );
   }
 
+  /// Notes kept with "Clarify my thoughts" or "Draft something for later".
+  void _openSavedNotes() {
+    final myId = AuthService.user?.id;
+    if (myId == null) return;
+    _push(
+      ResolutionNotesPage(
+        coupleId: widget.coupleId,
+        myUserId: myId,
+        partnerName: _partner,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = _session;
@@ -464,6 +479,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       onSelected: (v) => switch (v) {
         'history' => _openHistory(),
         'insights' => _push(const TherabotInsightsScreen()),
+        'notes' => _openSavedNotes(),
         'end' => _end(),
         'delete' => _deleteMine(),
         _ => null,
@@ -471,6 +487,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       itemBuilder: (_) => [
         const PopupMenuItem(value: 'history', child: Text('Past reflections')),
         const PopupMenuItem(value: 'insights', child: Text('My insights')),
+        const PopupMenuItem(value: 'notes', child: Text('Saved notes')),
         if (canEnd)
           const PopupMenuItem(value: 'end', child: Text('End this session')),
         if (canDelete)
@@ -728,7 +745,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
           children: [
-            for (final c in TherabotChoice.values)
+            for (final c in TherabotChoice.offered)
               TextButton(
                 onPressed: () => _revisit(c, s),
                 style: TextButton.styleFrom(foregroundColor: NotePalette.pink),

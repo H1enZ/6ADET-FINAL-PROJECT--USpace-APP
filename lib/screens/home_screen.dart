@@ -48,7 +48,6 @@ import 'notifications_screen.dart';
 import 'question_archive_screen.dart';
 import 'question_sheet.dart';
 import 'time_capsules/time_capsule_screen.dart';
-import 'work_it_out_screen.dart';
 import 'write_love_note_screen.dart';
 
 /// Home: how you are feeling today, front and centre, then shortcuts and
@@ -566,23 +565,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openWorkItOut() async {
-    if (_partner == null) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => WorkItOutScreen(
-          coupleId: _coupleId,
-          myUserId: _myId,
-          partnerName: _partnerName,
-          me: _me,
-          partner: _partner,
-          anniversary: _couple?.anniversaryDate,
-        ),
-      ),
-    );
-    await _load();
-  }
-
   /// True when the hug was sent.
   Future<bool> _sendHug() async {
     if (_partner == null || _busy) return false;
@@ -883,12 +865,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         partnerName: _partnerName,
                       ),
                     ),
-                  ),
-                  MoreAction(
-                    'Work it out',
-                    Icons.handshake_outlined,
-                    partner == null ? null : _openWorkItOut,
-                    disabledReason: _needsPartner,
                   ),
                 ],
               ),
