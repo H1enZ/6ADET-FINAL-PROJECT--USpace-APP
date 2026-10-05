@@ -769,6 +769,22 @@ class _HomeScreenState extends State<HomeScreen> {
             onSwitch: partner == null
                 ? null
                 : () => setState(() => _showPartner = !_showPartner),
+            // The other side, laid out invisibly so both are the same size.
+            otherName: partner == null
+                ? null
+                : showPartner
+                ? _first(_me.displayName)
+                : partnerFirst,
+            otherMood: partner == null
+                ? null
+                : showPartner
+                ? shown
+                : latestMoodOn(_moods, partner.userId, today)?.mood,
+            otherNote: partner == null
+                ? null
+                : showPartner
+                ? (pending ? null : _noteToday(_myId))
+                : _noteToday(partner.userId),
             onShare: _shareMood,
             onAddNote: _checkMood,
             actionsKey: _heroActionsKey,
