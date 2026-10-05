@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -212,7 +213,7 @@ class _ActionCardState extends State<_ActionCard> {
                     SizedBox(
                       height: artHeight,
                       width: double.infinity,
-                      child: CustomPaint(painter: _ArtPainter(a.art)),
+                      child: _CachedArt(a.art),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     const Spacer(),
@@ -373,11 +374,56 @@ class QuickActionArtView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
-    child: SizedBox.square(
-      dimension: size,
-      child: CustomPaint(painter: _ArtPainter(art)),
-    ),
+    child: SizedBox.square(dimension: size, child: _CachedArt(art)),
   );
+}
+
+/// A drawing painted once into an image and reused. The drawings have
+/// blurs and layers that are slow to paint, and on the web everything on
+/// screen is painted again on every frame while scrolling.
+class _CachedArt extends StatelessWidget {
+  const _CachedArt(this.art);
+
+  final QuickActionArt art;
+
+  /// By drawing, size and pixel ratio. Only a handful ever exist.
+  static final _images = <String, ui.Image>{};
+
+  static ui.Image _image(QuickActionArt art, Size size, double ratio) {
+    final key = '${art.name} ${size.width}x${size.height} @$ratio';
+    final cached = _images[key];
+    if (cached != null) return cached;
+    // Never disposed here: one may still be on screen. A safety valve only.
+    if (_images.length > 32) _images.clear();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)..scale(ratio);
+    _ArtPainter(art).paint(canvas, size);
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(
+      (size.width * ratio).ceil(),
+      (size.height * ratio).ceil(),
+    );
+    picture.dispose();
+    return _images[key] = image;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = MediaQuery.devicePixelRatioOf(context);
+    return LayoutBuilder(
+      builder: (context, box) {
+        final size = box.biggest;
+        if (!size.isFinite || size.isEmpty) return const SizedBox.shrink();
+        return RawImage(
+          image: _image(art, size, ratio),
+          width: size.width,
+          height: size.height,
+          fit: BoxFit.fill,
+          filterQuality: FilterQuality.medium,
+        );
+      },
+    );
+  }
 }
 
 /// The four card drawings, one family: soft cream / blush / rose objects
