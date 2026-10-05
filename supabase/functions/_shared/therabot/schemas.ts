@@ -80,6 +80,8 @@ export interface SharedReflection {
   differences: string[];
   possible_misunderstandings: string[];
   common_ground: string[];
+  /** Gentle, optional ideas for the two of them; never one of the four next steps. */
+  something_to_try: string[];
   discussion_questions: string[];
 }
 
@@ -99,6 +101,7 @@ export const LIMITS = {
   differences: 4,
   misunderstandings: 3,
   commonGround: 3,
+  somethingToTry: 2,
   questionsMin: 2,
   questionsMax: 4,
 } as const;
@@ -110,18 +113,18 @@ const HEDGE =
 
 // ---------------------------------------------------------------- helpers
 
-function isObject(x: unknown): x is Record<string, unknown> {
+export function isObject(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
 
-function onlyKeys(o: Record<string, unknown>, allowed: readonly string[]): string | null {
+export function onlyKeys(o: Record<string, unknown>, allowed: readonly string[]): string | null {
   for (const k of Object.keys(o)) {
     if (!allowed.includes(k)) return `unexpected field "${k}"`;
   }
   return null;
 }
 
-function text(x: unknown, max: number, field: string, allowEmpty = false): string {
+export function text(x: unknown, max: number, field: string, allowEmpty = false): string {
   if (typeof x !== 'string') throw new Error(`${field} must be text`);
   const t = x.trim();
   if (!allowEmpty && t.length === 0) throw new Error(`${field} is empty`);
@@ -135,7 +138,7 @@ function text(x: unknown, max: number, field: string, allowEmpty = false): strin
  * summaries are limited); an over-long item is still rejected, because
  * cutting it mid-sentence could change its meaning.
  */
-function list(x: unknown, min: number, max: number, itemMax: number, field: string): string[] {
+export function list(x: unknown, min: number, max: number, itemMax: number, field: string): string[] {
   if (!Array.isArray(x)) throw new Error(`${field} must be a list`);
   const items = x
     .filter((item) => !(typeof item === 'string' && item.trim().length === 0))
@@ -182,7 +185,7 @@ export function modelSafetySignal(json: unknown): { flagged: boolean; categories
   };
 }
 
-function attempt<T>(fn: () => T): Validation<T> {
+export function attempt<T>(fn: () => T): Validation<T> {
   try {
     return { ok: true, value: fn() };
   } catch (e) {
@@ -251,6 +254,7 @@ export function validateSharedReflection(x: unknown): Validation<SharedReflectio
         differences: [],
         possible_misunderstandings: [],
         common_ground: [],
+        something_to_try: [],
         discussion_questions: [],
       };
     }
@@ -260,6 +264,7 @@ export function validateSharedReflection(x: unknown): Validation<SharedReflectio
       'differences',
       'possible_misunderstandings',
       'common_ground',
+      'something_to_try',
       'discussion_questions',
     ]);
     if (extra) throw new Error(extra);
@@ -305,6 +310,10 @@ export function validateSharedReflection(x: unknown): Validation<SharedReflectio
       differences: list(x.differences, 0, LIMITS.differences, LIMITS.item, 'differences'),
       possible_misunderstandings: misunderstandings,
       common_ground: list(x.common_ground, 0, LIMITS.commonGround, LIMITS.item, 'common_ground'),
+      // Older answers (and older stored rows) have none.
+      something_to_try: x.something_to_try === undefined
+        ? []
+        : list(x.something_to_try, 0, LIMITS.somethingToTry, LIMITS.item, 'something_to_try'),
       discussion_questions: questions,
     };
   });
@@ -312,7 +321,7 @@ export function validateSharedReflection(x: unknown): Validation<SharedReflectio
 
 // ------------------------------------------------- JSON Schemas for providers
 
-const SAFETY_SCHEMA = {
+export const SAFETY_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: ['flagged', 'categories', 'message'],
@@ -361,6 +370,7 @@ export const SHARED_REFLECTION_SCHEMA: Record<string, unknown> = {
     'differences',
     'possible_misunderstandings',
     'common_ground',
+    'something_to_try',
     'discussion_questions',
   ],
   properties: {
@@ -383,6 +393,7 @@ export const SHARED_REFLECTION_SCHEMA: Record<string, unknown> = {
     differences: STRINGS(LIMITS.differences),
     possible_misunderstandings: STRINGS(LIMITS.misunderstandings),
     common_ground: STRINGS(LIMITS.commonGround),
+    something_to_try: STRINGS(LIMITS.somethingToTry),
     discussion_questions: STRINGS(LIMITS.questionsMax, LIMITS.questionsMin),
   },
 };
@@ -394,6 +405,7 @@ export function storedReflection(r: SharedReflection): Record<string, unknown> {
     differences: r.differences,
     possible_misunderstandings: r.possible_misunderstandings,
     common_ground: r.common_ground,
+    something_to_try: r.something_to_try,
     discussion_questions: r.discussion_questions,
   };
 }

@@ -17,7 +17,46 @@ export type TherabotRequest =
       memoryIds: string[];
       messageIds: string[];
     }
-  | { action: 'reflect'; sessionId: string };
+  | { action: 'reflect'; sessionId: string }
+  // Private Talk (never linked to a couple session)
+  | { action: 'talk_start'; reasonKey: string; reasonText: string | null }
+  | { action: 'talk_message'; talkId: string; text: string }
+  | { action: 'talk_goal'; talkId: string; goal: string }
+  | { action: 'talk_summary'; talkId: string }
+  // Couple Reflection chat (your own private part of a session)
+  | { action: 'chat_open'; sessionId: string; reasonKey: string | null; reasonText: string | null }
+  | { action: 'chat_pick'; sessionId: string; reasonKey: string; reasonText: string | null }
+  | { action: 'chat_message'; sessionId: string; text: string }
+  | { action: 'chat_goal'; sessionId: string; goal: string }
+  | { action: 'chat_finish'; sessionId: string };
+
+const KEY = /^[a-z_]{1,20}$/;
+const GOAL_KEYS = ['understand', 'advice', 'explain', 'solution', 'calm', 'heard'];
+
+function key(x: unknown, field: string): string {
+  if (typeof x !== 'string' || !KEY.test(x)) bad(`${field} is not valid.`);
+  return x as string;
+}
+
+function optionalText(x: unknown, max: number, field: string): string | null {
+  if (x === undefined || x === null) return null;
+  if (typeof x !== 'string') bad(`${field} must be text.`);
+  const t = (x as string).trim();
+  if (t.length === 0) return null;
+  if (t.length > max) bad(`${field} can be up to ${max} characters.`);
+  return t;
+}
+
+function message(x: unknown): string {
+  const t = optionalText(x, 2000, 'Your message');
+  if (t === null) bad('Write something first.');
+  return t as string;
+}
+
+function goal(x: unknown): string {
+  if (typeof x !== 'string' || !GOAL_KEYS.includes(x)) bad('Choose what would help.');
+  return x as string;
+}
 
 function bad(message: string): never {
   throw new TherabotError('bad_input', message);
@@ -69,6 +108,47 @@ export function parseRequest(body: unknown): TherabotRequest {
     case 'reflect':
       onlyKeys(b, ['action', 'session_id']);
       return { action: 'reflect', sessionId: uuid(b.session_id, 'session_id') };
+    case 'talk_start':
+      onlyKeys(b, ['action', 'reason_key', 'reason_text']);
+      return {
+        action: 'talk_start',
+        reasonKey: key(b.reason_key, 'reason_key'),
+        reasonText: optionalText(b.reason_text, 120, 'Your reason'),
+      };
+    case 'talk_message':
+      onlyKeys(b, ['action', 'talk_id', 'text']);
+      return { action: 'talk_message', talkId: uuid(b.talk_id, 'talk_id'), text: message(b.text) };
+    case 'talk_goal':
+      onlyKeys(b, ['action', 'talk_id', 'goal']);
+      return { action: 'talk_goal', talkId: uuid(b.talk_id, 'talk_id'), goal: goal(b.goal) };
+    case 'talk_summary':
+      onlyKeys(b, ['action', 'talk_id']);
+      return { action: 'talk_summary', talkId: uuid(b.talk_id, 'talk_id') };
+    case 'chat_open':
+      onlyKeys(b, ['action', 'session_id', 'reason_key', 'reason_text']);
+      return {
+        action: 'chat_open',
+        sessionId: uuid(b.session_id, 'session_id'),
+        reasonKey: b.reason_key === undefined || b.reason_key === null ? null : key(b.reason_key, 'reason_key'),
+        reasonText: optionalText(b.reason_text, 120, 'Your reason'),
+      };
+    case 'chat_pick':
+      onlyKeys(b, ['action', 'session_id', 'reason_key', 'reason_text']);
+      return {
+        action: 'chat_pick',
+        sessionId: uuid(b.session_id, 'session_id'),
+        reasonKey: key(b.reason_key, 'reason_key'),
+        reasonText: optionalText(b.reason_text, 120, 'Your reason'),
+      };
+    case 'chat_message':
+      onlyKeys(b, ['action', 'session_id', 'text']);
+      return { action: 'chat_message', sessionId: uuid(b.session_id, 'session_id'), text: message(b.text) };
+    case 'chat_goal':
+      onlyKeys(b, ['action', 'session_id', 'goal']);
+      return { action: 'chat_goal', sessionId: uuid(b.session_id, 'session_id'), goal: goal(b.goal) };
+    case 'chat_finish':
+      onlyKeys(b, ['action', 'session_id']);
+      return { action: 'chat_finish', sessionId: uuid(b.session_id, 'session_id') };
     default:
       bad('Unknown Therabot action.');
   }

@@ -183,6 +183,21 @@ export class MockProvider implements AiProvider {
           message: 'What you shared sounds serious. Your safety matters most.',
         },
       };
+    } else if (request.task === 'chat_turn') {
+      const input = JSON.parse(raw) as { previous_notes?: string[] };
+      const turns = (input.previous_notes ?? []).length;
+      json = {
+        safety: { flagged: false, categories: [], message: '' },
+        reply: 'Thank you for telling me. It sounds like this has been on your mind.\n\n' +
+          'What part of it stayed with you the most?',
+        notes: [...(input.previous_notes ?? []), `mock note ${turns + 1}`].slice(-6),
+        enough: turns >= 2,
+      };
+    } else if (request.task === 'talk_summary') {
+      json = {
+        safety: { flagged: false, categories: [], message: '' },
+        points: ['You shared what has been on your mind.', 'You wanted some space to think it through.'],
+      };
     } else if (request.task === 'private_reflection') {
       json = privateAnswer(raw);
     } else {

@@ -2,7 +2,7 @@
 // the server (AI_PROVIDER secret); the Flutter app never knows which one it
 // is talking to, and never holds a provider key.
 
-export type AiTask = 'private_reflection' | 'shared_reflection';
+export type AiTask = 'private_reflection' | 'shared_reflection' | 'chat_turn' | 'talk_summary';
 
 export interface AiRequest {
   task: AiTask;

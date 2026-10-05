@@ -141,8 +141,12 @@ intensifiers ("extended", "immediate", "any", "always", "never"), no interpretat
   ground: both explicitly say they want reassurance, both explicitly say they want some space, both explicitly
   say they want to talk later, both explicitly say they value honesty. If the only overlap is factual context,
   return common_ground: []. If uncertain, return [].
+- something_to_try: at most ${LIMITS.somethingToTry} gentle, optional, concrete ideas the two of them could try together,
+  each one sentence beginning with "One possible step is" or "You could both". Never one of Comfort, Talk,
+  Take Space or Reconnect, never who should apologise or change, never a decision about the relationship.
+  [] when nothing fits naturally.
 - discussion_questions: ${LIMITS.questionsMin} to ${LIMITS.questionsMax} open, neutral questions addressed to both of them,
-  each a single sentence ending with "?".`;
+  each a single sentence ending with "?". The first one should work as a gentle conversation starter.`;
 
 export interface PrivateAnswers {
   what_happened: string | null;
