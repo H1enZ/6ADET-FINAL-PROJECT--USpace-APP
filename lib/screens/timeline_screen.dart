@@ -314,13 +314,22 @@ class _TimelineScreenState extends State<TimelineScreen>
 
   // ------------------------------------------------------------ zooming
 
+  /// The normal reading zoom: a memory is comfortably big and the rest of
+  /// the board is a swipe away in any direction.
   double get _defaultScale =>
-      (_viewport?.width ?? ScrapbookLayout.canvasWidth) /
-      ScrapbookLayout.canvasWidth;
+      (_viewport?.width ?? ScrapbookLayout.readingWidth) /
+      ScrapbookLayout.readingWidth;
 
-  /// Far enough out to see many months as small collages; not so far that
-  /// they turn into dots.
-  double get _minScale => _defaultScale * 0.16;
+  /// The zoom that fits all the content on screen, both ways.
+  double get _fitScale {
+    final layout = _layout, vp = _viewport;
+    if (layout == null || vp == null) return _defaultScale;
+    final c = layout.contentRect.inflate(_room);
+    return math.min(vp.width / c.width, vp.height / c.height);
+  }
+
+  /// Far enough out to see the whole story at once (as small collages).
+  double get _minScale => math.min(_defaultScale * 0.16, _fitScale * 0.95);
 
   /// Close enough to study a photo, not so close it's just blur.
   double get _maxScale => _defaultScale * 3;
@@ -346,17 +355,41 @@ class _TimelineScreenState extends State<TimelineScreen>
   static Matrix4 _matrix(double s, Offset t) =>
       Matrix4.diagonal3Values(s, s, s)..setTranslationRaw(t.dx, t.dy, 0);
 
-  /// Keeps the scrapbook on screen: centred when it is narrower than the
-  /// screen, otherwise no further than its edges.
+  /// Breathing room kept around the content when panning (canvas units).
+  static const _room = 90.0;
+
+  /// Keeps the content on screen in both directions: the screen may not go
+  /// further than a little past the outermost memories, and content smaller
+  /// than the screen (along either axis) is centred. So you can explore the
+  /// whole board sideways and down, but never get lost in empty space.
   Offset _clamp(double s, Offset t) {
     final layout = _layout, vp = _viewport;
     if (layout == null || vp == null) return t;
-    final w = layout.width * s, h = layout.height * s;
-    final dx = w <= vp.width
-        ? (vp.width - w) / 2
-        : t.dx.clamp(vp.width - w, 0.0);
-    final dy = h <= vp.height ? 0.0 : t.dy.clamp(vp.height - h, 0.0);
-    return Offset(dx.toDouble(), dy.toDouble());
+    final c = layout.contentRect.inflate(_room);
+    double axis(double lo, double hi, double screen, double value) {
+      final size = (hi - lo) * s;
+      if (size <= screen) return screen / 2 - (lo + hi) / 2 * s;
+      return value.clamp(screen - hi * s, -lo * s);
+    }
+
+    return Offset(
+      axis(c.left, c.right, vp.width, t.dx),
+      axis(c.top, c.bottom, vp.height, t.dy),
+    );
+  }
+
+  /// Where the Timeline opens: the normal zoom, at the top of the story,
+  /// with the newest month's cluster in the middle of the screen.
+  Matrix4 _startView() {
+    final layout = _layout, vp = _viewport;
+    final s = _defaultScale;
+    if (layout == null || vp == null) return _matrix(s, Offset.zero);
+    final first = layout.months.isEmpty
+        ? layout.contentRect
+        : layout.months.first.area;
+    final top = math.min(first.top, layout.contentRect.top);
+    final t = Offset(vp.width / 2 - first.center.dx * s, 12 - top * s);
+    return _matrix(s, _clamp(s, t));
   }
 
   void _step() {
@@ -392,12 +425,17 @@ class _TimelineScreenState extends State<TimelineScreen>
     _animateTo(next, focal - point * next);
   }
 
-  /// See all: as much of the story as fits, newest at the top.
+  /// See all: the whole story, both ways: the box around every memory,
+  /// heading and line, fitted to the screen and centred.
   void _seeAll() {
     final layout = _layout, vp = _viewport;
     if (layout == null || vp == null) return;
-    final fit = math.min(vp.width / layout.width, vp.height / layout.height);
-    _animateTo(fit.clamp(_minScale, _defaultScale), Offset.zero);
+    final c = layout.contentRect.inflate(_room / 2);
+    final s = math
+        .min(vp.width / c.width, vp.height / c.height)
+        .clamp(_minScale, _defaultScale)
+        .toDouble();
+    _animateTo(s, Offset(vp.width / 2, vp.height / 2) - c.center * s);
   }
 
   /// Back to the normal browsing size, with [rect] (canvas units) in view.
@@ -528,24 +566,35 @@ class _TimelineScreenState extends State<TimelineScreen>
     if (g == null) return;
     final s = g.start;
     final d = at - g.from;
-    const w = ScrapbookLayout.canvasWidth;
     switch (g.kind) {
       case ScrapGesture.move:
         var x = s.x + d.dx;
-        final y = s.y + d.dy;
+        final y = (s.y + d.dy).clamp(-1900.0, 199000.0);
+        // Gentle guides: line up with another memory's left edge, right
+        // edge or middle when close. Nothing is ever pushed into columns.
         double? guide;
-        // Gentle snapping to the middle and the page edges.
-        if ((x + s.width / 2 - w / 2).abs() < 6) {
-          x = w / 2 - s.width / 2;
-          guide = w / 2;
-        } else if ((x - 18).abs() < 6) {
-          x = 18;
-          guide = 18;
-        } else if ((x + s.width - (w - 18)).abs() < 6) {
-          x = w - 18 - s.width;
-          guide = w - 18;
+        final layout = _layout;
+        if (layout != null) {
+          var best = 7.0;
+          for (final other in layout.pieces) {
+            if (other.memory.id == s.memoryId) continue;
+            final o = other.item;
+            final ow = other.rect.width;
+            for (final (mine, theirs) in [
+              (x, o.x),
+              (x + s.width, o.x + ow),
+              (x + s.width / 2, o.x + ow / 2),
+            ]) {
+              final gap = (mine - theirs).abs();
+              if (gap < best) {
+                best = gap;
+                x += theirs - mine;
+                guide = theirs - layout.originX;
+              }
+            }
+          }
         }
-        x = x.clamp(-40.0, w - s.width + 40);
+        x = x.clamp(ScrapbookLayout.minX, ScrapbookLayout.maxX);
         _live.value = ScrapLive(
           s.copyWith(x: x, y: y),
           guideX: guide,
@@ -921,7 +970,7 @@ class _TimelineScreenState extends State<TimelineScreen>
           if (first || widthChanged) {
             // Start at the normal browsing size, at the newest month.
             // (Nothing listens yet on the first build, so this is safe.)
-            final value = _matrix(_defaultScale, Offset.zero);
+            final value = _startView();
             if (first) {
               _view.value = value;
             } else {
@@ -1339,9 +1388,8 @@ class _ScrapbookViewport extends StatelessWidget {
           ),
         ),
         Positioned(
-          right: 2,
-          top: 12,
-          bottom: 84,
+          right: 8,
+          top: 10,
           child: _Minimap(
             layout: layout,
             view: view,
@@ -1403,7 +1451,10 @@ class _MonthLabels extends StatelessWidget {
               if (month.top * s + tr.y > -30 &&
                   month.top * s + tr.y < viewport.height)
                 Positioned(
-                  left: math.max(8, tr.x + 6),
+                  left: (month.headingRect.left * s + tr.x).clamp(
+                    8.0,
+                    math.max(8.0, viewport.width - 120),
+                  ),
                   top: month.top * s + tr.y,
                   child: Opacity(
                     opacity: t,
@@ -1458,8 +1509,8 @@ class _MonthChip extends StatelessWidget {
   }
 }
 
-/// A slim track on the right: month marks, and a highlight for the part on
-/// screen. Tap or drag it to travel through the story.
+/// A small map of the whole board in the corner: each month as a soft
+/// patch, and a frame for the part on screen. Tap or drag it to travel.
 class _Minimap extends StatelessWidget {
   const _Minimap({
     required this.layout,
@@ -1475,102 +1526,115 @@ class _Minimap extends StatelessWidget {
   final void Function(double s, Offset t) onJump;
   final void Function(double s, Offset t) onJumpAnimated;
 
+  static const _maxW = 78.0;
+  static const _maxH = 150.0;
+
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, box) {
-        final track = box.maxHeight;
-        void go(double dy, {required bool animate}) {
-          final m = view.value;
-          final s = m.getMaxScaleOnAxis();
-          final tr = m.getTranslation();
-          final canvasY = (dy / track).clamp(0.0, 1.0) * layout.height;
-          final t = Offset(tr.x, viewport.height / 2 - canvasY * s);
-          animate ? onJumpAnimated(s, t) : onJump(s, t);
-        }
+    final area = layout.contentRect.inflate(60);
+    // As big as fits in the corner, keeping the board's shape.
+    final k = math.min(_maxW / area.width, _maxH / area.height);
+    final size = Size(area.width * k, area.height * k);
 
-        return AnimatedBuilder(
-          animation: view,
-          builder: (context, _) {
-            final m = view.value;
-            final s = m.getMaxScaleOnAxis();
-            final tr = m.getTranslation();
-            // Nothing to travel when the whole story already fits.
-            if (layout.height * s <= viewport.height + 1) {
-              return const SizedBox.shrink();
-            }
-            final top = ((-tr.y / s) / layout.height).clamp(0.0, 1.0) * track;
-            final size =
-                ((viewport.height / s) / layout.height).clamp(0.04, 1.0) *
-                track;
-            return Semantics(
-              label: 'Timeline position',
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapDown: (d) => go(d.localPosition.dy, animate: true),
-                onVerticalDragUpdate: (d) =>
-                    go(d.localPosition.dy, animate: false),
-                child: SizedBox(
-                  width: 22,
-                  child: CustomPaint(
-                    painter: _MinimapPainter(
-                      months: [
-                        for (final mo in layout.months) mo.top / layout.height,
-                      ],
-                      top: top,
-                      size: size,
-                    ),
-                  ),
+    void go(Offset local, {required bool animate}) {
+      final m = view.value;
+      final s = m.getMaxScaleOnAxis();
+      final canvas = area.topLeft + local / k;
+      final t = Offset(viewport.width / 2, viewport.height / 2) - canvas * s;
+      animate ? onJumpAnimated(s, t) : onJump(s, t);
+    }
+
+    return AnimatedBuilder(
+      animation: view,
+      builder: (context, _) {
+        final m = view.value;
+        final s = m.getMaxScaleOnAxis();
+        final tr = m.getTranslation();
+        final visible = Rect.fromLTWH(
+          -tr.x / s,
+          -tr.y / s,
+          viewport.width / s,
+          viewport.height / s,
+        );
+        // Nothing to find when everything is already on screen.
+        if (visible.contains(area.topLeft) &&
+            visible.contains(area.bottomRight)) {
+          return const SizedBox.shrink();
+        }
+        return Semantics(
+          label: 'Map of the scrapbook. Tap to go there',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (d) => go(d.localPosition, animate: true),
+            onPanUpdate: (d) => go(d.localPosition, animate: false),
+            child: Container(
+              width: size.width,
+              height: size.height,
+              decoration: BoxDecoration(
+                color: const Color(0xCC1E0F1C),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: NotePalette.pink.withValues(alpha: 0.3),
                 ),
               ),
-            );
-          },
+              child: CustomPaint(
+                painter: _MinimapPainter(
+                  months: [
+                    for (final mo in layout.months) _toMap(mo.area, area, k),
+                  ],
+                  view: _toMap(visible, area, k),
+                ),
+              ),
+            ),
+          ),
         );
       },
     );
   }
+
+  static Rect _toMap(Rect r, Rect area, double k) => Rect.fromLTRB(
+    (r.left - area.left) * k,
+    (r.top - area.top) * k,
+    (r.right - area.left) * k,
+    (r.bottom - area.top) * k,
+  );
 }
 
 class _MinimapPainter extends CustomPainter {
-  _MinimapPainter({
-    required this.months,
-    required this.top,
-    required this.size,
-  });
+  _MinimapPainter({required this.months, required this.view});
 
-  final List<double> months;
-  final double top;
-  final double size;
+  final List<Rect> months;
+  final Rect view;
 
   @override
   void paint(Canvas canvas, Size box) {
-    final x = box.width / 2;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(x - 1.5, 0, 3, box.height),
-        const Radius.circular(2),
-      ),
-      Paint()..color = NotePalette.pink.withValues(alpha: 0.14),
-    );
-    final mark = Paint()..color = NotePalette.pink.withValues(alpha: 0.45);
-    for (final f in months) {
-      canvas.drawCircle(Offset(x, f * box.height), 2, mark);
+    canvas.clipRect(Offset.zero & box);
+    final patch = Paint()..color = NotePalette.pink.withValues(alpha: 0.28);
+    for (final r in months) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(r, const Radius.circular(2)),
+        patch,
+      );
     }
-    final r = RRect.fromRectAndRadius(
-      Rect.fromLTWH(x - 4, top, 8, math.min(size, box.height - top)),
-      const Radius.circular(4),
-    );
-    canvas.drawRRect(
-      r,
-      Paint()
-        ..color = NotePalette.rose.withValues(alpha: 0.75)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1),
-    );
+    final frame = view.intersect(Offset.zero & box);
+    if (frame.width > 0 && frame.height > 0) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(frame, const Radius.circular(2)),
+        Paint()..color = NotePalette.rose.withValues(alpha: 0.18),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(frame, const Radius.circular(2)),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4
+          ..color = NotePalette.rose,
+      );
+    }
   }
 
   @override
   bool shouldRepaint(_MinimapPainter old) =>
-      old.top != top || old.size != size || old.months.length != months.length;
+      old.view != view || old.months.length != months.length;
 }
 
 class _ZoomControls extends StatelessWidget {

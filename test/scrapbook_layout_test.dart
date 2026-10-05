@@ -50,7 +50,7 @@ void main() {
     );
     // Within October, newer memories sit higher.
     expect(org.items['a1']!.y, lessThan(org.items['a3']!.y));
-    // Later months sit below earlier... newer ones.
+    // Older months sit lower on the board.
     expect(org.items['a3']!.y, lessThan(org.items['b1']!.y));
   });
 
@@ -102,6 +102,47 @@ void main() {
         if (!p.isNew) p.rect.top,
     ].reduce((a, b) => a < b ? a : b);
     expect(newPiece.rect.bottom, lessThan(placedTop));
+  });
+
+  test('the board is wide: months spread sideways, time runs down', () {
+    final busy = [
+      for (var i = 0; i < 10; i++)
+        mem('m$i', DateTime(2026, 8, 28 - i), photo: i.isEven),
+      ...memories,
+    ];
+    final org = ScrapbookLayout.organize(busy);
+    // Every memory inside the range the database allows.
+    for (final i in org.items.values) {
+      expect(i.x, inInclusiveRange(ScrapbookLayout.minX, ScrapbookLayout.maxX));
+      expect(
+        i.x + i.width,
+        lessThanOrEqualTo(ScrapbookLayout.maxX + ScrapbookLayout.maxWidth),
+      );
+    }
+    // A busy month uses far more than the old 400-unit page.
+    final august = org.months.firstWhere((m) => m.month == 8);
+    expect(august.area.width, greaterThan(700));
+    // Months still run down the board, newest first.
+    for (var i = 1; i < org.months.length; i++) {
+      expect(org.months[i].top, greaterThan(org.months[i - 1].top));
+    }
+  });
+
+  test('the drawn content box covers every memory', () {
+    final layout = ScrapbookLayout.compose(
+      memories: memories,
+      saved: const {},
+      customized: false,
+    );
+    for (final p in layout.pieces) {
+      expect(layout.contentRect.inflate(1).contains(p.rect.topLeft), isTrue);
+      expect(
+        layout.contentRect.inflate(1).contains(p.rect.bottomRight),
+        isTrue,
+      );
+    }
+    // The canvas spans the whole board sideways.
+    expect(layout.width, greaterThanOrEqualTo(ScrapbookLayout.boardWidth));
   });
 
   test('frames suit the memory', () {

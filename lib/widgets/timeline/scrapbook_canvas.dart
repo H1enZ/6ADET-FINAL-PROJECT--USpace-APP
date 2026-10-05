@@ -132,7 +132,7 @@ class _ScrapbookCanvasState extends State<ScrapbookCanvas> {
             ),
           for (final m in layout.months) ...[
             Positioned.fromRect(
-              rect: Rect.fromLTWH(0, m.top, layout.width, m.bottom - m.top),
+              rect: m.area.inflate(24),
               child: _MonthDecor(month: m),
             ),
             if (m.yearRect != null)
@@ -296,7 +296,7 @@ class _LivePiece extends StatelessWidget {
           l.item,
           piece.memory,
           piece.frame,
-        ).translate(0, -layout.originY);
+        ).shift(-layout.origin);
         return _at(rect, l.item.rotation, lifted: true);
       },
     );
@@ -472,7 +472,7 @@ class _SelectionHandles extends StatelessWidget {
                   l.item,
                   piece.memory,
                   piece.frame,
-                ).translate(0, -layout.originY)
+                ).shift(-layout.origin)
               : piece.rect;
           final turn = mine ? l.item.rotation : piece.turn;
 
@@ -594,7 +594,7 @@ class _LinksPainter extends CustomPainter {
           l.item,
           p.memory,
           p.frame,
-        ).translate(0, -layout.originY);
+        ).shift(-layout.origin);
       }
     }
     return rects[id];

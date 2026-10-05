@@ -41,6 +41,7 @@ class ScrapPiece {
 }
 
 /// One month's chapter: its heading and the space its pieces use.
+/// One month's chapter: its heading and the space its memories use.
 class ScrapMonth {
   const ScrapMonth({
     required this.year,
@@ -49,6 +50,7 @@ class ScrapMonth {
     required this.bottom,
     required this.headingRect,
     required this.count,
+    required this.area,
     this.yearRect,
   });
 
@@ -59,20 +61,46 @@ class ScrapMonth {
   final Rect headingRect;
   final int count;
 
+  /// Everything the month covers (heading and memories), for the minimap
+  /// and for zooming to a month.
+  final Rect area;
+
   /// A year stamp above the heading, where a new year starts.
   final Rect? yearRect;
+
+  ScrapMonth _shift(Offset by) => ScrapMonth(
+    year: year,
+    month: month,
+    top: top + by.dy,
+    bottom: bottom + by.dy,
+    headingRect: headingRect.shift(by),
+    count: count,
+    area: area.shift(by),
+    yearRect: yearRect?.shift(by),
+  );
 }
 
+/// The scrapbook is a 2D board: newer months higher up, older ones lower
+/// down (time runs down the board), and each month's memories spread out
+/// sideways as a cluster. The board is wider than any phone: you pan it in
+/// every direction and pinch to zoom.
+///
+/// Saved positions are board units. A memory's left edge (x) can be
+/// anywhere from [minX] to [maxX], the range the database allows, so the
+/// board is [boardWidth] units wide; its height follows the content.
 class ScrapbookLayout {
   const ScrapbookLayout({
     required this.width,
     required this.height,
     required this.pieces,
     required this.months,
+    required this.originX,
     required this.originY,
+    required this.contentRect,
     this.newStripRect,
   });
 
+  /// The drawn canvas: the whole board sideways, the content downwards.
   final double width;
   final double height;
 
@@ -80,11 +108,22 @@ class ScrapbookLayout {
   final List<ScrapPiece> pieces;
   final List<ScrapMonth> months;
 
-  /// The saved y that is drawn at the canvas top (y - originY = drawn y).
+  /// The board position drawn at the canvas's top-left corner:
+  /// drawn = saved - origin.
+  final double originX;
   final double originY;
+
+  /// Where the memories, headings and strip actually are (drawn units).
+  /// Panning stays around this, so nobody gets lost in empty board.
+  final Rect contentRect;
 
   /// The "New memories" label area, when there are new memories to place.
   final Rect? newStripRect;
+
+  Offset get origin => Offset(originX, originY);
+
+  /// A saved (board) rectangle, where it is drawn.
+  Rect toCanvas(Rect board) => board.shift(-origin);
 
   ScrapPiece? pieceOf(String memoryId) {
     for (final p in pieces) {
@@ -93,12 +132,27 @@ class ScrapbookLayout {
     return null;
   }
 
-  /// The canvas is always laid out at this width, whatever the phone, so a
-  /// memory sits in the same place on every device; the viewer scales it.
-  static const canvasWidth = 400.0;
+  /// The board's sideways extent: the database keeps x in -400..800, and a
+  /// memory is at most [maxWidth] wide.
+  static const minX = -400.0;
+  static const maxX = 800.0;
+  static const boardWidth = maxX + maxWidth - minX; // 1580
+  static const _boardMargin = 40.0;
 
-  static const _pad = 18.0;
-  static const _gap = 14.0;
+  /// How much of the board fills a phone's width at the normal reading
+  /// zoom: a memory is as big as it was on the old one-column page, and
+  /// the rest of the board is a swipe sideways.
+  static const readingWidth = 420.0;
+
+  /// Organize lays clusters out between these (leaving the very edges of
+  /// the board free for your own arranging).
+  static const _areaLeft = -380.0;
+  // A memory's left edge may go up to maxX, so the area ends one column
+  // (less the wobble) past it.
+  static const _areaRight = maxX + _colW - 12;
+
+  static const _colW = 182.0;
+  static const _colGap = 24.0;
   static const _headingHeight = 46.0;
   static const _yearHeight = 44.0;
 
@@ -121,7 +175,7 @@ class ScrapbookLayout {
   /// Narrowest and widest a memory may be, so text stays readable.
   static double minWidth(ContentKind kind) =>
       kind == ContentKind.photo ? 110 : 130;
-  static const maxWidth = 360.0;
+  static const maxWidth = 380.0;
 
   /// The Small / Medium / Large sizes.
   static List<double> presetWidths(ContentKind kind) =>
@@ -166,11 +220,15 @@ class ScrapbookLayout {
 
   // ------------------------------------------------------------- organize
 
-  /// Arranges [memories] by date: newest month at the top, a year stamp
-  /// where the year changes; inside a month, newest first, filling two
-  /// staggered columns with a big feature photo now and then. Pure and
-  /// deterministic: the same memories (and frames) always give the same
-  /// arrangement. [frames] are kept: each memory is sized for its frame.
+  /// Arranges [memories] by date on the board. Months run down the board,
+  /// newest at the top, with a year stamp where the year changes. Each
+  /// month is a cluster spread sideways: a few staggered columns (more for
+  /// busier months), a big feature photo now and then across two columns,
+  /// a little hand-placed wobble, and the whole cluster set towards the
+  /// left, middle or right of the board so the story zigzags as you go.
+  ///
+  /// Pure and deterministic: the same memories (and frames) always give the
+  /// same arrangement. [frames] are kept: each memory is sized for its frame.
   static ({
     Map<String, LayoutItem> items,
     List<ScrapMonth> months,
@@ -180,10 +238,6 @@ class ScrapbookLayout {
     List<Memory> memories, {
     Map<String, FrameStyle?> frames = const {},
   }) {
-    const w = canvasWidth;
-    const content = w - _pad * 2;
-    const colW = (content - _gap) / 2;
-
     final sorted = [...memories]
       ..sort((a, b) {
         final byDate = b.memoryDate.compareTo(a.memoryDate);
@@ -198,6 +252,12 @@ class ScrapbookLayout {
           .add(m);
     }
 
+    // Where each month's cluster sits across the board, picked from the
+    // month itself so it never changes when other months come and go.
+    const zones = [0.5, 0.12, 0.88, 0.32, 0.7, 0.2, 0.8];
+    // Column tops, staggered for a hand-placed look.
+    const stagger = [0.0, 30.0, 12.0, 40.0, 4.0, 24.0, 16.0];
+
     final items = <String, LayoutItem>{};
     final months = <ScrapMonth>[];
     var y = 24.0;
@@ -207,26 +267,37 @@ class ScrapbookLayout {
     for (final entry in groups.entries) {
       final (year, month) = entry.key;
       final list = entry.value;
+      final n = list.length;
+      final cols = (n / 2).ceil().clamp(2, 6);
+      final clusterW = cols * _colW + (cols - 1) * _colGap;
+      final room = (_areaRight - _areaLeft) - clusterW;
+      final left = _areaLeft + room * zones[(year * 12 + month) % zones.length];
+
       final top = y;
       Rect? yearRect;
       if (year != lastYear) {
-        yearRect = Rect.fromLTWH(_pad, y, 150, _yearHeight);
+        yearRect = Rect.fromLTWH(left, y, 150, _yearHeight);
         y += _yearHeight + 6;
         lastYear = year;
       }
-      final headingRect = Rect.fromLTWH(_pad - 4, y, 210, _headingHeight);
-      y += _headingHeight + 18;
+      final headingRect = Rect.fromLTWH(left - 4, y, 230, _headingHeight);
+      y += _headingHeight + 22;
 
-      // Column bottoms: left starts a little higher than right, which
-      // gives the staggered, hand-placed look.
-      final cols = [y, y + 22];
+      final colY = [
+        for (var c = 0; c < cols; c++) y + stagger[c % stagger.length],
+      ];
+      double colX(int c) => left + c * (_colW + _colGap);
       var photoCount = 0;
+      var right = left + clusterW;
 
       for (final m in list) {
         final seed = seedOf(m.id);
         final kind = contentKindOf(m);
         final frame = effectiveFrame(m, frames[m.id], seed);
         final turn = ((seed % 61) / 60) * 6 - 3; // -3 .. 3 degrees
+        // A little hand-placed wobble (stable per memory).
+        final wobbleX = ((seed >> 3) % 17) - 8.0;
+        final wobbleY = ((seed >> 7) % 11).toDouble();
 
         var feature = false;
         var small = false;
@@ -239,10 +310,20 @@ class ScrapbookLayout {
         }
 
         if (feature) {
-          final fw = content * 0.9;
+          // Across the two neighbouring columns that are free highest up.
+          var best = 0;
+          var bestY = double.infinity;
+          for (var c = 0; c + 1 < cols; c++) {
+            final top2 = math.max(colY[c], colY[c + 1]);
+            if (top2 < bestY - 0.5) {
+              bestY = top2;
+              best = c;
+            }
+          }
+          final fw = math.min(_colW * 2 + _colGap, maxWidth);
           final fh = frameHeight(frame, fw, m);
-          final fy = math.max(cols[0], cols[1]);
-          final fx = _pad + (seed.isEven ? 0 : content - fw);
+          final fx = colX(best) + (_colW * 2 + _colGap - fw) / 2 + wobbleX;
+          final fy = bestY + wobbleY;
           items[m.id] = LayoutItem(
             memoryId: m.id,
             x: fx,
@@ -252,46 +333,51 @@ class ScrapbookLayout {
             frame: frames[m.id],
             z: z++,
           );
-          cols[0] = cols[1] = fy + fh + _gap;
+          colY[best] = colY[best + 1] = fy + fh + _colGap;
+          right = math.max(right, fx + fw);
           continue;
         }
 
-        // Shortest column next, so pieces fill top to bottom.
-        final c = cols[0] <= cols[1] ? 0 : 1;
-        final colX = _pad + c * (colW + _gap);
+        // The column free highest up next, so newer memories sit higher.
+        var c = 0;
+        for (var i = 1; i < cols; i++) {
+          if (colY[i] < colY[c] - 0.5) c = i;
+        }
         final pw = switch (kind) {
-          ContentKind.photo => small ? colW * 0.84 : colW,
-          ContentKind.event => colW * 0.92,
-          ContentKind.text => colW * 0.96,
+          ContentKind.photo => small ? _colW * 0.84 : _colW,
+          ContentKind.event => _colW * 0.92,
+          ContentKind.text => _colW * 0.96,
         };
         final ph = frameHeight(frame, pw, m);
-        // Narrower pieces lean towards one side of their column.
-        final px = colX + (seed % 3 == 0 ? 0 : colW - pw);
+        final px = colX(c) + (_colW - pw) / 2 + wobbleX;
+        final py = colY[c] + wobbleY;
         items[m.id] = LayoutItem(
           memoryId: m.id,
           x: px,
-          y: cols[c],
+          y: py,
           width: pw,
           rotation: turn,
           frame: frames[m.id],
           z: z++,
         );
-        cols[c] += ph + _gap;
+        colY[c] = py + ph + _colGap;
+        right = math.max(right, px + pw);
       }
 
-      y = math.max(cols[0], cols[1]) + 30;
+      final bottom = colY.reduce(math.max) + 30;
       months.add(
         ScrapMonth(
           year: year,
           month: month,
           top: top,
-          bottom: y,
+          bottom: bottom,
           headingRect: headingRect,
-          count: list.length,
+          count: n,
           yearRect: yearRect,
+          area: Rect.fromLTRB(left - 16, top, right + 16, bottom),
         ),
       );
-      y += 20;
+      y = bottom + 44;
     }
     return (items: items, months: months, height: y + 40);
   }
@@ -310,81 +396,47 @@ class ScrapbookLayout {
     required Map<String, LayoutItem> saved,
     required bool customized,
   }) {
+    final placedItems = <String, LayoutItem>{};
+    final waiting = <Memory>[];
+    var rawMonths = <ScrapMonth>[];
+
     if (!customized) {
       final org = organize(memories);
-      final pieces = [
-        for (final m in memories)
-          if (org.items[m.id] case final item?) _piece(m, item, 0),
-      ]..sort((a, b) => a.item.z.compareTo(b.item.z));
-      return ScrapbookLayout(
-        width: canvasWidth,
-        height: org.height,
-        pieces: pieces,
-        months: org.months,
-        originY: 0,
-      );
-    }
-
-    final placed = <Memory>[];
-    final waiting = <Memory>[];
-    for (final m in memories) {
-      (saved.containsKey(m.id) ? placed : waiting).add(m);
-    }
-
-    // Headings above each month's highest memory.
-    final groups = <(int, int), List<Rect>>{};
-    for (final m in placed) {
-      final seed = seedOf(m.id);
-      final item = saved[m.id]!;
-      final frame = effectiveFrame(m, item.frame, seed);
-      groups
-          .putIfAbsent((m.memoryDate.year, m.memoryDate.month), () => [])
-          .add(rectOf(item, m, frame));
-    }
-    final keys = groups.keys.toList()
-      ..sort(
-        (a, b) => a.$1 != b.$1 ? b.$1.compareTo(a.$1) : b.$2.compareTo(a.$2),
-      );
-    final rawMonths = <ScrapMonth>[];
-    int? lastYear;
-    for (final key in keys) {
-      final rects = groups[key]!;
-      final top = rects.map((r) => r.top).reduce(math.min);
-      final bottom = rects.map((r) => r.bottom).reduce(math.max);
-      final headingTop = top - _headingHeight - 14;
-      Rect? yearRect;
-      if (key.$1 != lastYear) {
-        yearRect = Rect.fromLTWH(
-          _pad,
-          headingTop - _yearHeight - 6,
-          150,
-          _yearHeight,
-        );
-        lastYear = key.$1;
+      placedItems.addAll(org.items);
+      rawMonths = org.months;
+    } else {
+      for (final m in memories) {
+        if (saved[m.id] case final item?) {
+          placedItems[m.id] = item;
+        } else {
+          waiting.add(m);
+        }
       }
-      rawMonths.add(
-        ScrapMonth(
-          year: key.$1,
-          month: key.$2,
-          top: (yearRect?.top ?? headingTop),
-          bottom: bottom + 30,
-          headingRect: Rect.fromLTWH(_pad - 4, headingTop, 210, _headingHeight),
-          count: rects.length,
-          yearRect: yearRect,
-        ),
-      );
+      rawMonths = _headingsFor(memories, placedItems);
+    }
+
+    final byId = {for (final m in memories) m.id: m};
+    Rect boardRect(String id, LayoutItem item) {
+      final m = byId[id]!;
+      return rectOf(item, m, effectiveFrame(m, item.frame, seedOf(id)));
     }
 
     // The New memories strip, above everything placed.
+    final placedRects = [
+      for (final e in placedItems.entries) boardRect(e.key, e.value),
+    ];
     final placedTop = [
       for (final m in rawMonths) m.top,
-      for (final m in placed) saved[m.id]!.y,
+      for (final r in placedRects) r.top,
     ].fold<double>(24, math.min);
+    final placedLeft = placedRects.isEmpty
+        ? _areaLeft
+        : placedRects.map((r) => r.left).reduce(math.min);
     final waitingItems = <String, LayoutItem>{};
     Rect? stripRaw;
     if (waiting.isNotEmpty) {
-      const cardW = 116.0;
-      const perRow = 3;
+      const cardW = 140.0;
+      const perRow = 4;
       final rowHeights = <double>[];
       for (var i = 0; i < waiting.length; i += perRow) {
         var h = 0.0;
@@ -395,8 +447,9 @@ class ScrapbookLayout {
         rowHeights.add(h);
       }
       final total = 40 + rowHeights.fold<double>(0, (a, h) => a + h + 18);
-      final stripTop = placedTop - 36 - total;
-      stripRaw = Rect.fromLTWH(_pad, stripTop, canvasWidth - _pad * 2, 32);
+      final stripTop = placedTop - 40 - total;
+      final stripLeft = placedLeft.clamp(minX, maxX - (cardW + 16) * perRow);
+      stripRaw = Rect.fromLTWH(stripLeft, stripTop, (cardW + 16) * perRow, 32);
       var rowY = stripTop + 40;
       for (var r = 0; r < rowHeights.length; r++) {
         final row = waiting.skip(r * perRow).take(perRow).toList();
@@ -405,7 +458,7 @@ class ScrapbookLayout {
           final seed = seedOf(m.id);
           waitingItems[m.id] = LayoutItem(
             memoryId: m.id,
-            x: _pad + i * (cardW + 13),
+            x: stripLeft + i * (cardW + 16),
             y: rowY,
             width: cardW,
             rotation: ((seed % 41) / 40) * 4 - 2,
@@ -416,44 +469,106 @@ class ScrapbookLayout {
       }
     }
 
-    final originY = (stripRaw?.top ?? placedTop) - 24;
+    // Everything that is actually there, on the board.
+    final all = <Rect>[
+      ...placedRects,
+      for (final e in waitingItems.entries) boardRect(e.key, e.value),
+      for (final m in rawMonths) m.area,
+      ?stripRaw,
+    ];
+    final content = all.isEmpty
+        ? const Rect.fromLTWH(0, 0, readingWidth, 400)
+        : all.reduce((a, b) => a.expandToInclude(b));
+
+    // The drawn canvas: the whole board sideways (so memories can be moved
+    // anywhere the database allows), the content plus a margin downwards.
+    final origin = Offset(minX - _boardMargin, content.top - 40);
+    final width = boardWidth + _boardMargin * 2;
+    final height = content.bottom - origin.dy + 60;
+
     final pieces = <ScrapPiece>[
-      for (final m in placed) _piece(m, saved[m.id]!, originY),
-      for (final m in waiting)
-        _piece(m, waitingItems[m.id]!, originY, isNew: true),
+      for (final e in placedItems.entries)
+        _piece(byId[e.key]!, e.value, origin),
+      for (final e in waitingItems.entries)
+        _piece(byId[e.key]!, e.value, origin, isNew: true),
     ]..sort((a, b) => a.item.z.compareTo(b.item.z));
 
-    final bottom = [
-      for (final p in pieces) p.rect.bottom,
-      for (final m in rawMonths) m.bottom - originY,
-    ].fold<double>(0, math.max);
-
-    Rect shift(Rect r) => r.translate(0, -originY);
     return ScrapbookLayout(
-      width: canvasWidth,
-      height: bottom + 60,
+      width: width,
+      height: height,
       pieces: pieces,
-      originY: originY,
-      newStripRect: stripRaw == null ? null : shift(stripRaw),
-      months: [
-        for (final m in rawMonths)
-          ScrapMonth(
-            year: m.year,
-            month: m.month,
-            top: m.top - originY,
-            bottom: m.bottom - originY,
-            headingRect: shift(m.headingRect),
-            count: m.count,
-            yearRect: m.yearRect == null ? null : shift(m.yearRect!),
-          ),
-      ],
+      originX: origin.dx,
+      originY: origin.dy,
+      contentRect: content.shift(-origin),
+      newStripRect: stripRaw?.shift(-origin),
+      months: [for (final m in rawMonths) m._shift(-origin)],
     );
+  }
+
+  /// Month and year headings for a hand-arranged board: each above its
+  /// month's highest memory, at that memory's left.
+  static List<ScrapMonth> _headingsFor(
+    List<Memory> memories,
+    Map<String, LayoutItem> placed,
+  ) {
+    final groups = <(int, int), List<Rect>>{};
+    for (final m in memories) {
+      final item = placed[m.id];
+      if (item == null) continue;
+      final frame = effectiveFrame(m, item.frame, seedOf(m.id));
+      groups
+          .putIfAbsent((m.memoryDate.year, m.memoryDate.month), () => [])
+          .add(rectOf(item, m, frame));
+    }
+    final keys = groups.keys.toList()
+      ..sort(
+        (a, b) => a.$1 != b.$1 ? b.$1.compareTo(a.$1) : b.$2.compareTo(a.$2),
+      );
+    final months = <ScrapMonth>[];
+    int? lastYear;
+    for (final key in keys) {
+      final rects = groups[key]!;
+      final bounds = rects.reduce((a, b) => a.expandToInclude(b));
+      // Above the highest memory, lined up with it.
+      final highest = rects.reduce((a, b) => a.top <= b.top ? a : b);
+      final headingTop = bounds.top - _headingHeight - 14;
+      final left = highest.left;
+      Rect? yearRect;
+      if (key.$1 != lastYear) {
+        yearRect = Rect.fromLTWH(
+          left,
+          headingTop - _yearHeight - 6,
+          150,
+          _yearHeight,
+        );
+        lastYear = key.$1;
+      }
+      final top = yearRect?.top ?? headingTop;
+      months.add(
+        ScrapMonth(
+          year: key.$1,
+          month: key.$2,
+          top: top,
+          bottom: bounds.bottom + 30,
+          headingRect: Rect.fromLTWH(left - 4, headingTop, 230, _headingHeight),
+          count: rects.length,
+          yearRect: yearRect,
+          area: Rect.fromLTRB(
+            math.min(bounds.left, left) - 16,
+            top,
+            math.max(bounds.right, left + 230) + 16,
+            bounds.bottom + 30,
+          ),
+        ),
+      );
+    }
+    return months;
   }
 
   static ScrapPiece _piece(
     Memory m,
     LayoutItem item,
-    double originY, {
+    Offset origin, {
     bool isNew = false,
   }) {
     final seed = seedOf(m.id);
@@ -463,7 +578,7 @@ class ScrapbookLayout {
       kind: contentKindOf(m),
       frame: frame,
       item: item,
-      rect: rectOf(item, m, frame).translate(0, -originY),
+      rect: rectOf(item, m, frame).shift(-origin),
       seed: seed,
       isNew: isNew,
     );
