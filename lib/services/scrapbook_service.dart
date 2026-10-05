@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/scrap_decoration.dart';
 import '../models/scrapbook.dart';
 
 /// The Timeline scrapbook's layout and connections (migration 018). Both
@@ -86,6 +87,32 @@ class ScrapbookService {
     await _db.from('timeline_connections').delete().eq('id', id);
   }
 
+  /// The couple's decorations. Throws when the database has no decorations
+  /// yet (before migration 019): the scrapbook then works without them.
+  static Future<List<ScrapDecoration>> decorations(String coupleId) async {
+    final rows = await _db
+        .from('timeline_decorations')
+        .select()
+        .eq('couple_id', coupleId);
+    return [for (final r in rows) ?ScrapDecoration.fromRow(r)];
+  }
+
+  /// Saves several decorations (new or changed) in one request.
+  static Future<void> saveDecorations(
+    String coupleId,
+    Iterable<ScrapDecoration> decorations,
+  ) async {
+    final rows = [for (final d in decorations) d.toRow(coupleId)];
+    if (rows.isEmpty) return;
+    await _db.from('timeline_decorations').upsert(rows);
+  }
+
+  static Future<void> removeDecorations(Iterable<String> ids) async {
+    final list = ids.toList();
+    if (list.isEmpty) return;
+    await _db.from('timeline_decorations').delete().inFilter('id', list);
+  }
+
   /// Calls [onChange] when either partner saves layout or connections.
   /// (Inserts and updates only: removals are picked up on the next load,
   /// since delete events cannot be filtered to one couple safely.)
@@ -96,7 +123,11 @@ class ScrapbookService {
       value: coupleId,
     );
     var channel = _db.channel('scrapbook-$coupleId');
-    for (final table in ['timeline_layout_items', 'timeline_connections']) {
+    for (final table in [
+      'timeline_layout_items',
+      'timeline_connections',
+      'timeline_decorations',
+    ]) {
       for (final event in [
         PostgresChangeEvent.insert,
         PostgresChangeEvent.update,

@@ -154,7 +154,7 @@ void main() {
     expect(FrameStyle.forKind(ContentKind.event), contains(FrameStyle.ticket));
     // A chosen frame that no longer suits (photo removed) falls back.
     final text = mem('t', DateTime(2026));
-    expect(effectiveFrame(text, FrameStyle.polaroid, 1), FrameStyle.paper);
+    expect(effectiveFrame(text, FrameStyle.polaroid, 1), FrameStyle.sticky);
   });
 
   test('photo frames keep a sensible shape at any allowed width', () {

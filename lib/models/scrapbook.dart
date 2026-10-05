@@ -24,7 +24,8 @@ enum FrameStyle {
   postcard('postcard', 'Postcard'),
   minimal('minimal', 'Minimal'),
   loveNote('love_note', 'Love Note'),
-  ticket('ticket', 'Ticket');
+  ticket('ticket', 'Ticket'),
+  sticky('sticky', 'Sticky note');
 
   const FrameStyle(this.dbValue, this.label);
 
@@ -38,12 +39,12 @@ enum FrameStyle {
     return null;
   }
 
-  /// The frames that suit a memory: photo frames need a photo, paper and
-  /// love notes are for words, tickets for events.
+  /// The frames that suit a memory: photo frames need a photo; sticky
+  /// notes, paper and love notes are for words, tickets for events.
   static List<FrameStyle> forKind(ContentKind kind) => switch (kind) {
     ContentKind.photo => const [polaroid, taped, film, postcard, minimal],
-    ContentKind.text => const [paper, loveNote, minimal],
-    ContentKind.event => const [ticket, paper, postcard, minimal],
+    ContentKind.text => const [sticky, paper, loveNote, minimal],
+    ContentKind.event => const [sticky, ticket, paper, postcard, minimal],
   };
 
   bool get showsPhoto =>
@@ -55,11 +56,10 @@ enum FrameStyle {
 }
 
 /// The look a memory has until someone chooses one: stable per memory, so
-/// it never changes on its own.
+/// it never changes on its own. A memory without a photo is a sticky note.
 FrameStyle autoFrameOf(Memory m, int seed) => switch (contentKindOf(m)) {
   ContentKind.photo => seed % 4 == 3 ? FrameStyle.taped : FrameStyle.polaroid,
-  ContentKind.text => FrameStyle.paper,
-  ContentKind.event => FrameStyle.ticket,
+  ContentKind.text || ContentKind.event => FrameStyle.sticky,
 };
 
 /// The frame a memory is drawn in: the chosen one if it suits the memory

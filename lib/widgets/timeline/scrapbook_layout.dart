@@ -207,6 +207,9 @@ class ScrapbookLayout {
         return (hasStory ? 160.0 : 130.0) + ((w - 170) * 0.1).clamp(0.0, 30.0);
       case FrameStyle.ticket:
         return math.max(118.0, w * 0.5);
+      case FrameStyle.sticky:
+        // A square note, a little taller when it has a story to hold.
+        return math.max(120.0, w * (hasStory ? 1.0 : 0.9));
     }
   }
 
@@ -395,6 +398,7 @@ class ScrapbookLayout {
     required List<Memory> memories,
     required Map<String, LayoutItem> saved,
     required bool customized,
+    List<Rect> extra = const [],
   }) {
     final placedItems = <String, LayoutItem>{};
     final waiting = <Memory>[];
@@ -475,6 +479,8 @@ class ScrapbookLayout {
       for (final e in waitingItems.entries) boardRect(e.key, e.value),
       for (final m in rawMonths) m.area,
       ?stripRaw,
+      // Decorations (board units), so panning and See all reach them.
+      ...extra,
     ];
     final content = all.isEmpty
         ? const Rect.fromLTWH(0, 0, readingWidth, 400)

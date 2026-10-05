@@ -58,6 +58,7 @@ class ScrapFrame extends StatelessWidget {
       FrameStyle.paper => _Paper(this, f),
       FrameStyle.loveNote => _LoveNote(this, f),
       FrameStyle.ticket => _Ticket(this, f),
+      FrameStyle.sticky => _Sticky(this, f),
     };
     return SizedBox.fromSize(size: size, child: child);
   }
@@ -824,6 +825,157 @@ class _FlapLines extends CustomPainter {
 
   @override
   bool shouldRepaint(_FlapLines old) => false;
+}
+
+// ------------------------------------------------------------- 9 sticky
+
+/// The note colours, shared with sticky-note decorations.
+const stickyColors = [
+  Color(0xFFF9D3DE), // pink
+  Color(0xFFFCEFA8), // butter yellow
+  Color(0xFFDCCFF5), // lavender
+  Color(0xFFCFEFDD), // mint
+  Color(0xFFFAD9C1), // peach
+];
+
+/// A square sticky note, handwritten, with no date: the look of a memory
+/// without a photo.
+class _Sticky extends StatelessWidget {
+  const _Sticky(this.p, this.f);
+
+  final ScrapFrame p;
+  final double f;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = p.memory;
+    final story = m.description?.trim() ?? '';
+    return StickyPaper(
+      color: stickyColors[p.seed % stickyColors.length],
+      size: p.size,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            m.title,
+            maxLines: story.isEmpty ? 4 : 2,
+            overflow: TextOverflow.ellipsis,
+            style: scrapHand(22 * f.clamp(0.85, 1.35)),
+          ),
+          if (story.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Expanded(
+              child: Text(
+                story,
+                overflow: TextOverflow.fade,
+                style: scrapHand(
+                  16 * f.clamp(0.9, 1.25),
+                  color: NotePalette.inkSoft,
+                ),
+              ),
+            ),
+          ] else
+            const Spacer(),
+          if (m.isFavorite)
+            const Align(
+              alignment: Alignment.bottomRight,
+              child: Icon(
+                Icons.favorite_rounded,
+                size: 14,
+                color: NotePalette.deepRose,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The paper of a sticky note: a soft colour, a slightly darker glue strip
+/// at the top and a lifted bottom corner.
+class StickyPaper extends StatelessWidget {
+  const StickyPaper({
+    super.key,
+    required this.color,
+    required this.size,
+    required this.child,
+  });
+
+  final Color color;
+  final Size size;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final glue = Color.lerp(color, Colors.black, 0.06)!;
+    return Container(
+      width: size.width,
+      height: size.height,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [glue, color, color, Color.lerp(color, Colors.white, 0.18)!],
+          stops: const [0, 0.14, 0.7, 1],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 10,
+            offset: const Offset(2, 7),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // The lifted corner.
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: CustomPaint(
+              size: Size.square(math.min(26, size.width * 0.16)),
+              painter: _CornerCurl(color),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14, size.height * 0.16, 12, 10),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CornerCurl extends CustomPainter {
+  _CornerCurl(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final fold = Path()
+      ..moveTo(w, 0)
+      ..lineTo(0, w)
+      ..lineTo(w * 0.15, w * 0.15)
+      ..close();
+    canvas.drawPath(
+      Path()
+        ..moveTo(w, 0)
+        ..lineTo(w, w)
+        ..lineTo(0, w)
+        ..close(),
+      Paint()..color = const Color(0xFF1C0F1A),
+    );
+    canvas.drawPath(
+      fold,
+      Paint()..color = Color.lerp(color, Colors.black, 0.12)!,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CornerCurl old) => old.color != color;
 }
 
 // ------------------------------------------------------------- 8 ticket

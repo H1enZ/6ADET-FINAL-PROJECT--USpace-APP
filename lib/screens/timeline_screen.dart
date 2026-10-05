@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../models/memory.dart';
 import '../models/profile.dart';
+import '../models/scrap_decoration.dart';
 import '../models/scrapbook.dart';
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
@@ -17,6 +19,7 @@ import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/home/quick_actions.dart';
 import '../widgets/notes/note_style.dart';
+import '../widgets/timeline/scrap_decorations.dart';
 import '../widgets/timeline/scrapbook_canvas.dart';
 import '../widgets/timeline/scrapbook_editor.dart';
 import '../widgets/timeline/scrapbook_layout.dart';
@@ -48,6 +51,7 @@ class TimelineScreen extends StatefulWidget {
 class _Undo {
   _Undo({
     this.items = const {},
+    this.decos = const {},
     this.addedLinkId,
     this.removedLink,
     this.restyled,
@@ -55,6 +59,9 @@ class _Undo {
 
   /// Each changed memory's placement before the step (null = none saved).
   final Map<String, LayoutItem?> items;
+
+  /// Each changed decoration before the step (null = it did not exist).
+  final Map<String, ScrapDecoration?> decos;
   final String? addedLinkId;
   final ScrapConnection? removedLink;
   final ScrapConnection? restyled;
@@ -83,6 +90,11 @@ class _TimelineScreenState extends State<TimelineScreen>
   Size? _viewport;
   bool _lowRes = false;
 
+  /// Dates (month labels and headings) hidden, so the board shows on its
+  /// own. A choice for this phone, remembered.
+  bool _hideDates = false;
+  static const _hideDatesKey = 'timeline_hide_dates';
+
   // ------------------------------------------------ the shared arrangement
 
   /// Saved placements (what both of you see). Empty = never arranged by
@@ -103,6 +115,17 @@ class _TimelineScreenState extends State<TimelineScreen>
   final _live = ValueNotifier<ScrapLive?>(null);
   ({ScrapPiece piece, ScrapGesture kind, LayoutItem start, Offset from})?
   _gesture;
+
+  // Decorations (migration 019): sticky notes, stickers, tape, doodles.
+  List<ScrapDecoration> _decos = [];
+
+  /// False on a database without 019: the scrapbook works without them.
+  bool _decosReady = false;
+  String? _selectedDeco;
+  final _decoLive = ValueNotifier<ScrapDecoration?>(null);
+  ({ScrapDecoration start, ScrapGesture kind, Offset from})? _decoGesture;
+  final _dirtyDecos = <String>{};
+  final _removedDecos = <String>{};
 
   final _undo = <_Undo>[];
   static const _undoLimit = 30;
@@ -132,6 +155,7 @@ class _TimelineScreenState extends State<TimelineScreen>
     WidgetsBinding.instance.addObserver(this);
     _view.addListener(_watchZoom);
     _load();
+    _loadDatesChoice();
     try {
       _channel = ScrapbookService.listen(_coupleId, _remoteChanged);
     } catch (_) {
@@ -159,6 +183,7 @@ class _TimelineScreenState extends State<TimelineScreen>
     _arrange.dispose();
     _view.dispose();
     _live.dispose();
+    _decoLive.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -169,6 +194,24 @@ class _TimelineScreenState extends State<TimelineScreen>
         state == AppLifecycleState.inactive) {
       _flush();
     }
+  }
+
+  Future<void> _loadDatesChoice() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hide = prefs.getBool(_hideDatesKey) ?? false;
+      if (mounted && hide != _hideDates) setState(() => _hideDates = hide);
+    } catch (_) {
+      // Only a preference: the dates simply show.
+    }
+  }
+
+  void _toggleDates() {
+    setState(() => _hideDates = !_hideDates);
+    final hide = _hideDates;
+    SharedPreferences.getInstance()
+        .then((p) => p.setBool(_hideDatesKey, hide))
+        .catchError((_) => false);
   }
 
   /// Your own tags (not built-ins), offered as chips when tagging.
@@ -197,6 +240,7 @@ class _TimelineScreenState extends State<TimelineScreen>
       memories: _memories.where(_matches).toList(),
       saved: s,
       customized: s.isNotEmpty,
+      extra: [for (final d in _decos) d.rect],
     );
   }
 
@@ -206,6 +250,9 @@ class _TimelineScreenState extends State<TimelineScreen>
         CoupleService.members(_coupleId),
         MemoryService.list(_coupleId),
         ScrapbookService.load(
+          _coupleId,
+        ).then<Object?>((v) => v, onError: (_) => null),
+        ScrapbookService.decorations(
           _coupleId,
         ).then<Object?>((v) => v, onError: (_) => null),
       ]);
@@ -224,6 +271,10 @@ class _TimelineScreenState extends State<TimelineScreen>
         if (scrap != null) {
           _layoutReady = true;
           _mergeRemote(scrap.items, scrap.links);
+        }
+        if (results[3] case final List<ScrapDecoration> decos) {
+          _decosReady = true;
+          _mergeDecos(decos);
         }
         _relayout();
         _error = null;
@@ -260,15 +311,38 @@ class _TimelineScreenState extends State<TimelineScreen>
     _links = links;
   }
 
+  /// Takes the saved decorations, except ones changed or removed here and
+  /// not saved yet, and the one being moved.
+  void _mergeDecos(List<ScrapDecoration> remote) {
+    final local = {for (final d in _decos) d.id: d};
+    final liveId = _decoLive.value?.id;
+    final out = <ScrapDecoration>[
+      for (final d in remote)
+        if (!_removedDecos.contains(d.id))
+          (_dirtyDecos.contains(d.id) || d.id == liveId)
+              ? (local[d.id] ?? d)
+              : d,
+    ];
+    final ids = {for (final d in out) d.id};
+    for (final id in _dirtyDecos) {
+      if (!ids.contains(id) && local[id] != null) out.add(local[id]!);
+    }
+    _decos = out;
+  }
+
   void _remoteChanged() {
     _remoteTimer?.cancel();
     _remoteTimer = Timer(const Duration(milliseconds: 400), () async {
       if (!mounted || _gesture != null || _arrange.isAnimating) return;
       try {
         final scrap = await ScrapbookService.load(_coupleId);
-        if (!mounted || _gesture != null) return;
+        final decos = _decosReady
+            ? await ScrapbookService.decorations(_coupleId)
+            : null;
+        if (!mounted || _gesture != null || _decoGesture != null) return;
         setState(() {
           _mergeRemote(scrap.items, scrap.links);
+          if (decos != null) _mergeDecos(decos);
           _relayout();
         });
       } catch (_) {}
@@ -463,10 +537,10 @@ class _TimelineScreenState extends State<TimelineScreen>
       if (_connectFrom != null) {
         _finishConnect(piece);
       } else {
-        setState(
-          () =>
-              _selected = _selected == piece.memory.id ? null : piece.memory.id,
-        );
+        setState(() {
+          _selected = _selected == piece.memory.id ? null : piece.memory.id;
+          _selectedDeco = null;
+        });
       }
       return;
     }
@@ -475,6 +549,15 @@ class _TimelineScreenState extends State<TimelineScreen>
     } else {
       _open(piece.memory);
     }
+  }
+
+  void _tapDeco(ScrapDecoration deco) {
+    if (!_editing || _anim.isAnimating) return;
+    setState(() {
+      _selectedDeco = _selectedDeco == deco.id ? null : deco.id;
+      _selected = null;
+      _connectFrom = null;
+    });
   }
 
   // ------------------------------------------------------------ editing
@@ -495,6 +578,7 @@ class _TimelineScreenState extends State<TimelineScreen>
     setState(() {
       _editing = false;
       _selected = null;
+      _selectedDeco = null;
       _connectFrom = null;
       _undo.clear();
     });
@@ -509,6 +593,287 @@ class _TimelineScreenState extends State<TimelineScreen>
   };
 
   int get _topZ => _saved.values.fold<int>(0, (z, i) => math.max(z, i.z));
+
+  /// Every layer on the board (placed memories and decorations; not the
+  /// waiting New strip), lowest first.
+  List<int> get _allZ => [
+    for (final p in _layout?.pieces ?? const <ScrapPiece>[])
+      if (!p.isNew) p.item.z,
+    for (final d in _decos) d.z,
+  ]..sort();
+
+  int get _frontZ => _allZ.isEmpty ? 0 : _allZ.last + 1;
+  int get _backZ => _allZ.isEmpty ? 0 : _allZ.first - 1;
+
+  ScrapDecoration? get _selectedDecoration {
+    final id = _selectedDeco;
+    if (id == null) return null;
+    return _decos.where((d) => d.id == id).firstOrNull;
+  }
+
+  /// Applies decoration changes (null = remove it), remembers how to undo
+  /// them, and saves them shortly (removals go at once).
+  void _applyDeco(Map<String, ScrapDecoration?> changes, {bool record = true}) {
+    if (changes.isEmpty) return;
+    final current = {for (final d in _decos) d.id: d};
+    final before = {for (final id in changes.keys) id: current[id]};
+    final removed = <String>[];
+    for (final e in changes.entries) {
+      final v = e.value;
+      if (v == null) {
+        current.remove(e.key);
+        _dirtyDecos.remove(e.key);
+        _removedDecos.add(e.key);
+        removed.add(e.key);
+      } else {
+        current[e.key] = v;
+        _dirtyDecos.add(e.key);
+        _removedDecos.remove(e.key);
+      }
+    }
+    _decos = current.values.toList();
+    if (record) {
+      _undo.add(_Undo(decos: before));
+      if (_undo.length > _undoLimit) _undo.removeAt(0);
+    }
+    if (_selectedDeco != null && !current.containsKey(_selectedDeco)) {
+      _selectedDeco = null;
+    }
+    setState(_relayout);
+    if (removed.isNotEmpty) {
+      ScrapbookService.removeDecorations(removed).catchError((_) {
+        if (mounted) _showMessage("Couldn't remove that just now.");
+      });
+    }
+    _scheduleSave();
+  }
+
+  /// The board point in the middle of the screen (where new things go).
+  ({double x, double y}) get _viewCenter {
+    final vp = _viewport, layout = _layout;
+    if (vp == null || layout == null) return (x: 200, y: 200);
+    final s = _scale, t = _translation;
+    final canvas = (Offset(vp.width / 2, vp.height / 2) - t) / s;
+    final board = canvas + layout.origin;
+    return (x: board.dx, y: board.dy);
+  }
+
+  Future<void> _addMenu() async {
+    final choice = await pickAdd(context, decorations: _decosReady);
+    if (choice == null || !mounted) return;
+    final center = _viewCenter;
+    ScrapDecoration? made;
+    switch (choice) {
+      case AddChoice.memory:
+        await _addMemoryHere();
+        return;
+      case AddChoice.stickyNote:
+        final note = await writeStickyNote(context);
+        if (note == null) return;
+        made = ScrapDecoration.create(
+          kind: DecoKind.stickyNote,
+          variant: 'square',
+          center: center,
+          z: _frontZ,
+          body: note.$1,
+          color: note.$2,
+        );
+      case AddChoice.sticker:
+        final id = await pickSticker(context);
+        if (id == null) return;
+        made = ScrapDecoration.create(
+          kind: DecoKind.sticker,
+          variant: id,
+          center: center,
+          z: _frontZ,
+        );
+      case AddChoice.tape:
+        final tape = await pickTape(context);
+        if (tape == null) return;
+        made = ScrapDecoration.create(
+          kind: DecoKind.tape,
+          variant: tape.$1,
+          center: center,
+          z: _frontZ,
+          color: tape.$2,
+        );
+      case AddChoice.doodle:
+        final doodle = await pickDoodle(context);
+        if (doodle == null) return;
+        made = ScrapDecoration.create(
+          kind: DecoKind.doodle,
+          variant: doodle.$1,
+          center: center,
+          z: _frontZ,
+          color: doodle.$2,
+        );
+    }
+    if (!mounted) return;
+    _applyDeco({made.id: made});
+    setState(() {
+      _selectedDeco = made!.id;
+      _selected = null;
+    });
+  }
+
+  /// A new memory from edit mode: on an arranged board it lands where you
+  /// are looking (instead of waiting in the New strip).
+  Future<void> _addMemoryHere() async {
+    final center = _viewCenter;
+    final before = {for (final m in _memories) m.id};
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) =>
+          AddMemorySheet(coupleId: _coupleId, knownTags: _knownTags),
+    );
+    if (saved != true || !mounted) return;
+    await _load();
+    if (!mounted) return;
+    final fresh = _memories.where((m) => !before.contains(m.id)).toList();
+    if (fresh.isEmpty) return;
+    if (_customized) {
+      final changes = <String, LayoutItem>{};
+      var z = _frontZ;
+      for (final (i, m) in fresh.indexed) {
+        final kind = contentKindOf(m);
+        final w = ScrapbookLayout.presetWidths(kind)[1];
+        final frame = autoFrameOf(m, ScrapbookLayout.seedOf(m.id));
+        final h = ScrapbookLayout.frameHeight(frame, w, m);
+        changes[m.id] = LayoutItem(
+          memoryId: m.id,
+          x: center.x - w / 2 + i * 24,
+          y: center.y - h / 2 + i * 24,
+          width: w,
+          z: z++,
+        );
+      }
+      _apply(changes);
+    }
+    setState(() {
+      _selected = fresh.first.id;
+      _selectedDeco = null;
+    });
+    showFloatingHearts(context);
+    _showMessage('Memory saved');
+  }
+
+  /// The selected memory's own editor (title, story, date, photos).
+  Future<void> _editMemory() async {
+    final p = _selectedPiece;
+    if (p == null) return;
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => AddMemorySheet(
+        coupleId: _coupleId,
+        memory: p.memory,
+        knownTags: _knownTags,
+      ),
+    );
+    if (saved == true && mounted) await _load();
+  }
+
+  Future<void> _editNote() async {
+    final d = _selectedDecoration;
+    if (d == null || d.kind != DecoKind.stickyNote) return;
+    final note = await writeStickyNote(context, text: d.body, color: d.color);
+    if (note == null || !mounted) return;
+    _applyDeco({d.id: d.copyWith(body: note.$1, color: note.$2)});
+  }
+
+  Future<void> _recolor() async {
+    final d = _selectedDecoration;
+    if (d == null) return;
+    final c = await pickColor(context, d.kind, d.color);
+    if (c == null || !mounted) return;
+    _applyDeco({d.id: d.copyWith(color: c)});
+  }
+
+  void _deleteDeco() {
+    final d = _selectedDecoration;
+    if (d == null) return;
+    _applyDeco({d.id: null});
+    _showMessage('Removed. Undo brings it back.');
+  }
+
+  Future<void> _turnDeco() async {
+    final d = _selectedDecoration;
+    if (d == null) return;
+    final angle = await pickTurn(
+      context,
+      d.rotation,
+      (v) => _decoLive.value = d.copyWith(rotation: v),
+      limit: d.kind.maxTurn,
+    );
+    _decoLive.value = null;
+    if (angle == null || !mounted || angle == d.rotation) return;
+    _applyDeco({d.id: d.copyWith(rotation: angle)});
+  }
+
+  Future<void> _layerDeco() async {
+    final d = _selectedDecoration;
+    if (d == null) return;
+    final action = await pickLayer(context);
+    if (action == null || !mounted) return;
+    final others = _allZ..remove(d.z);
+    // Forward / backward: just past the next layer above / below.
+    final above = others.where((z) => z >= d.z).firstOrNull;
+    final below = others.reversed.where((z) => z <= d.z).firstOrNull;
+    final z = switch (action) {
+      LayerAction.front => others.isEmpty ? d.z : others.last + 1,
+      LayerAction.back => others.isEmpty ? d.z : others.first - 1,
+      LayerAction.forward => above == null ? d.z : above + 1,
+      LayerAction.backward => below == null ? d.z : below - 1,
+    };
+    if (z == d.z) return;
+    _applyDeco({d.id: d.copyWith(z: z)});
+  }
+
+  void _decoGestureStart(ScrapDecoration deco, ScrapGesture kind, Offset at) {
+    if (_arrange.isAnimating) return;
+    _decoGesture = (start: deco, kind: kind, from: at);
+    _decoLive.value = deco;
+    if (_selectedDeco != deco.id) {
+      setState(() {
+        _selectedDeco = deco.id;
+        _selected = null;
+        _connectFrom = null;
+      });
+    }
+  }
+
+  void _decoGestureUpdate(Offset at) {
+    final g = _decoGesture!;
+    final s = g.start;
+    final d = at - g.from;
+    switch (g.kind) {
+      case ScrapGesture.move:
+        _decoLive.value = s.copyWith(
+          x: (s.x + d.dx).clamp(ScrapbookLayout.minX, ScrapbookLayout.maxX),
+          y: (s.y + d.dy).clamp(-1900.0, 199000.0),
+        );
+      case ScrapGesture.resize:
+        final (lo, hi) = s.kind.widthRange;
+        final w = (s.width + d.dx).clamp(lo, hi).toDouble();
+        final h = s.kind.keepsHeight
+            ? s.height
+            : (s.height * w / s.width).clamp(12.0, 380.0);
+        _decoLive.value = s.copyWith(width: w, height: h);
+      case ScrapGesture.rotate:
+        final origin = _layout?.origin ?? Offset.zero;
+        final c = s.rect.shift(-origin).center;
+        final v = at - c;
+        var deg = math.atan2(v.dx, -v.dy) * 180 / math.pi;
+        deg = deg.clamp(-s.kind.maxTurn, s.kind.maxTurn);
+        if (deg.abs() < 1) deg = 0;
+        _decoLive.value = s.copyWith(rotation: deg);
+    }
+  }
 
   /// Applies placement changes (null = forget the placement), remembers
   /// how to undo them, and saves them shortly.
@@ -562,6 +927,10 @@ class _TimelineScreenState extends State<TimelineScreen>
   }
 
   void _gestureUpdate(Offset at) {
+    if (_decoGesture != null) {
+      _decoGestureUpdate(at);
+      return;
+    }
     final g = _gesture;
     if (g == null) return;
     final s = g.start;
@@ -616,6 +985,13 @@ class _TimelineScreenState extends State<TimelineScreen>
   }
 
   void _gestureEnd() {
+    if (_decoGesture case final dg?) {
+      final now = _decoLive.value;
+      _decoGesture = null;
+      if (now != null && now != dg.start) _applyDeco({now.id: now});
+      _decoLive.value = null;
+      return;
+    }
     final g = _gesture;
     final l = _live.value;
     _gesture = null;
@@ -636,6 +1012,7 @@ class _TimelineScreenState extends State<TimelineScreen>
     if (_undo.isEmpty) return;
     final step = _undo.removeLast();
     if (step.items.isNotEmpty) _apply(step.items, record: false);
+    if (step.decos.isNotEmpty) _applyDeco(step.decos, record: false);
     if (step.addedLinkId case final id?) {
       setState(
         () => _links = [
@@ -712,9 +1089,13 @@ class _TimelineScreenState extends State<TimelineScreen>
     final changes = <String, LayoutItem>{};
     switch (action) {
       case LayerAction.front:
-        changes[me.memoryId] = me.copyWith(z: order.last.z + 1);
+        changes[me.memoryId] = me.copyWith(
+          z: math.max(order.last.z + 1, _frontZ),
+        );
       case LayerAction.back:
-        changes[me.memoryId] = me.copyWith(z: order.first.z - 1);
+        changes[me.memoryId] = me.copyWith(
+          z: math.min(order.first.z - 1, _backZ),
+        );
       case LayerAction.forward when i < order.length - 1:
         final other = order[i + 1];
         changes[me.memoryId] = me.copyWith(z: other.z);
@@ -881,7 +1262,14 @@ class _TimelineScreenState extends State<TimelineScreen>
   /// Sends what changed, in as few requests as possible.
   Future<void> _flush() async {
     _saveTimer?.cancel();
-    if (_saving || (_dirty.isEmpty && _removed.isEmpty)) return;
+    if (_saving ||
+        (_dirty.isEmpty && _removed.isEmpty && _dirtyDecos.isEmpty)) {
+      return;
+    }
+    final decosToSave = [
+      for (final d in _decos)
+        if (_dirtyDecos.contains(d.id)) d,
+    ];
     final toSave = [for (final id in _dirty) ?_saved[id]];
     final toRemove = {..._removed};
     _saving = true;
@@ -895,6 +1283,10 @@ class _TimelineScreenState extends State<TimelineScreen>
         }
       }
       await ScrapbookService.saveItems(_coupleId, toSave);
+      await ScrapbookService.saveDecorations(_coupleId, decosToSave);
+      for (final d in decosToSave) {
+        if (_decos.contains(d)) _dirtyDecos.remove(d.id);
+      }
       _removed.removeAll(toRemove);
       for (final i in toSave) {
         if (_saved[i.memoryId] == i) _dirty.remove(i.memoryId);
@@ -909,7 +1301,11 @@ class _TimelineScreenState extends State<TimelineScreen>
       _saving = false;
       if (mounted) {
         setState(() {});
-        if (_dirty.isNotEmpty || _removed.isNotEmpty) _scheduleSave();
+        if (_dirty.isNotEmpty ||
+            _removed.isNotEmpty ||
+            _dirtyDecos.isNotEmpty) {
+          _scheduleSave();
+        }
       }
     }
   }
@@ -1001,12 +1397,19 @@ class _TimelineScreenState extends State<TimelineScreen>
               view: _view,
               onTapEmpty: () => setState(() {
                 _selected = null;
+                _selectedDeco = null;
                 _connectFrom = null;
               }),
               onTapLink: _tapLink,
               onGestureStart: _gestureStart,
               onGestureUpdate: _gestureUpdate,
               onGestureEnd: _gestureEnd,
+              decorations: _decos,
+              decoLive: _decoLive,
+              selectedDecoId: _selectedDeco,
+              onTapDeco: _tapDeco,
+              onDecoGestureStart: _decoGestureStart,
+              showDates: !_hideDates,
             ),
             onInteractionStart: _anim.stop,
             onInteractionEnd: _settle,
@@ -1019,6 +1422,8 @@ class _TimelineScreenState extends State<TimelineScreen>
             onZoomIn: () => _zoomBy(1.6),
             onZoomOut: () => _zoomBy(1 / 1.6),
             onSeeAll: _seeAll,
+            hideDates: _hideDates,
+            onToggleDates: _toggleDates,
             overlay: !_editing
                 ? null
                 : Stack(
@@ -1045,10 +1450,25 @@ class _TimelineScreenState extends State<TimelineScreen>
                           saving: _saving,
                           onFrame: _frame,
                           onSize: _size,
-                          onTurn: _turn,
-                          onLayer: _layer,
+                          onTurn: _selectedDeco != null ? _turnDeco : _turn,
+                          onLayer: _selectedDeco != null ? _layerDeco : _layer,
                           onConnect: _toggleConnect,
                           onDone: _done,
+                          onAdd: _addMenu,
+                          onEditMemory: _selected == null ? null : _editMemory,
+                          deco: _selectedDeco != null,
+                          onEditNote:
+                              _selectedDecoration?.kind == DecoKind.stickyNote
+                              ? _editNote
+                              : null,
+                          onColor:
+                              _selectedDecoration != null &&
+                                  colorsFor(
+                                    _selectedDecoration!.kind,
+                                  ).isNotEmpty
+                              ? _recolor
+                              : null,
+                          onDelete: _deleteDeco,
                         ),
                       ),
                     ],
@@ -1334,8 +1754,13 @@ class _ScrapbookViewport extends StatelessWidget {
     required this.onZoomIn,
     required this.onZoomOut,
     required this.onSeeAll,
+    required this.hideDates,
+    required this.onToggleDates,
     this.overlay,
   });
+
+  final bool hideDates;
+  final VoidCallback onToggleDates;
 
   final ScrapbookLayout layout;
   final TransformationController view;
@@ -1378,13 +1803,25 @@ class _ScrapbookViewport extends StatelessWidget {
         ),
         // Everything below listens to the view and redraws on its own;
         // the scrapbook itself is never rebuilt while you zoom.
-        Positioned.fill(
-          child: _MonthLabels(
-            layout: layout,
+        if (!hideDates)
+          Positioned.fill(
+            child: _MonthLabels(
+              layout: layout,
+              view: view,
+              viewport: viewport,
+              defaultScale: defaultScale,
+              onMonth: onMonth,
+            ),
+          ),
+        // Zoomed out: hide or show the dates, above the zoom controls.
+        Positioned(
+          right: 12,
+          bottom: (editing ? 96 : 16) + 56,
+          child: _DatesToggle(
             view: view,
-            viewport: viewport,
             defaultScale: defaultScale,
-            onMonth: onMonth,
+            hidden: hideDates,
+            onTap: onToggleDates,
           ),
         ),
         Positioned(
@@ -1410,6 +1847,78 @@ class _ScrapbookViewport extends StatelessWidget {
         ),
         ?overlay,
       ],
+    );
+  }
+}
+
+/// "Hide dates" / "Show dates", only while zoomed out (where the month
+/// labels float over the board).
+class _DatesToggle extends StatelessWidget {
+  const _DatesToggle({
+    required this.view,
+    required this.defaultScale,
+    required this.hidden,
+    required this.onTap,
+  });
+
+  final TransformationController view;
+  final double defaultScale;
+  final bool hidden;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: view,
+      builder: (context, _) {
+        final far = view.value.getMaxScaleOnAxis() < defaultScale * 0.6;
+        return IgnorePointer(
+          ignoring: !far,
+          child: AnimatedOpacity(
+            opacity: far ? 1 : 0,
+            duration: motionOff(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 200),
+            child: Material(
+              color: const Color(0xE62A1426),
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color: NotePalette.pink.withValues(alpha: 0.35),
+                ),
+              ),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        hidden
+                            ? Icons.event_available_outlined
+                            : Icons.event_busy_outlined,
+                        size: 18,
+                        color: NotePalette.pink,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        hidden ? 'Show dates' : 'Hide dates',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: NotePalette.cream,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

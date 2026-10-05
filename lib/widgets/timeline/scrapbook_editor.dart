@@ -20,7 +20,25 @@ class ScrapEditToolbar extends StatelessWidget {
     required this.onLayer,
     required this.onConnect,
     required this.onDone,
+    required this.onAdd,
+    this.onEditMemory,
+    this.deco = false,
+    this.onEditNote,
+    this.onColor,
+    this.onDelete,
   });
+
+  /// Add a memory, sticky note, sticker, tape or doodle.
+  final VoidCallback onAdd;
+
+  /// The selected memory's own editor (null when none is selected).
+  final VoidCallback? onEditMemory;
+
+  /// A decoration is selected: its own tools replace the memory tools.
+  final bool deco;
+  final VoidCallback? onEditNote;
+  final VoidCallback? onColor;
+  final VoidCallback? onDelete;
 
   final bool hasSelection;
   final bool connecting;
@@ -94,32 +112,45 @@ class ScrapEditToolbar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
                 children: [
-                  tool(
-                    'Frame',
-                    Icons.filter_frames_outlined,
-                    hasSelection ? onFrame : null,
-                  ),
-                  tool(
-                    'Size',
-                    Icons.photo_size_select_large_rounded,
-                    hasSelection ? onSize : null,
-                  ),
-                  tool(
-                    'Turn',
-                    Icons.rotate_90_degrees_ccw_rounded,
-                    hasSelection ? onTurn : null,
-                  ),
-                  tool(
-                    'Layer',
-                    Icons.layers_outlined,
-                    hasSelection ? onLayer : null,
-                  ),
-                  tool(
-                    'Connect',
-                    Icons.timeline_rounded,
-                    hasSelection || connecting ? onConnect : null,
-                    on: connecting,
-                  ),
+                  tool('Add', Icons.add_circle_outline_rounded, onAdd),
+                  if (deco) ...[
+                    if (onEditNote != null)
+                      tool('Write', Icons.edit_note_rounded, onEditNote),
+                    if (onColor != null)
+                      tool('Colour', Icons.palette_outlined, onColor),
+                    tool('Turn', Icons.rotate_90_degrees_ccw_rounded, onTurn),
+                    tool('Layer', Icons.layers_outlined, onLayer),
+                    tool('Delete', Icons.delete_outline_rounded, onDelete),
+                  ] else ...[
+                    if (onEditMemory != null)
+                      tool('Edit', Icons.edit_outlined, onEditMemory),
+                    tool(
+                      'Frame',
+                      Icons.filter_frames_outlined,
+                      hasSelection ? onFrame : null,
+                    ),
+                    tool(
+                      'Size',
+                      Icons.photo_size_select_large_rounded,
+                      hasSelection ? onSize : null,
+                    ),
+                    tool(
+                      'Turn',
+                      Icons.rotate_90_degrees_ccw_rounded,
+                      hasSelection ? onTurn : null,
+                    ),
+                    tool(
+                      'Layer',
+                      Icons.layers_outlined,
+                      hasSelection ? onLayer : null,
+                    ),
+                    tool(
+                      'Connect',
+                      Icons.timeline_rounded,
+                      hasSelection || connecting ? onConnect : null,
+                      on: connecting,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -346,8 +377,9 @@ Future<double?> pickSize(BuildContext context, ScrapPiece piece) {
 Future<double?> pickTurn(
   BuildContext context,
   double start,
-  void Function(double) onPreview,
-) {
+  void Function(double) onPreview, {
+  double limit = LayoutItem.maxRotation,
+}) {
   var value = start;
   return _sheet<double>(
     context,
@@ -355,7 +387,7 @@ Future<double?> pickTurn(
     child: StatefulBuilder(
       builder: (context, setSheet) {
         void set(double v) {
-          v = v.clamp(LayoutItem.minRotation, LayoutItem.maxRotation);
+          v = v.clamp(-limit, limit);
           if (v.abs() < 0.4) v = 0;
           setSheet(() => value = v);
           onPreview(v);
@@ -377,9 +409,9 @@ Future<double?> pickTurn(
                 Expanded(
                   child: Slider(
                     value: value,
-                    min: LayoutItem.minRotation,
-                    max: LayoutItem.maxRotation,
-                    divisions: 24,
+                    min: -limit,
+                    max: limit,
+                    divisions: (limit * 4).round(),
                     label: '${value.toStringAsFixed(1)}°',
                     activeColor: NotePalette.rose,
                     onChanged: set,

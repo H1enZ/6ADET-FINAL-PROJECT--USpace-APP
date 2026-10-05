@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../models/scrap_decoration.dart';
 import '../../models/scrapbook.dart';
 import '../../utils/anniversary.dart';
 import '../notes/note_style.dart';
+import 'scrap_decorations.dart';
 import 'scrap_frames.dart';
 import 'scrapbook_layout.dart';
 
@@ -56,9 +58,28 @@ class ScrapbookCanvas extends StatefulWidget {
     this.onGestureStart,
     this.onGestureUpdate,
     this.onGestureEnd,
+    this.decorations = const [],
+    this.decoLive,
+    this.selectedDecoId,
+    this.onTapDeco,
+    this.onDecoGestureStart,
+    this.showDates = true,
   });
 
+  /// The year stamps and month headings on the board (hidden on request).
+  final bool showDates;
+
   final ScrapbookLayout layout;
+
+  /// Sticky notes, stickers, tape and doodles (board positions).
+  final List<ScrapDecoration> decorations;
+
+  /// The decoration being moved, sized or turned right now.
+  final ValueNotifier<ScrapDecoration?>? decoLive;
+  final String? selectedDecoId;
+  final void Function(ScrapDecoration deco)? onTapDeco;
+  final void Function(ScrapDecoration deco, ScrapGesture kind, Offset canvas)?
+  onDecoGestureStart;
   final List<ScrapConnection> links;
 
   /// Device pixels per canvas unit at the closest zoom, to size photos.
@@ -135,15 +156,16 @@ class _ScrapbookCanvasState extends State<ScrapbookCanvas> {
               rect: m.area.inflate(24),
               child: _MonthDecor(month: m),
             ),
-            if (m.yearRect != null)
+            if (w.showDates && m.yearRect != null)
               Positioned.fromRect(
                 rect: m.yearRect!,
                 child: _YearStamp(year: m.year),
               ),
-            Positioned.fromRect(
-              rect: m.headingRect,
-              child: _MonthHeading(label: monthLabel(m.year, m.month)),
-            ),
+            if (w.showDates)
+              Positioned.fromRect(
+                rect: m.headingRect,
+                child: _MonthHeading(label: monthLabel(m.year, m.month)),
+              ),
           ],
           if (layout.newStripRect != null)
             Positioned.fromRect(
@@ -163,30 +185,51 @@ class _ScrapbookCanvasState extends State<ScrapbookCanvas> {
               ),
             ),
           ),
-          for (final p in layout.pieces)
-            _LivePiece(
-              key: ValueKey('piece-${p.memory.id}'),
-              piece: p,
-              layout: layout,
-              live: live,
-              child: _PieceBody(
-                piece: p,
+          // Memories and decorations, lowest layer first (a piece of tape
+          // can sit over a photo's corner).
+          for (final (_, isDeco, index) in _order(layout, w.decorations))
+            if (isDeco)
+              _LiveDeco(
+                key: ValueKey('deco-${w.decorations[index].id}'),
+                deco: w.decorations[index],
+                origin: layout.origin,
+                live: w.decoLive,
                 editing: editing,
-                selected: p.memory.id == w.selectedId,
-                connectTarget:
-                    w.connectFromId != null && w.connectFromId != p.memory.id,
-                decodeWidth:
-                    (p.rect.width * w.photoScale * (w.lowRes ? 0.3 : 1))
-                        .round()
-                        .clamp(48, 1400),
-                view: w.view,
-                onTap: () => w.onTapPiece(p),
-                onStart: (kind, global) =>
-                    w.onGestureStart?.call(p, kind, toCanvas(global)),
+                selected: w.decorations[index].id == w.selectedDecoId,
+                onTap: () => w.onTapDeco?.call(w.decorations[index]),
+                onStart: (kind, global) => w.onDecoGestureStart?.call(
+                  w.decorations[index],
+                  kind,
+                  toCanvas(global),
+                ),
                 onUpdate: (global) => w.onGestureUpdate?.call(toCanvas(global)),
                 onEnd: () => w.onGestureEnd?.call(),
+              )
+            else if (layout.pieces[index] case final p)
+              _LivePiece(
+                key: ValueKey('piece-${p.memory.id}'),
+                piece: p,
+                layout: layout,
+                live: live,
+                child: _PieceBody(
+                  piece: p,
+                  editing: editing,
+                  selected: p.memory.id == w.selectedId,
+                  connectTarget:
+                      w.connectFromId != null && w.connectFromId != p.memory.id,
+                  decodeWidth:
+                      (p.rect.width * w.photoScale * (w.lowRes ? 0.3 : 1))
+                          .round()
+                          .clamp(48, 1400),
+                  view: w.view,
+                  onTap: () => w.onTapPiece(p),
+                  onStart: (kind, global) =>
+                      w.onGestureStart?.call(p, kind, toCanvas(global)),
+                  onUpdate: (global) =>
+                      w.onGestureUpdate?.call(toCanvas(global)),
+                  onEnd: () => w.onGestureEnd?.call(),
+                ),
               ),
-            ),
           // The selected memory's handles, on top of every memory. Small
           // phones use the toolbar's Size and Turn instead.
           if (editing &&
@@ -196,12 +239,49 @@ class _ScrapbookCanvasState extends State<ScrapbookCanvas> {
             if (w.selectedId case final id?)
               if (layout.pieceOf(id) case final piece?)
                 _SelectionHandles(
-                  piece: piece,
-                  layout: layout,
-                  live: live,
+                  listenable: live,
+                  resolve: () {
+                    final l = live.value;
+                    if (l == null || l.item.memoryId != piece.memory.id) {
+                      return (rect: piece.rect, turn: piece.turn);
+                    }
+                    return (
+                      rect: ScrapbookLayout.rectOf(
+                        l.item,
+                        piece.memory,
+                        piece.frame,
+                      ).shift(-layout.origin),
+                      turn: l.item.rotation,
+                    );
+                  },
                   view: w.view!,
                   onStart: (kind, global) =>
                       w.onGestureStart?.call(piece, kind, toCanvas(global)),
+                  onUpdate: (global) =>
+                      w.onGestureUpdate?.call(toCanvas(global)),
+                  onEnd: () => w.onGestureEnd?.call(),
+                ),
+          // The selected decoration's handles.
+          if (editing &&
+              w.decoLive != null &&
+              w.view != null &&
+              MediaQuery.sizeOf(context).width >= 340)
+            if (w.selectedDecoId case final id?)
+              if (w.decorations.where((d) => d.id == id).firstOrNull
+                  case final deco?)
+                _SelectionHandles(
+                  listenable: w.decoLive!,
+                  resolve: () {
+                    final l = w.decoLive!.value;
+                    final d = l != null && l.id == deco.id ? l : deco;
+                    return (
+                      rect: d.rect.shift(-layout.origin),
+                      turn: d.rotation,
+                    );
+                  },
+                  view: w.view!,
+                  onStart: (kind, global) =>
+                      w.onDecoGestureStart?.call(deco, kind, toCanvas(global)),
                   onUpdate: (global) =>
                       w.onGestureUpdate?.call(toCanvas(global)),
                   onEnd: () => w.onGestureEnd?.call(),
@@ -238,6 +318,123 @@ class _ScrapbookCanvasState extends State<ScrapbookCanvas> {
                 ),
         ],
       ),
+    );
+  }
+}
+
+/// Drawing order of memories and decorations: (layer, is decoration,
+/// index). On equal layers, memories go first.
+List<(int, bool, int)> _order(
+  ScrapbookLayout layout,
+  List<ScrapDecoration> decorations,
+) =>
+    [
+      for (var i = 0; i < layout.pieces.length; i++)
+        (layout.pieces[i].item.z, false, i),
+      for (var i = 0; i < decorations.length; i++) (decorations[i].z, true, i),
+    ]..sort((a, b) {
+      final byZ = a.$1.compareTo(b.$1);
+      if (byZ != 0) return byZ;
+      return (a.$2 ? 1 : 0).compareTo(b.$2 ? 1 : 0);
+    });
+
+/// A decoration on the board. In view mode it is just part of the picture
+/// (taps go through to the memories under it); in edit mode it can be
+/// selected and moved like a memory. Follows [live] while it is edited.
+class _LiveDeco extends StatelessWidget {
+  const _LiveDeco({
+    super.key,
+    required this.deco,
+    required this.origin,
+    required this.live,
+    required this.editing,
+    required this.selected,
+    required this.onTap,
+    required this.onStart,
+    required this.onUpdate,
+    required this.onEnd,
+  });
+
+  final ScrapDecoration deco;
+  final Offset origin;
+  final ValueNotifier<ScrapDecoration?>? live;
+  final bool editing;
+  final bool selected;
+  final VoidCallback onTap;
+  final void Function(ScrapGesture kind, Offset global) onStart;
+  final void Function(Offset global) onUpdate;
+  final VoidCallback onEnd;
+
+  Widget _at(ScrapDecoration d, {bool lifted = false}) {
+    final rect = d.rect.shift(-origin);
+    Widget body = DecorationView(decoration: d, size: rect.size);
+    if (!editing) {
+      body = IgnorePointer(child: ExcludeSemantics(child: body));
+    } else {
+      body = Semantics(
+        button: true,
+        selected: selected,
+        label: switch (d.kind) {
+          DecoKind.stickyNote => 'Sticky note: ${d.body ?? ''}',
+          DecoKind.sticker => 'Sticker',
+          DecoKind.tape => 'Washi tape',
+          DecoKind.doodle => 'Doodle',
+        },
+        excludeSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          onLongPressStart: (e) => onStart(ScrapGesture.move, e.globalPosition),
+          onLongPressMoveUpdate: (e) => onUpdate(e.globalPosition),
+          onLongPressEnd: (_) => onEnd(),
+          onLongPressCancel: onEnd,
+          onPanStart: selected
+              ? (e) => onStart(ScrapGesture.move, e.globalPosition)
+              : null,
+          onPanUpdate: selected ? (e) => onUpdate(e.globalPosition) : null,
+          onPanEnd: selected ? (_) => onEnd() : null,
+          onPanCancel: selected ? onEnd : null,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              body,
+              if (selected)
+                Positioned(
+                  left: -5,
+                  top: -5,
+                  right: -5,
+                  bottom: -5,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: NotePalette.rose, width: 2),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Positioned.fromRect(
+      rect: rect,
+      child: Transform.rotate(
+        angle: d.rotation * math.pi / 180,
+        child: Transform.scale(scale: lifted ? 1.05 : 1, child: body),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifier = live;
+    if (notifier == null) return _at(deco);
+    return ValueListenableBuilder<ScrapDecoration?>(
+      valueListenable: notifier,
+      builder: (context, l, _) =>
+          l != null && l.id == deco.id ? _at(l, lifted: true) : _at(deco),
     );
   }
 }
@@ -439,18 +636,19 @@ class _PieceBody extends StatelessWidget {
 /// follow the memory while it moves, grows or turns.
 class _SelectionHandles extends StatelessWidget {
   const _SelectionHandles({
-    required this.piece,
-    required this.layout,
-    required this.live,
+    required this.listenable,
+    required this.resolve,
     required this.view,
     required this.onStart,
     required this.onUpdate,
     required this.onEnd,
   });
 
-  final ScrapPiece piece;
-  final ScrapbookLayout layout;
-  final ValueNotifier<ScrapLive?> live;
+  /// Changes while the selected thing is being moved, sized or turned.
+  final Listenable listenable;
+
+  /// Where the selected thing is drawn right now, and its turn.
+  final ({Rect rect, double turn}) Function() resolve;
   final TransformationController view;
   final void Function(ScrapGesture kind, Offset global) onStart;
   final void Function(Offset global) onUpdate;
@@ -459,88 +657,77 @@ class _SelectionHandles extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: view,
-      builder: (context, _) => ValueListenableBuilder<ScrapLive?>(
-        valueListenable: live,
-        builder: (context, l, _) {
-          final s = view.value.getMaxScaleOnAxis();
-          final d = 34 / s; // about 34 screen pixels
-          final m = d * 1.6; // room around the memory for the handles
-          final mine = l != null && l.item.memoryId == piece.memory.id;
-          final rect = mine
-              ? ScrapbookLayout.rectOf(
-                  l.item,
-                  piece.memory,
-                  piece.frame,
-                ).shift(-layout.origin)
-              : piece.rect;
-          final turn = mine ? l.item.rotation : piece.turn;
+      animation: Listenable.merge([view, listenable]),
+      builder: (context, _) {
+        final s = view.value.getMaxScaleOnAxis();
+        final d = 34 / s; // about 34 screen pixels
+        final m = d * 1.6; // room around the item for the handles
+        final (:rect, :turn) = resolve();
 
-          Widget handle(ScrapGesture kind, IconData icon, String label) =>
-              Semantics(
-                button: true,
-                label: label,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanStart: (e) => onStart(kind, e.globalPosition),
-                  onPanUpdate: (e) => onUpdate(e.globalPosition),
-                  onPanEnd: (_) => onEnd(),
-                  onPanCancel: onEnd,
-                  child: Center(
-                    child: Container(
-                      width: d * 0.72,
-                      height: d * 0.72,
-                      decoration: BoxDecoration(
-                        color: NotePalette.rose,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2 / s),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
-                            blurRadius: 6 / s,
-                          ),
-                        ],
-                      ),
-                      child: Icon(icon, size: d * 0.42, color: Colors.white),
+        Widget handle(ScrapGesture kind, IconData icon, String label) =>
+            Semantics(
+              button: true,
+              label: label,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanStart: (e) => onStart(kind, e.globalPosition),
+                onPanUpdate: (e) => onUpdate(e.globalPosition),
+                onPanEnd: (_) => onEnd(),
+                onPanCancel: onEnd,
+                child: Center(
+                  child: Container(
+                    width: d * 0.72,
+                    height: d * 0.72,
+                    decoration: BoxDecoration(
+                      color: NotePalette.rose,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2 / s),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 6 / s,
+                        ),
+                      ],
                     ),
+                    child: Icon(icon, size: d * 0.42, color: Colors.white),
                   ),
                 ),
-              );
-
-          return Positioned.fromRect(
-            rect: rect.inflate(m),
-            child: Transform.rotate(
-              angle: turn * math.pi / 180,
-              child: Stack(
-                children: [
-                  Positioned(
-                    left: m + rect.width - d / 2,
-                    top: m + rect.height - d / 2,
-                    width: d,
-                    height: d,
-                    child: handle(
-                      ScrapGesture.resize,
-                      Icons.open_in_full_rounded,
-                      'Resize',
-                    ),
-                  ),
-                  Positioned(
-                    left: m + rect.width / 2 - d / 2,
-                    top: m - d * 1.25 - d / 2,
-                    width: d,
-                    height: d,
-                    child: handle(
-                      ScrapGesture.rotate,
-                      Icons.rotate_right_rounded,
-                      'Turn',
-                    ),
-                  ),
-                ],
               ),
+            );
+
+        return Positioned.fromRect(
+          rect: rect.inflate(m),
+          child: Transform.rotate(
+            angle: turn * math.pi / 180,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: m + rect.width - d / 2,
+                  top: m + rect.height - d / 2,
+                  width: d,
+                  height: d,
+                  child: handle(
+                    ScrapGesture.resize,
+                    Icons.open_in_full_rounded,
+                    'Resize',
+                  ),
+                ),
+                Positioned(
+                  left: m + rect.width / 2 - d / 2,
+                  top: m - d * 1.25 - d / 2,
+                  width: d,
+                  height: d,
+                  child: handle(
+                    ScrapGesture.rotate,
+                    Icons.rotate_right_rounded,
+                    'Turn',
+                  ),
+                ),
+              ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
