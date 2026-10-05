@@ -7,6 +7,7 @@ import '../../theme/app_spacing.dart';
 import '../atoms/app_button.dart';
 import '../effects/heartbeat.dart';
 import '../effects/motion.dart';
+import '../effects/smooth_scroll.dart';
 
 /// The exact Therabot subtitle, shown wherever Therabot introduces itself.
 const therabotSubtitle = 'A private relationship reflection assistant';
@@ -29,7 +30,8 @@ class TherabotPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final list = ListView(
+    Widget list(ScrollController scroll) => ListView(
+      controller: scroll,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.screenMargin),
       children: [
@@ -46,9 +48,11 @@ class TherabotPage extends StatelessWidget {
     );
     return Scaffold(
       appBar: AppBar(title: Text(title), actions: actions),
-      body: onRefresh == null
-          ? list
-          : RefreshIndicator(onRefresh: onRefresh!, child: list),
+      body: SmoothScroll(
+        builder: (scroll) => onRefresh == null
+            ? list(scroll)
+            : RefreshIndicator(onRefresh: onRefresh!, child: list(scroll)),
+      ),
     );
   }
 }

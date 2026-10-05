@@ -12,6 +12,7 @@ import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/avatar_circle.dart';
 import '../widgets/atoms/section_label.dart';
 import 'splash_screen.dart';
+import '../widgets/effects/smooth_scroll.dart';
 
 /// Your profile: photo, name, birthday, and your partner at a glance.
 /// You can only change your own details (the database enforces it).
@@ -25,6 +26,15 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  /// Mouse-wheel scrolling glides instead of jumping.
+  final _scroll = SmoothScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
   late Profile _me = widget.profile;
   Profile? _partner;
   bool _loading = true;
@@ -210,6 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
+                controller: _scroll,
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppSpacing.screenMargin),
                 children: [

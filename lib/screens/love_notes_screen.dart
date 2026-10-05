@@ -20,6 +20,7 @@ import '../widgets/notes/note_style.dart';
 import 'love_note_detail_screen.dart';
 import 'time_capsules/time_capsule_screen.dart';
 import 'write_love_note_screen.dart';
+import '../widgets/effects/smooth_scroll.dart';
 
 /// Love Notes: every note you can read, filtered by type, plus Previous
 /// Capsules (the older notes-based Time Capsules, which still open by
@@ -35,6 +36,9 @@ class LoveNotesScreen extends StatefulWidget {
 }
 
 class _LoveNotesScreenState extends State<LoveNotesScreen> {
+  /// Mouse-wheel scrolling glides instead of jumping.
+  final _scroll = SmoothScrollController();
+
   List<LoveNote> _notes = [];
   List<SealedNote> _sealed = [];
   Map<String, Profile> _people = {};
@@ -75,6 +79,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _tick?.cancel();
     final live = _live;
     if (live != null) NoteService.stopListening(live);
@@ -186,6 +191,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
+                    controller: _scroll,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(
                       0,

@@ -49,6 +49,7 @@ import 'question_archive_screen.dart';
 import 'question_sheet.dart';
 import 'time_capsules/time_capsule_screen.dart';
 import 'write_love_note_screen.dart';
+import '../widgets/effects/smooth_scroll.dart';
 
 /// Home: how you are feeling today, front and centre, then shortcuts and
 /// the next special day. Recent activity lives behind the bell.
@@ -67,6 +68,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  /// Mouse-wheel scrolling glides instead of jumping.
+  final _scroll = SmoothScrollController();
+
   Couple? _couple;
   List<Profile> _members = [];
   List<MoodEntry> _moods = [];
@@ -158,6 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _liveDebounce?.cancel();
     final live = _live;
     if (live != null) ActivityService.stopListening(live);
@@ -887,6 +892,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
+            controller: _scroll,
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.screenMargin,

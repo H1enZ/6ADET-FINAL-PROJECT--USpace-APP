@@ -24,6 +24,7 @@ import 'private_reflection_page.dart';
 import 'therabot_chat_screen.dart';
 import 'shared_reflection_view.dart';
 import 'therabot_history_screen.dart';
+import '../../widgets/effects/smooth_scroll.dart';
 
 /// Therabot: "A private relationship reflection assistant".
 ///
@@ -55,6 +56,9 @@ class TherabotScreen extends StatefulWidget {
 }
 
 class _TherabotScreenState extends State<TherabotScreen> {
+  /// Mouse-wheel scrolling glides instead of jumping.
+  final _scroll = SmoothScrollController();
+
   TherabotSession? _session;
   MySubmission? _submission;
 
@@ -93,6 +97,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _poll?.cancel();
     super.dispose();
   }
@@ -539,6 +544,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
           child: RefreshIndicator(
             onRefresh: _load,
             child: ListView(
+              controller: _scroll,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screenMargin,
