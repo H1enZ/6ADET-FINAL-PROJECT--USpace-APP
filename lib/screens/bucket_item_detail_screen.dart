@@ -91,7 +91,6 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
         _item = fresh;
         _changed = true;
       });
-      _showMessage('Changes saved');
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));
@@ -115,9 +114,6 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
       _changed = true;
       await _load();
       if (!mounted) return;
-      _showMessage(_item.isFunded
-          ? 'Goal reached! ${formatPeso(result.amount)} added.'
-          : '${formatPeso(result.amount)} added to your savings');
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));

@@ -36,8 +36,8 @@ import 'memory_detail_screen.dart';
 /// lines. That arrangement is shared by both of you and saved separately
 /// from the memories (a memory's date and content never change).
 ///
-/// Only the scrapbook zooms: the header, Add, zoom controls, the minimap
-/// and the editing toolbar stay normal size.
+/// Only the scrapbook zooms (pinch, or the mouse wheel / trackpad): the
+/// header, Add and the editing toolbar stay normal size.
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key, required this.profile});
 
@@ -369,7 +369,6 @@ class _TimelineScreenState extends State<TimelineScreen>
     await _load();
     if (!mounted) return;
     showFloatingHearts(context);
-    _showMessage('Memory saved');
   }
 
   Future<void> _open(Memory memory) async {
@@ -486,30 +485,6 @@ class _TimelineScreenState extends State<TimelineScreen>
       end: target,
     ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOutCubic));
     _anim.forward(from: 0);
-  }
-
-  /// Zoom in or out by [factor] around the middle of the screen.
-  void _zoomBy(double factor) {
-    final vp = _viewport;
-    if (vp == null) return;
-    final s = _scale, t = _translation;
-    final focal = Offset(vp.width / 2, vp.height / 2);
-    final point = (focal - t) / s; // the canvas spot under the middle
-    final next = (s * factor).clamp(_minScale, _maxScale);
-    _animateTo(next, focal - point * next);
-  }
-
-  /// See all: the whole story, both ways: the box around every memory,
-  /// heading and line, fitted to the screen and centred.
-  void _seeAll() {
-    final layout = _layout, vp = _viewport;
-    if (layout == null || vp == null) return;
-    final c = layout.contentRect.inflate(_room / 2);
-    final s = math
-        .min(vp.width / c.width, vp.height / c.height)
-        .clamp(_minScale, _defaultScale)
-        .toDouble();
-    _animateTo(s, Offset(vp.width / 2, vp.height / 2) - c.center * s);
   }
 
   /// Back to the normal browsing size, with [rect] (canvas units) in view.
@@ -757,7 +732,6 @@ class _TimelineScreenState extends State<TimelineScreen>
       _selectedDeco = null;
     });
     showFloatingHearts(context);
-    _showMessage('Memory saved');
   }
 
   /// The selected memory's own editor (title, story, date, photos).
@@ -798,7 +772,6 @@ class _TimelineScreenState extends State<TimelineScreen>
     final d = _selectedDecoration;
     if (d == null) return;
     _applyDeco({d.id: null});
-    _showMessage('Removed. Undo brings it back.');
   }
 
   Future<void> _turnDeco() async {
@@ -1417,11 +1390,6 @@ class _TimelineScreenState extends State<TimelineScreen>
               Rect.fromLTRB(0, m.top, layout.width, m.bottom),
               alignTop: true,
             ),
-            onJump: (s, t) => _view.value = _matrix(s, _clamp(s, t)),
-            onJumpAnimated: _animateTo,
-            onZoomIn: () => _zoomBy(1.6),
-            onZoomOut: () => _zoomBy(1 / 1.6),
-            onSeeAll: _seeAll,
             hideDates: _hideDates,
             onToggleDates: _toggleDates,
             overlay: !_editing
@@ -1734,8 +1702,8 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// The zoomable scrapbook plus the controls that sit on top of it at
-/// normal size: month labels when far out, the minimap, and zoom buttons.
+/// The zoomable scrapbook plus what sits on top of it at normal size: month
+/// labels when far out, and the Hide / Show dates button.
 class _ScrapbookViewport extends StatelessWidget {
   const _ScrapbookViewport({
     required this.layout,
@@ -1749,11 +1717,6 @@ class _ScrapbookViewport extends StatelessWidget {
     required this.onInteractionStart,
     required this.onInteractionEnd,
     required this.onMonth,
-    required this.onJump,
-    required this.onJumpAnimated,
-    required this.onZoomIn,
-    required this.onZoomOut,
-    required this.onSeeAll,
     required this.hideDates,
     required this.onToggleDates,
     this.overlay,
@@ -1773,11 +1736,6 @@ class _ScrapbookViewport extends StatelessWidget {
   final VoidCallback onInteractionStart;
   final VoidCallback onInteractionEnd;
   final void Function(ScrapMonth) onMonth;
-  final void Function(double s, Offset t) onJump;
-  final void Function(double s, Offset t) onJumpAnimated;
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final VoidCallback onSeeAll;
 
   /// The editing toolbar and banners, on top of everything.
   final Widget? overlay;
@@ -1813,36 +1771,16 @@ class _ScrapbookViewport extends StatelessWidget {
               onMonth: onMonth,
             ),
           ),
-        // Zoomed out: hide or show the dates, above the zoom controls.
+        // Zoomed out: hide or show the dates (above the editing toolbar
+        // while editing).
         Positioned(
           right: 12,
-          bottom: (editing ? 96 : 16) + 56,
+          bottom: editing ? 96 : 16,
           child: _DatesToggle(
             view: view,
             defaultScale: defaultScale,
             hidden: hideDates,
             onTap: onToggleDates,
-          ),
-        ),
-        Positioned(
-          right: 8,
-          top: 10,
-          child: _Minimap(
-            layout: layout,
-            view: view,
-            viewport: viewport,
-            onJump: onJump,
-            onJumpAnimated: onJumpAnimated,
-          ),
-        ),
-        Positioned(
-          right: 12,
-          // Above the editing toolbar while editing.
-          bottom: editing ? 96 : 16,
-          child: _ZoomControls(
-            onZoomIn: onZoomIn,
-            onZoomOut: onZoomOut,
-            onSeeAll: onSeeAll,
           ),
         ),
         ?overlay,
@@ -2013,190 +1951,6 @@ class _MonthChip extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// A small map of the whole board in the corner: each month as a soft
-/// patch, and a frame for the part on screen. Tap or drag it to travel.
-class _Minimap extends StatelessWidget {
-  const _Minimap({
-    required this.layout,
-    required this.view,
-    required this.viewport,
-    required this.onJump,
-    required this.onJumpAnimated,
-  });
-
-  final ScrapbookLayout layout;
-  final TransformationController view;
-  final Size viewport;
-  final void Function(double s, Offset t) onJump;
-  final void Function(double s, Offset t) onJumpAnimated;
-
-  static const _maxW = 78.0;
-  static const _maxH = 150.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final area = layout.contentRect.inflate(60);
-    // As big as fits in the corner, keeping the board's shape.
-    final k = math.min(_maxW / area.width, _maxH / area.height);
-    final size = Size(area.width * k, area.height * k);
-
-    void go(Offset local, {required bool animate}) {
-      final m = view.value;
-      final s = m.getMaxScaleOnAxis();
-      final canvas = area.topLeft + local / k;
-      final t = Offset(viewport.width / 2, viewport.height / 2) - canvas * s;
-      animate ? onJumpAnimated(s, t) : onJump(s, t);
-    }
-
-    return AnimatedBuilder(
-      animation: view,
-      builder: (context, _) {
-        final m = view.value;
-        final s = m.getMaxScaleOnAxis();
-        final tr = m.getTranslation();
-        final visible = Rect.fromLTWH(
-          -tr.x / s,
-          -tr.y / s,
-          viewport.width / s,
-          viewport.height / s,
-        );
-        // Nothing to find when everything is already on screen.
-        if (visible.contains(area.topLeft) &&
-            visible.contains(area.bottomRight)) {
-          return const SizedBox.shrink();
-        }
-        return Semantics(
-          label: 'Map of the scrapbook. Tap to go there',
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (d) => go(d.localPosition, animate: true),
-            onPanUpdate: (d) => go(d.localPosition, animate: false),
-            child: Container(
-              width: size.width,
-              height: size.height,
-              decoration: BoxDecoration(
-                color: const Color(0xCC1E0F1C),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: NotePalette.pink.withValues(alpha: 0.3),
-                ),
-              ),
-              child: CustomPaint(
-                painter: _MinimapPainter(
-                  months: [
-                    for (final mo in layout.months) _toMap(mo.area, area, k),
-                  ],
-                  view: _toMap(visible, area, k),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  static Rect _toMap(Rect r, Rect area, double k) => Rect.fromLTRB(
-    (r.left - area.left) * k,
-    (r.top - area.top) * k,
-    (r.right - area.left) * k,
-    (r.bottom - area.top) * k,
-  );
-}
-
-class _MinimapPainter extends CustomPainter {
-  _MinimapPainter({required this.months, required this.view});
-
-  final List<Rect> months;
-  final Rect view;
-
-  @override
-  void paint(Canvas canvas, Size box) {
-    canvas.clipRect(Offset.zero & box);
-    final patch = Paint()..color = NotePalette.pink.withValues(alpha: 0.28);
-    for (final r in months) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(r, const Radius.circular(2)),
-        patch,
-      );
-    }
-    final frame = view.intersect(Offset.zero & box);
-    if (frame.width > 0 && frame.height > 0) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(frame, const Radius.circular(2)),
-        Paint()..color = NotePalette.rose.withValues(alpha: 0.18),
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(frame, const Radius.circular(2)),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.4
-          ..color = NotePalette.rose,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_MinimapPainter old) =>
-      old.view != view || old.months.length != months.length;
-}
-
-class _ZoomControls extends StatelessWidget {
-  const _ZoomControls({
-    required this.onZoomIn,
-    required this.onZoomOut,
-    required this.onSeeAll,
-  });
-
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
-  final VoidCallback onSeeAll;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget button(String tip, IconData icon, VoidCallback onTap) => IconButton(
-      tooltip: tip,
-      onPressed: onTap,
-      icon: Icon(icon, color: NotePalette.cream, size: 22),
-    );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0xE62A1426),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: NotePalette.pink.withValues(alpha: 0.35)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 12),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          button('Zoom out', Icons.remove_rounded, onZoomOut),
-          // Narrow phones: just the icon, so the bar covers less.
-          if (MediaQuery.sizeOf(context).width < 360)
-            IconButton(
-              tooltip: 'See all',
-              onPressed: onSeeAll,
-              icon: const Icon(
-                Icons.zoom_out_map_rounded,
-                color: NotePalette.pink,
-                size: 20,
-              ),
-            )
-          else
-            TextButton.icon(
-              onPressed: onSeeAll,
-              style: TextButton.styleFrom(foregroundColor: NotePalette.pink),
-              icon: const Icon(Icons.zoom_out_map_rounded, size: 18),
-              label: const Text('See all'),
-            ),
-          button('Zoom in', Icons.add_rounded, onZoomIn),
-        ],
       ),
     );
   }

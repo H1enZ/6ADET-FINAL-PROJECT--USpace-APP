@@ -221,7 +221,6 @@ class _TherabotScreenState extends State<TherabotScreen> {
     try {
       await action();
       if (!mounted) return;
-      if (done != null) therabotToast(context, done);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -331,7 +330,6 @@ class _TherabotScreenState extends State<TherabotScreen> {
     if (!mounted) return;
     if (approved == true) {
       showFloatingHearts(context, emoji: '💗');
-      therabotToast(context, 'Approved. Your part is done 💗');
     }
     await _load();
   }

@@ -87,7 +87,6 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
         _page = 0;
       });
       if (_pages.hasClients) _pages.jumpToPage(0);
-      _showMessage('Changes saved');
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));
@@ -110,7 +109,6 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
         _memory = fresh;
         _changed = true;
       });
-      _showMessage('Moved');
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));

@@ -327,9 +327,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ];
         _preview = null;
       });
-      _showMessage(
-        _partner == null ? 'Mood saved' : 'Mood shared with $_partnerName',
-      );
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -357,7 +354,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _preview = null;
       _showPartner = false;
     });
-    _showMessage('Mood saved');
   }
 
   // ---------------------------------------------------------------- actions
@@ -375,7 +371,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (saved != true) return;
     await _load();
     if (!mounted) return;
-    _showMessage('Memory saved');
   }
 
   Future<void> _answerQuestion() async {
@@ -395,7 +390,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await _load();
     if (!mounted) return;
     showFloatingHearts(context, emoji: '💌');
-    _showMessage('Answer saved');
   }
 
   Future<void> _writeNote() async {
@@ -409,7 +403,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await _load();
     if (!mounted) return;
     showEnvelopeFly(context, emoji: '💌');
-    _showMessage('Love note sent to $_partnerName 💌');
   }
 
   Future<void> _openChat() async {
@@ -578,7 +571,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await AffectionService.send(coupleId: _coupleId, kind: 'hug');
       if (!mounted) return true;
       showGesturePulse(context, '🫂');
-      _showMessage('Hug sent to $_partnerName 🫂');
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -612,7 +604,6 @@ class _HomeScreenState extends State<HomeScreen> {
       await CoupleService.setAnniversary(couple.id, picked);
       await _load();
       if (!mounted) return;
-      _showMessage('Anniversary saved');
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));
@@ -1012,7 +1003,7 @@ class _InviteBanner extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Code copied')));
+    );
   }
 
   @override

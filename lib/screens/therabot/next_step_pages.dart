@@ -109,7 +109,6 @@ class _TherabotComfortPageState extends State<TherabotComfortPage> {
       );
       if (!mounted) return;
       showGesturePulse(context, o.emoji);
-      therabotToast(context, 'Sent to ${widget.partnerName} ${o.emoji}');
       setState(() {
         _picked = null;
         _message.clear();
@@ -250,7 +249,6 @@ class _TherabotTalkPageState extends State<TherabotTalkPage> {
     ].join('\n');
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    therabotToast(context, 'Questions copied');
   }
 
   @override
@@ -520,7 +518,6 @@ class _TherabotSpacePageState extends State<TherabotSpacePage> {
         message: text,
       );
       if (!mounted) return;
-      therabotToast(context, '${widget.partnerName} will see your note 💗');
     } catch (e) {
       if (!mounted) return;
       therabotToast(context, therabotError(e).message);
@@ -771,7 +768,6 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
     );
     if (!sent || !mounted) return;
     showEnvelopeFly(context);
-    therabotToast(context, 'Appreciation sent to ${widget.partnerName} 💌');
   }
 
   @override
@@ -929,7 +925,6 @@ class _TherabotPrivateNotePageState extends State<TherabotPrivateNotePage> {
         done: false,
       );
       if (!mounted) return;
-      therabotToast(context, 'Saved privately in Therabot › Saved notes.');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;

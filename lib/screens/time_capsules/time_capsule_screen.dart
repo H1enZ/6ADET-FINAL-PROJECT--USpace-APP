@@ -183,9 +183,6 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
       for (final id in sealedNow) {
         _pressed[id] = (_pressed[id] ?? 0) + 1;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Your Time Capsule is now sealed.')),
-      );
       _load(); // its contents are no longer yours to read
     } else if (_oldSealed.any((n) => n.isReady(now: now))) {
       _load(); // a previous capsule's moment arrived
@@ -224,9 +221,6 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
             if (n.wasCapsule) n,
         ];
       } catch (_) {} // the new capsules still show without them
-      final justOpened = oldOpened
-          .where((n) => _oldSealed.any((s) => s.id == n.id))
-          .length;
       if (!mounted) return;
       setState(() {
         _names = {for (final m in members) m.userId: m.displayName};
@@ -247,13 +241,6 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
         _error = null;
         _loading = false;
       });
-      if (justOpened > 0) {
-        _showMessage(
-          justOpened == 1
-              ? 'A previous capsule just opened. It is under Opened.'
-              : '$justOpened previous capsules just opened. They are under Opened.',
-        );
-      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -303,7 +290,6 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     if (!mounted) return;
     if (outcome == ComposerOutcome.sealed) {
       _choose(_Filter.sealed);
-      _showMessage('Sealed. You can still edit or cancel it for ten minutes.');
     } else if (outcome == ComposerOutcome.deleteDraft) {
       final draft = _capsules
           .where((c) => c.senderId == _myId && c.status == CapsuleStatus.draft)
@@ -384,7 +370,6 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
         c.id,
         sealed: c.status == CapsuleStatus.sealed,
       );
-      _showMessage('Capsule cancelled.');
     } catch (e) {
       _showMessage(friendlyError(e));
     }
@@ -414,7 +399,6 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     if (ok != true) return;
     try {
       await NoteService.cancelCapsule(n.id);
-      _showMessage('Capsule cancelled.');
     } catch (e) {
       _showMessage(friendlyError(e));
     }

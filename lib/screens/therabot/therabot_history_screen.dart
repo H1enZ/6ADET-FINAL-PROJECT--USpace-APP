@@ -68,7 +68,6 @@ class _TherabotHistoryScreenState extends State<TherabotHistoryScreen> {
     try {
       await action();
       if (!mounted) return;
-      therabotToast(context, done);
     } catch (e) {
       if (!mounted) return;
       therabotToast(context, therabotError(e).message);
@@ -102,14 +101,8 @@ class _TherabotHistoryScreenState extends State<TherabotHistoryScreen> {
     );
     if (ok != true) return;
     try {
-      final deleted = await TherabotService.requestDelete(e.sessionId, true);
+      await TherabotService.requestDelete(e.sessionId, true);
       if (!mounted) return;
-      therabotToast(
-        context,
-        deleted
-            ? 'Deleted for both of you'
-            : 'Asked. Waiting for ${widget.partnerName}.',
-      );
     } catch (err) {
       if (!mounted) return;
       therabotToast(context, therabotError(err).message);

@@ -162,7 +162,6 @@ class _SharedMemoriesPageState extends State<SharedMemoriesPage> {
       );
       if (!mounted) return;
       showEnvelopeFly(context);
-      therabotToast(context, 'Sent to ${widget.partnerName} 💌');
     } catch (e) {
       if (!mounted) return;
       therabotToast(context, therabotError(e).message);

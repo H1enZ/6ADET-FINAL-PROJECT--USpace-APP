@@ -138,10 +138,6 @@ class _PrivateReflectionPageState extends State<PrivateReflectionPage> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (!ok) return;
-    therabotToast(
-      context,
-      'Saved privately. Come back whenever you are ready.',
-    );
     Navigator.of(context).pop(false);
   }
 
@@ -284,10 +280,6 @@ class _PrivateReflectionPageState extends State<PrivateReflectionPage> {
       if (!mounted) return;
       setState(() => _busy = false);
       if (!ok) return;
-      therabotToast(
-        context,
-        'Saved privately. Come back whenever you are ready.',
-      );
     }
     Navigator.of(context).pop(false);
   }

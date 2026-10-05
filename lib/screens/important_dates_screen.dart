@@ -67,7 +67,6 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
       _changed = true;
       await _load();
       if (!mounted) return;
-      _showMessage('Saved "${result.title}"');
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));

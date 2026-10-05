@@ -84,7 +84,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await change();
       await _load();
       if (!mounted) return;
-      _showMessage(done);
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));

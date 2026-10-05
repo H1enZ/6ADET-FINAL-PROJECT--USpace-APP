@@ -90,7 +90,6 @@ class _BucketListScreenState extends State<BucketListScreen> {
     if (saved != true) return;
     await _load();
     if (!mounted) return;
-    _showMessage('Added to your bucket list');
   }
 
   Future<void> _open(BucketItem item) async {
@@ -163,7 +162,6 @@ class _BucketListScreenState extends State<BucketListScreen> {
       setState(() {
         _items = _items.where((current) => current.id != item.id).toList();
       });
-      _showMessage('Bucket-list item deleted');
     } catch (e) {
       if (!mounted) return;
       _showMessage(friendlyError(e));

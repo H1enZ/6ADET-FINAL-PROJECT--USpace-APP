@@ -114,11 +114,6 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
         );
         if (!mounted) return;
         showFloatingHearts(context, emoji: '💌');
-        _showMessage(
-          justOpened.length == 1
-              ? 'A time capsule just opened 💌'
-              : '${justOpened.length} time capsules just opened 💌',
-        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -128,9 +123,6 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
       });
     }
   }
-
-  void _showMessage(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   String _nameOf(String userId) => userId == _myId
       ? 'You'
@@ -146,7 +138,6 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
     await _load();
     if (!mounted) return;
     showEnvelopeFly(context, emoji: '💌');
-    _showMessage('Sent to $_partnerName');
   }
 
   Future<void> _open(LoveNote note) async {

@@ -301,7 +301,6 @@ class _ChatScreenState extends State<ChatScreen> {
         case MessageAction.copy:
           await Clipboard.setData(ClipboardData(text: m.body!));
           if (!mounted) return;
-          _showMessage('Copied');
           return;
         case MessageAction.edit:
           final text = await showDialog<String>(
