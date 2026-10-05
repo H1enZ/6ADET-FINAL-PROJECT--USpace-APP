@@ -85,7 +85,9 @@ class _NextStepsScreenState extends State<NextStepsScreen> {
   }
 
   Future<void> _choose(TherabotChoice choice) async {
-    if (_busy || _session.myChoice == choice || _session.partnerChoice != null) {
+    if (_busy ||
+        _session.myChoice == choice ||
+        _session.partnerChoice != null) {
       return;
     }
     setState(() => _busy = true);
@@ -311,38 +313,33 @@ class _Grid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final choices = TherabotChoice.values;
+    const choices = TherabotChoice.offered;
+    Widget card(TherabotChoice c) => _ChoiceCard(
+      choice: c,
+      art: art[c]!,
+      selected: selected == c,
+      busy: busy,
+      onTap: onTap,
+    );
+    // Two to a row; an odd one out gets the last row to itself.
     Widget row(int i) => IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: _ChoiceCard(
-              choice: choices[i],
-              art: art[choices[i]]!,
-              selected: selected == choices[i],
-              busy: busy,
-              onTap: onTap,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: _ChoiceCard(
-              choice: choices[i + 1],
-              art: art[choices[i + 1]]!,
-              selected: selected == choices[i + 1],
-              busy: busy,
-              onTap: onTap,
-            ),
-          ),
+          Expanded(child: card(choices[i])),
+          if (i + 1 < choices.length) ...[
+            const SizedBox(width: AppSpacing.md),
+            Expanded(child: card(choices[i + 1])),
+          ],
         ],
       ),
     );
     return Column(
       children: [
-        row(0),
-        const SizedBox(height: AppSpacing.md),
-        row(2),
+        for (var i = 0; i < choices.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: AppSpacing.md),
+          row(i),
+        ],
       ],
     );
   }

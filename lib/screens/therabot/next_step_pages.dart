@@ -17,6 +17,7 @@ import '../../widgets/effects/motion.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
 import '../../models/love_note.dart';
 import '../write_love_note_screen.dart';
+import 'shared_memories_page.dart';
 
 // The four next steps after a shared reflection. Each is a choice for one
 // person; none is better than another. Nothing here is ever sent without a
@@ -749,39 +750,15 @@ class TherabotReconnectPage extends StatefulWidget {
 }
 
 class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
-  bool _sending = false;
-
-  /// One more tap to be sure, so nothing is sent by accident.
-  Future<void> _send(String kind, String emoji, String what) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Send ${widget.partnerName} $what? $emoji'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Not now'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Send'),
-          ),
-        ],
+  void _memories() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SharedMemoriesPage(
+          coupleId: widget.coupleId,
+          partnerName: widget.partnerName,
+        ),
       ),
     );
-    if (ok != true || !mounted) return;
-    setState(() => _sending = true);
-    try {
-      await AffectionService.send(coupleId: widget.coupleId, kind: kind);
-      if (!mounted) return;
-      showGesturePulse(context, emoji);
-      therabotToast(context, 'Sent to ${widget.partnerName} $emoji');
-    } catch (e) {
-      if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
   }
 
   Future<void> _appreciation() async {
@@ -876,31 +853,16 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
         ),
         const SizedBox(height: AppSpacing.xl),
         tile(
-          '🫂',
-          'Hug',
-          'Send ${widget.partnerName} a warm hug.',
-          _sending ? null : () => _send('hug', '🫂', 'a hug'),
-        ),
-        tile(
-          '💋',
-          'Kiss',
-          'A little kiss, from you to them.',
-          _sending ? null : () => _send('kiss', '💋', 'a kiss'),
+          '📸',
+          'Shared memories',
+          'Look back on a favourite moment from your Timeline together.',
+          _memories,
         ),
         tile(
           '💌',
-          'Write a short appreciation',
-          'Tell ${widget.partnerName} one thing you appreciate about them.',
+          'Write an appreciation letter',
+          'Tell ${widget.partnerName} what you appreciate about them.',
           _appreciation,
-        ),
-        // Choosing memories to revisit needs Therabot's context phase. Until
-        // then it is shown, honestly, as not available: no made-up memories.
-        tile(
-          '📸',
-          'Shared memories',
-          'Look back at a favourite moment together.',
-          null,
-          badge: 'Coming later',
         ),
       ],
     );
@@ -910,7 +872,7 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
 // ------------------------------------------------- waiting: private notes
 
 /// "Clarify my thoughts" or "Draft something for later" while you wait.
-/// Saved only as a private note (Let's work it out › Our saved notes, not
+/// Saved only as a private note (Therabot › Saved notes, not
 /// shared), never sent, never given to Therabot.
 class TherabotPrivateNotePage extends StatefulWidget {
   const TherabotPrivateNotePage({
@@ -967,10 +929,7 @@ class _TherabotPrivateNotePageState extends State<TherabotPrivateNotePage> {
         done: false,
       );
       if (!mounted) return;
-      therabotToast(
-        context,
-        "Saved privately in Let's work it out › Our saved notes.",
-      );
+      therabotToast(context, 'Saved privately in Therabot › Saved notes.');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
@@ -1001,7 +960,7 @@ class _TherabotPrivateNotePageState extends State<TherabotPrivateNotePage> {
         Text(
           widget.draft
               ? 'Write something you might want to say later. Nothing is sent: it is '
-                    "kept privately in Let's work it out › Our saved notes, for you to "
+                    'kept privately in Therabot › Saved notes, for you to '
                     'share yourself later if you choose.'
               : 'A quiet place to untangle your thoughts while you wait. This is just for you.',
           style: theme.textTheme.bodyMedium?.copyWith(

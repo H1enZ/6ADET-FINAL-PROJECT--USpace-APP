@@ -66,6 +66,10 @@ enum TherabotChoice {
   final String label;
   final String blurb;
 
+  /// The steps offered now. Comfort is no longer offered, but it stays so
+  /// past reflections that chose it still show it.
+  static const offered = [talk, space, reconnect];
+
   static TherabotChoice? from(Object? v) {
     for (final c in values) {
       if (c.value == v) return c;
