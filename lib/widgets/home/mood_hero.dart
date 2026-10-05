@@ -13,6 +13,9 @@ import 'mood_particles.dart';
 /// quote and the mood's illustration. It follows the mood being previewed,
 /// so tapping a mood below changes it straight away; nothing is saved until
 /// Share mood is pressed, and until then it says "not shared yet".
+///
+/// Tapping the card switches to your partner's mood today and back. A note
+/// shared with the mood replaces the built-in quote.
 class MoodHero extends StatelessWidget {
   const MoodHero({
     super.key,
@@ -23,6 +26,10 @@ class MoodHero extends StatelessWidget {
     required this.hasPartner,
     required this.onShare,
     required this.onAddNote,
+    this.note,
+    this.showingPartner = false,
+    this.switchLabel,
+    this.onSwitch,
     this.actionsKey,
   });
 
@@ -41,6 +48,17 @@ class MoodHero extends StatelessWidget {
   final bool hasPartner;
   final VoidCallback onShare;
   final VoidCallback onAddNote;
+
+  /// The note shared with [mood], shown instead of the mood's quote.
+  final String? note;
+
+  /// True while the card shows the partner's mood instead of yours.
+  final bool showingPartner;
+
+  /// "See Alex's mood" / "See yours": switches between the two of you.
+  /// Null without a partner.
+  final String? switchLabel;
+  final VoidCallback? onSwitch;
 
   /// On the Share / Add a note row, so Home can scroll it into view.
   final Key? actionsKey;
@@ -90,6 +108,14 @@ class MoodHero extends StatelessWidget {
       ),
     );
     final switchTime = still ? Duration.zero : AppMotion.medium;
+    final shownNote = note?.trim() ?? '';
+    final hasNote = shownNote.isNotEmpty;
+    final quote = hasNote
+        ? '“$shownNote”'
+        : visual?.quote ??
+              (showingPartner
+                  ? 'Their mood shows here once they share it.'
+                  : 'Pick a mood below to share it.');
 
     return AnimatedContainer(
       duration: still ? Duration.zero : AppMotion.slow,
@@ -105,178 +131,203 @@ class MoodHero extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.hero),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: AnimatedSwitcher(
-                duration: switchTime,
-                child: visual == null
-                    ? const SizedBox.shrink(key: ValueKey('none'))
-                    : MoodParticlesLayer(
-                        key: ValueKey(visual.mood),
-                        style: visual.particles,
-                        color: visual.colors.particle,
-                      ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.xl,
-                AppSpacing.md,
-                AppSpacing.lg,
-              ),
-              child: LayoutBuilder(
-                builder: (context, box) {
-                  final artSize = (box.maxWidth * 0.36).clamp(96.0, 160.0);
-                  final textWidth = box.maxWidth - artSize - AppSpacing.sm;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onSwitch,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedSwitcher(
+                    duration: switchTime,
+                    child: visual == null
+                        ? const SizedBox.shrink(key: ValueKey('none'))
+                        : MoodParticlesLayer(
+                            key: ValueKey(visual.mood),
+                            style: visual.particles,
+                            color: visual.colors.particle,
+                          ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    AppSpacing.xl,
+                    AppSpacing.md,
+                    AppSpacing.lg,
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      final artSize = (box.maxWidth * 0.36).clamp(96.0, 160.0);
+                      final textWidth = box.maxWidth - artSize - AppSpacing.sm;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            // Grows and shrinks smoothly as the quote
-                            // length changes, instead of snapping.
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                // Grows and shrinks smoothly as the quote
+                                // length changes, instead of snapping.
+                                child: AnimatedSize(
+                                  duration: _sizeTime(still),
+                                  curve: AppMotion.enter,
+                                  alignment: Alignment.topLeft,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        m != null
+                                            ? '$name is feeling'
+                                            : showingPartner
+                                            ? name
+                                            : 'Hi $name,',
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(color: ink),
+                                      ),
+                                      const SizedBox(height: AppSpacing.xs),
+                                      AnimatedSwitcher(
+                                        duration: switchTime,
+                                        transitionBuilder: words,
+                                        layoutBuilder: _topLeft,
+                                        child: m == null
+                                            ? Text(
+                                                showingPartner
+                                                    ? 'No mood yet today'
+                                                    : 'How are you feeling?',
+                                                key: ValueKey(
+                                                  'none-$showingPartner',
+                                                ),
+                                                style: theme
+                                                    .textTheme
+                                                    .titleLarge
+                                                    ?.copyWith(
+                                                      color: titleColor,
+                                                    ),
+                                              )
+                                            // One line normally; with large
+                                            // text it may wrap at spaces. It
+                                            // never breaks mid-word.
+                                            : FitLabel(
+                                                m.label.toUpperCase(),
+                                                key: ValueKey(
+                                                  '$m-$showingPartner',
+                                                ),
+                                                maxWidth: textWidth,
+                                                maxLines: largeText ? 2 : 1,
+                                                textAlign: TextAlign.start,
+                                                alignment: Alignment.centerLeft,
+                                                style: theme
+                                                    .textTheme
+                                                    .headlineMedium
+                                                    ?.copyWith(
+                                                      color: titleColor,
+                                                    ),
+                                              ),
+                                      ),
+                                      if (visual != null) ...[
+                                        const SizedBox(height: AppSpacing.xs),
+                                        // A short accent bar under the mood:
+                                        // colour as decoration, never for words.
+                                        AnimatedContainer(
+                                          duration: switchTime,
+                                          width: _accentBarWidth,
+                                          height: _accentBarHeight,
+                                          decoration: BoxDecoration(
+                                            color: visual.accentFor(brightness),
+                                            borderRadius: BorderRadius.circular(
+                                              _accentBarHeight / 2,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: AppSpacing.xs),
+                                        Text(
+                                          pending
+                                              ? 'today · not shared yet'
+                                              : 'today',
+                                          style: theme.textTheme.bodyLarge
+                                              ?.copyWith(color: ink),
+                                        ),
+                                      ],
+                                      const SizedBox(height: AppSpacing.md),
+                                      AnimatedSwitcher(
+                                        duration: switchTime,
+                                        transitionBuilder: words,
+                                        layoutBuilder: _topLeft,
+                                        child: Text(
+                                          quote,
+                                          key: ValueKey(
+                                            '$m-$showingPartner-$quote',
+                                          ),
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                color: ink,
+                                                fontStyle:
+                                                    visual == null && !hasNote
+                                                    ? null
+                                                    : FontStyle.italic,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              SizedBox.square(
+                                dimension: artSize,
+                                child: AnimatedSwitcher(
+                                  duration: switchTime,
+                                  switchInCurve: AppMotion.enter,
+                                  switchOutCurve: AppMotion.exit,
+                                  transitionBuilder: art,
+                                  child: visual == null
+                                      ? Opacity(
+                                          key: const ValueKey('none'),
+                                          opacity: 0.45,
+                                          child: MoodArt(
+                                            visual: MoodVisual.of(Mood.loved),
+                                            size: artSize,
+                                            semantic: false,
+                                          ),
+                                        )
+                                      : MoodArt(
+                                          key: ValueKey(visual.mood),
+                                          visual: visual,
+                                          size: artSize,
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          KeyedSubtree(
+                            key: actionsKey,
                             child: AnimatedSize(
                               duration: _sizeTime(still),
                               curve: AppMotion.enter,
                               alignment: Alignment.topLeft,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    m == null
-                                        ? 'Hi $name,'
-                                        : '$name is feeling',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: ink,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  AnimatedSwitcher(
-                                    duration: switchTime,
-                                    transitionBuilder: words,
-                                    layoutBuilder: _topLeft,
-                                    child: m == null
-                                        ? Text(
-                                            'How are you feeling?',
-                                            key: const ValueKey('none'),
-                                            style: theme.textTheme.titleLarge
-                                                ?.copyWith(color: titleColor),
-                                          )
-                                        // One line normally; with large
-                                        // text it may wrap at spaces. It
-                                        // never breaks mid-word.
-                                        : FitLabel(
-                                            m.label.toUpperCase(),
-                                            key: ValueKey(m),
-                                            maxWidth: textWidth,
-                                            maxLines: largeText ? 2 : 1,
-                                            textAlign: TextAlign.start,
-                                            alignment: Alignment.centerLeft,
-                                            style: theme
-                                                .textTheme
-                                                .headlineMedium
-                                                ?.copyWith(color: titleColor),
-                                          ),
-                                  ),
-                                  if (visual != null) ...[
-                                    const SizedBox(height: AppSpacing.xs),
-                                    // A short accent bar under the mood:
-                                    // colour as decoration, never for words.
-                                    AnimatedContainer(
-                                      duration: switchTime,
-                                      width: _accentBarWidth,
-                                      height: _accentBarHeight,
-                                      decoration: BoxDecoration(
-                                        color: visual.accentFor(brightness),
-                                        borderRadius: BorderRadius.circular(
-                                          _accentBarHeight / 2,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSpacing.xs),
-                                    Text(
-                                      pending
-                                          ? 'today · not shared yet'
-                                          : 'today',
-                                      style: theme.textTheme.bodyLarge
-                                          ?.copyWith(color: ink),
-                                    ),
-                                  ],
-                                  const SizedBox(height: AppSpacing.md),
-                                  AnimatedSwitcher(
-                                    duration: switchTime,
-                                    transitionBuilder: words,
-                                    layoutBuilder: _topLeft,
-                                    child: Text(
-                                      visual?.quote ??
-                                          'Pick a mood below to share it.',
-                                      key: ValueKey(m),
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: ink,
-                                            fontStyle: visual == null
-                                                ? null
-                                                : FontStyle.italic,
-                                          ),
-                                    ),
-                                  ),
-                                ],
+                              child: _Actions(
+                                pending: pending,
+                                saving: saving,
+                                hasPartner: hasPartner,
+                                showingPartner: showingPartner,
+                                switchLabel: switchLabel,
+                                onShare: onShare,
+                                onAddNote: onAddNote,
+                                onSwitch: onSwitch,
                               ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          SizedBox.square(
-                            dimension: artSize,
-                            child: AnimatedSwitcher(
-                              duration: switchTime,
-                              switchInCurve: AppMotion.enter,
-                              switchOutCurve: AppMotion.exit,
-                              transitionBuilder: art,
-                              child: visual == null
-                                  ? Opacity(
-                                      key: const ValueKey('none'),
-                                      opacity: 0.45,
-                                      child: MoodArt(
-                                        visual: MoodVisual.of(Mood.loved),
-                                        size: artSize,
-                                        semantic: false,
-                                      ),
-                                    )
-                                  : MoodArt(
-                                      key: ValueKey(visual.mood),
-                                      visual: visual,
-                                      size: artSize,
-                                    ),
-                            ),
-                          ),
                         ],
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      KeyedSubtree(
-                        key: actionsKey,
-                        child: AnimatedSize(
-                          duration: _sizeTime(still),
-                          curve: AppMotion.enter,
-                          alignment: Alignment.topLeft,
-                          child: _Actions(
-                            pending: pending,
-                            saving: saving,
-                            hasPartner: hasPartner,
-                            onShare: onShare,
-                            onAddNote: onAddNote,
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -293,21 +344,29 @@ class MoodHero extends StatelessWidget {
   );
 }
 
-/// "Share mood" (only while a preview is unsaved) and "Add a note".
+/// "Share mood" (only while a preview is unsaved), "Add a note", and the
+/// switch between your mood and your partner's. Only the switch shows while
+/// the partner's mood is on the card.
 class _Actions extends StatelessWidget {
   const _Actions({
     required this.pending,
     required this.saving,
     required this.hasPartner,
+    required this.showingPartner,
+    required this.switchLabel,
     required this.onShare,
     required this.onAddNote,
+    required this.onSwitch,
   });
 
   final bool pending;
   final bool saving;
   final bool hasPartner;
+  final bool showingPartner;
+  final String? switchLabel;
   final VoidCallback onShare;
   final VoidCallback onAddNote;
+  final VoidCallback? onSwitch;
 
   @override
   Widget build(BuildContext context) {
@@ -318,7 +377,7 @@ class _Actions extends StatelessWidget {
       runSpacing: AppSpacing.xs,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (pending)
+        if (pending && !showingPartner)
           FilledButton.icon(
             onPressed: saving ? null : onShare,
             icon: saving
@@ -338,15 +397,26 @@ class _Actions extends StatelessWidget {
               shape: const StadiumBorder(),
             ),
           ),
-        TextButton.icon(
-          onPressed: saving ? null : onAddNote,
-          icon: const Icon(Icons.edit_note_rounded, size: 20),
-          label: const Text('Add a note'),
-          style: TextButton.styleFrom(
-            minimumSize: const Size(0, AppSpacing.touchTarget),
-            foregroundColor: scheme.onSurface,
+        if (!showingPartner)
+          TextButton.icon(
+            onPressed: saving ? null : onAddNote,
+            icon: const Icon(Icons.edit_note_rounded, size: 20),
+            label: const Text('Add a note'),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, AppSpacing.touchTarget),
+              foregroundColor: scheme.onSurface,
+            ),
           ),
-        ),
+        if (switchLabel != null && onSwitch != null)
+          TextButton.icon(
+            onPressed: saving ? null : onSwitch,
+            icon: const Icon(Icons.swap_horiz_rounded, size: 20),
+            label: Text(switchLabel!),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, AppSpacing.touchTarget),
+              foregroundColor: scheme.onSurface,
+            ),
+          ),
       ],
     );
   }

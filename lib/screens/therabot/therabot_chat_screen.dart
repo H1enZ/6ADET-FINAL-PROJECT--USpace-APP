@@ -119,7 +119,6 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
     setState(() {
       _busy = true;
       _sending = said;
-      _hideChips = false;
     });
     _toBottom();
     try {
@@ -127,9 +126,15 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
       if (!mounted) return;
       _changed = true;
       setState(() {
+        _hideChips = false;
         switch (result) {
           case ChatUpdated(:final view):
-            _view = view;
+            // Replies don't repeat the summary: keep the last one, so
+            // "Show me what you heard" can bring it back.
+            final kept = _view?.summary;
+            _view = view.summary == null && kept != null
+                ? view.copyWith(summary: kept)
+                : view;
           case ChatSafety(:final message):
             _safety = message;
           case ChatFinished():
@@ -219,8 +224,20 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
         if (chip.key == 'more') {
           setState(() => _hideChips = true);
           _focus.requestFocus();
+          _toBottom();
         } else if (chip.key == 'summary') {
-          await _run(() => TherabotService.talkSummary(view.talkId!));
+          await _run(() async {
+            try {
+              return await TherabotService.talkSummary(view.talkId!);
+            } on TherabotException catch (e) {
+              // Out of new summaries: show the last one again.
+              final kept = _view?.summary;
+              if (e.code != 'rate_limited' || kept == null) rethrow;
+              return ChatUpdated(
+                view.copyWith(stage: 'summary', summary: kept),
+              );
+            }
+          });
         } else if (chip.key == 'finish') {
           await _run(() => TherabotService.chatFinish(_sessionId!));
         }
@@ -485,6 +502,14 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
                           children: [
                             if (showMessages)
                               for (final m in messages) _Bubble(message: m),
+                            // "Keep talking": a visible go-ahead (not saved).
+                            if (_hideChips && view != null)
+                              const _Bubble(
+                                message: ChatMsg(
+                                  fromTherabot: true,
+                                  text: "Of course. Go on, I'm listening.",
+                                ),
+                              ),
                             if (_sending != null)
                               _Bubble(
                                 message: ChatMsg(

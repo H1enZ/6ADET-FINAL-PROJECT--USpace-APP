@@ -90,6 +90,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Mood? _preview;
   bool _savingMood = false;
 
+  /// The hero shows your partner's mood instead of yours (tap to switch).
+  bool _showPartner = false;
+
   /// On the hero's Share / Add a note row, to scroll it into view.
   final _heroActionsKey = GlobalKey();
 
@@ -118,6 +121,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Today's saved mood, from the database.
   Mood? get _savedMood => latestMoodOn(_moods, _myId, _today)?.mood;
+
+  /// The newest note someone shared today, even if they changed their
+  /// mood after writing it.
+  String? _noteToday(String userId) {
+    final today = _today;
+    MoodEntry? latest;
+    for (final e in _moods) {
+      final note = e.note?.trim() ?? '';
+      final sameDay =
+          e.createdAt.year == today.year &&
+          e.createdAt.month == today.month &&
+          e.createdAt.day == today.day;
+      if (e.userId != userId || !sameDay || note.isEmpty) continue;
+      if (latest == null || e.createdAt.isAfter(latest.createdAt)) latest = e;
+    }
+    return latest?.note?.trim();
+  }
 
   @override
   void initState() {
@@ -252,7 +272,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_savingMood) return;
     HapticFeedback.selectionClick();
     final preview = mood == _savedMood ? null : mood;
-    setState(() => _preview = preview);
+    setState(() {
+      _preview = preview;
+      _showPartner = false;
+    });
 
     // Make it clear nothing is shared yet: say so to screen readers, and
     // bring the Share button into view if the grid has scrolled it away.
@@ -326,7 +349,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (saved != true) return;
     await _load();
     if (!mounted) return;
-    setState(() => _preview = null);
+    setState(() {
+      _preview = null;
+      _showPartner = false;
+    });
     _showMessage('Mood saved');
   }
 
@@ -670,6 +696,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final today = _today;
     final saved = _savedMood;
     final shown = _preview ?? saved;
+    final pending = _preview != null && _preview != saved;
+    final showPartner = _showPartner && partner != null;
     final myAnswered = _answers.any((a) => a.userId == _myId);
     const gap = AppSpacing.xl;
 
@@ -719,11 +747,28 @@ class _HomeScreenState extends State<HomeScreen> {
         section(
           'hero',
           MoodHero(
-            name: _first(_me.displayName),
-            mood: shown,
-            pending: _preview != null && _preview != saved,
+            name: showPartner ? partnerFirst! : _first(_me.displayName),
+            mood: showPartner
+                ? latestMoodOn(_moods, partner.userId, today)?.mood
+                : shown,
+            // A preview shows the mood's own quote until it is shared.
+            note: showPartner
+                ? _noteToday(partner.userId)
+                : pending
+                ? null
+                : _noteToday(_myId),
+            pending: !showPartner && pending,
             saving: _savingMood,
             hasPartner: partner != null,
+            showingPartner: showPartner,
+            switchLabel: partner == null
+                ? null
+                : showPartner
+                ? 'See yours'
+                : 'See $partnerFirst',
+            onSwitch: partner == null
+                ? null
+                : () => setState(() => _showPartner = !_showPartner),
             onShare: _shareMood,
             onAddNote: _checkMood,
             actionsKey: _heroActionsKey,
