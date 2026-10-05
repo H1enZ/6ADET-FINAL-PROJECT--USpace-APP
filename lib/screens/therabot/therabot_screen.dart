@@ -17,6 +17,7 @@ import '../../widgets/notes/note_style.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
 import '../chat_screen.dart';
 import 'next_step_pages.dart';
+import 'next_steps_screen.dart';
 import 'private_reflection_page.dart';
 import 'therabot_chat_screen.dart';
 import 'shared_reflection_view.dart';
@@ -368,86 +369,18 @@ class _TherabotScreenState extends State<TherabotScreen> {
     );
   }
 
-  /// Asks before recording a choice, because your partner sees it. You can
-  /// also just look at a step without choosing it.
-  Future<String?> _askChoose(TherabotChoice choice) {
-    return showModalBottomSheet<String>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) {
-        final theme = Theme.of(context);
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenMargin,
-            0,
-            AppSpacing.screenMargin,
-            AppSpacing.xxl,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '${choice.emoji}  ${choice.label}',
-                style: theme.textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Choosing it lets $_partner see that you picked ${choice.label}. You can '
-                'change your mind while this reflection is open.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AppButton(
-                label: 'Choose ${choice.label}',
-                onPressed: () => Navigator.of(context).pop('choose'),
-                fullWidth: true,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              AppButton(
-                label: 'Just look first',
-                variant: AppButtonVariant.outlined,
-                onPressed: () => Navigator.of(context).pop('look'),
-                fullWidth: true,
-              ),
-            ],
-          ),
-        );
-      },
+  Future<void> _openNextSteps(TherabotSession s) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => NextStepsScreen(
+          session: s,
+          partnerName: _partner,
+          pageFor: _pageFor,
+          onOkayForNow: _okayForNow,
+          onTalkPrivately: _openTalk,
+        ),
+      ),
     );
-  }
-
-  Future<void> _choose(TherabotChoice choice) async {
-    final s = _session;
-    if (s == null) return;
-    var record = false;
-    if (s.myChoice != choice) {
-      final answer = await _askChoose(choice);
-      if (!mounted || answer == null) return;
-      record = answer == 'choose';
-    }
-    if (record) {
-      setState(() => _busy = true);
-      try {
-        await TherabotService.choose(s.id, choice);
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _busy = false);
-        therabotToast(context, therabotError(e).message);
-        return;
-      }
-      if (!mounted) return;
-      setState(() => _busy = false);
-      await _load();
-      if (!mounted) return;
-    }
-    final fresh = _session ?? s;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => _pageFor(choice, fresh)));
     if (mounted) await _load();
   }
 
@@ -772,7 +705,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
           body:
               '${s.title == null ? 'Your reflection is' : '"${s.title}" is'} '
               'saved in Past reflections, where you can read it again any time.'
-              '${mine != null && theirs != null ? '\n\nYou chose ${mine.label} · $_partner chose ${theirs.label}' : ''}',
+              '${mine != null && theirs != null ? '\n\n${nextStepOutcome(mine, theirs).title}. ${nextStepOutcome(mine, theirs).body}' : ''}',
           secondary: TextButton.icon(
             onPressed: _openHistory,
             style: TextButton.styleFrom(foregroundColor: NotePalette.pink),
@@ -799,7 +732,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
               TextButton(
                 onPressed: () => _revisit(c, s),
                 style: TextButton.styleFrom(foregroundColor: NotePalette.pink),
-                child: Text('${c.emoji} ${c.label}'),
+                child: Text(c.label),
               ),
           ],
         ),
@@ -999,39 +932,19 @@ class _TherabotScreenState extends State<TherabotScreen> {
     );
     final mine = s.myChoice;
     final theirs = s.partnerChoice;
-
-    String choiceLine() {
-      if (mine == null && theirs == null) {
-        return 'Each of you chooses for yourself. Different choices are okay.';
-      }
-      if (mine == null) {
-        return '$_partner has chosen. Take your time choosing yours.';
-      }
-      if (theirs == null) {
-        return 'You chose ${mine.label}. $_partner hasn\'t chosen yet.';
-      }
-      if (mine == theirs) return 'You both chose ${mine.label}.';
-      return 'You chose ${mine.label} and $_partner chose ${theirs.label}. You need different '
-          "things right now, and that's okay. Each of you can do what helps; there's no need to agree.";
+    final String status;
+    if (mine == null) {
+      status = s.partnerHasChosen
+          ? '$_partner has chosen privately. Take your time choosing yours.'
+          : 'Each of you chooses privately. Neither of you sees the other\'s choice until you both have.';
+    } else {
+      status =
+          'You chose ${mine.label}, privately. Waiting for $_partner to choose.';
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Not complete yet: the server keeps this session open (and refuses
-        // a new one) until both of you have chosen, or for 24 hours.
-        if (mine != null && theirs == null) ...[
-          TherabotCard(
-            tentative: true,
-            child: Text(
-              "You've chosen ${mine.label}. This reflection completes when "
-              '$_partner chooses too (or after 24 hours), and then you can '
-              'start a new one.',
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-        ],
         Row(
           children: [
             Expanded(
@@ -1058,18 +971,14 @@ class _TherabotScreenState extends State<TherabotScreen> {
           names: _names(s.myPartnerNumber),
         ),
         const SizedBox(height: AppSpacing.xxl),
-        Text('What would help you next?', style: theme.textTheme.titleLarge),
-        const SizedBox(height: AppSpacing.xs),
-        Text(choiceLine(), style: muted),
-        const SizedBox(height: AppSpacing.md),
-        NextStepGrid(selected: mine, onTap: _choose, busy: _busy),
-        const SizedBox(height: AppSpacing.xxl),
-        AppButton(
-          label: "We're okay for now",
-          icon: Icons.favorite_border,
-          variant: AppButtonVariant.outlined,
-          onPressed: _okayForNow,
-          fullWidth: true,
+        _ActionCard(
+          icon: Icons.route_rounded,
+          title: 'What would help you now?',
+          body: theirs != null ? 'You have both chosen.' : status,
+          button: mine == null
+              ? 'Choose a next step'
+              : 'See or change my choice',
+          onPressed: _busy ? null : () => _openNextSteps(s),
         ),
         const SizedBox(height: AppSpacing.md),
         ExpiryNote(expiresAt: s.expiresAt),

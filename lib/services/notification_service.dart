@@ -458,7 +458,7 @@ class NotificationService {
           target: NotificationTarget.therabot,
         );
     if (s.status == TherabotStatus.reflectionReady) {
-      if (s.partnerChoice != null && s.myChoice == null) {
+      if (s.partnerHasChosen && s.myChoice == null) {
         return make(
           'partner-chose',
           '$partner chose a next step',

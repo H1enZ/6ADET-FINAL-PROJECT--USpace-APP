@@ -7,7 +7,17 @@ import '../atoms/fit_label.dart';
 import '../effects/motion.dart';
 
 /// Which drawing sits at the top of a quick-action card.
-enum QuickActionArt { loveNote, memory, date, capsule }
+enum QuickActionArt {
+  loveNote,
+  memory,
+  date,
+  capsule,
+  // Therabot next steps.
+  comfort,
+  talk,
+  breather,
+  reconnect,
+}
 
 /// One of the four big Home cards.
 class QuickAction {
@@ -394,6 +404,14 @@ class _ArtPainter extends CustomPainter {
         _date(canvas);
       case QuickActionArt.capsule:
         _capsule(canvas);
+      case QuickActionArt.comfort:
+        _comfort(canvas);
+      case QuickActionArt.talk:
+        _talkBubbles(canvas);
+      case QuickActionArt.breather:
+        _breather(canvas);
+      case QuickActionArt.reconnect:
+        _reconnect(canvas);
     }
     canvas.restore();
   }
@@ -823,6 +841,240 @@ class _ArtPainter extends CustomPainter {
     });
     _floating(canvas, const Offset(88, 20), 9);
     _floating(canvas, const Offset(12, 22), 7);
+  }
+
+  // ---- Comfort each other: two soft figures leaning in, a heart above
+
+  void _figure(
+    Canvas canvas,
+    Offset at,
+    double scale,
+    List<Color> colors, {
+    required bool facingRight,
+  }) {
+    final body = RRect.fromRectAndRadius(
+      Rect.fromCenter(
+        center: at + Offset(0, 14 * scale),
+        width: 30 * scale,
+        height: 34 * scale,
+      ),
+      Radius.circular(15 * scale),
+    );
+    final head = Rect.fromCircle(
+      center: at + Offset(0, -10 * scale),
+      radius: 13 * scale,
+    );
+    final shape = Path()
+      ..addRRect(body)
+      ..addOval(head);
+    _shadow(canvas, shape);
+    canvas.drawPath(
+      shape,
+      Paint()..shader = _vertical(shape.getBounds(), colors),
+    );
+    // A sleepy, content face.
+    final face = Paint()
+      ..color = const Color(0xFF6B2A47)
+      ..strokeWidth = 1.6 * scale
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final eye = facingRight ? 3.0 : -3.0;
+    for (final dx in [-4.0, 4.0]) {
+      canvas.drawArc(
+        Rect.fromCenter(
+          center: at + Offset((dx + eye) * scale, -11 * scale),
+          width: 4 * scale,
+          height: 3 * scale,
+        ),
+        0,
+        math.pi,
+        false,
+        face,
+      );
+    }
+    canvas.drawCircle(
+      at + Offset((eye - 6) * scale, -6 * scale),
+      2.2 * scale,
+      Paint()..color = const Color(0xFFF58FAD).withValues(alpha: 0.7),
+    );
+    canvas.drawCircle(
+      at + Offset((eye + 6) * scale, -6 * scale),
+      2.2 * scale,
+      Paint()..color = const Color(0xFFF58FAD).withValues(alpha: 0.7),
+    );
+  }
+
+  void _comfort(Canvas canvas) {
+    _rotated(canvas, const Offset(38, 60), -8, () {
+      _figure(canvas, const Offset(38, 54), 1.0, const [
+        Color(0xFFF7A1B8),
+        Color(0xFFD95F86),
+      ], facingRight: true);
+    });
+    _rotated(canvas, const Offset(62, 60), 8, () {
+      _figure(canvas, const Offset(62, 54), 1.0, const [
+        Color(0xFFFFF1F3),
+        Color(0xFFE6C9D6),
+      ], facingRight: false);
+    });
+    _heart(canvas, const Offset(50, 18), 18);
+    _floating(canvas, const Offset(14, 30), 7);
+    _floating(canvas, const Offset(88, 34), 6);
+  }
+
+  // ---- Talk it through: two speech bubbles, one with a heart
+
+  void _bubble(
+    Canvas canvas,
+    Rect r,
+    List<Color> colors, {
+    required bool tailLeft,
+  }) {
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(r, Radius.circular(r.height * 0.32)));
+    final tx = tailLeft ? r.left + r.width * 0.25 : r.right - r.width * 0.25;
+    path.moveTo(tx - 5, r.bottom - 2);
+    path.lineTo(tx + (tailLeft ? -6 : 6), r.bottom + 9);
+    path.lineTo(tx + 6, r.bottom - 2);
+    path.close();
+    _shadow(canvas, path);
+    canvas.drawPath(path, Paint()..shader = _vertical(r, colors));
+  }
+
+  void _talkBubbles(Canvas canvas) {
+    _bubble(canvas, const Rect.fromLTRB(44, 40, 86, 72), const [
+      Color(0xFFFFF4F1),
+      Color(0xFFEBD3D8),
+    ], tailLeft: false);
+    final dots = Paint()..color = const Color(0xFFC79AAE);
+    for (final x in [56.0, 65.0, 74.0]) {
+      canvas.drawCircle(Offset(x, 56), 2.4, dots);
+    }
+    _bubble(canvas, const Rect.fromLTRB(12, 18, 58, 52), const [
+      Color(0xFFF7A1B8),
+      Color(0xFFDD6A90),
+    ], tailLeft: true);
+    canvas.save();
+    canvas.drawPath(
+      _heartPathAt(const Offset(35, 35), 16),
+      Paint()..color = Colors.white.withValues(alpha: 0.92),
+    );
+    canvas.restore();
+    _floating(canvas, const Offset(84, 22), 7);
+  }
+
+  Path _heartPathAt(Offset c, double w) {
+    final h = w * 0.9;
+    final x = c.dx - w / 2, y = c.dy - h / 2;
+    return Path()
+      ..moveTo(x + w * 0.5, y + h * 0.95)
+      ..cubicTo(
+        x + w * 0.1,
+        y + h * 0.66,
+        x - w * 0.04,
+        y + h * 0.32,
+        x + w * 0.2,
+        y + h * 0.1,
+      )
+      ..cubicTo(
+        x + w * 0.34,
+        y - h * 0.02,
+        x + w * 0.48,
+        y + h * 0.08,
+        x + w * 0.5,
+        y + h * 0.22,
+      )
+      ..cubicTo(
+        x + w * 0.52,
+        y + h * 0.08,
+        x + w * 0.66,
+        y - h * 0.02,
+        x + w * 0.8,
+        y + h * 0.1,
+      )
+      ..cubicTo(
+        x + w * 1.04,
+        y + h * 0.32,
+        x + w * 0.9,
+        y + h * 0.66,
+        x + w * 0.5,
+        y + h * 0.95,
+      )
+      ..close();
+  }
+
+  // ---- Take a breather: a crescent moon and a few soft z's
+
+  void _breather(Canvas canvas) {
+    final moon = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addOval(Rect.fromCircle(center: const Offset(42, 56), radius: 26));
+    final bite = Path()
+      ..addOval(Rect.fromCircle(center: const Offset(56, 46), radius: 22));
+    final crescent = Path.combine(PathOperation.difference, moon, bite);
+    _shadow(canvas, crescent);
+    canvas.drawPath(
+      crescent,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.4, -0.2),
+          colors: [Color(0xFFFFFBF2), Color(0xFFF0D9C9)],
+        ).createShader(const Rect.fromLTRB(16, 30, 68, 82)),
+    );
+    for (final (x, y, size) in const [
+      (62.0, 22.0, 15.0),
+      (74.0, 34.0, 12.0),
+      (82.0, 18.0, 10.0),
+    ]) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: 'z',
+          style: TextStyle(
+            fontSize: size,
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFFB98AD8),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x, y));
+    }
+    _floating(canvas, const Offset(14, 30), 6);
+  }
+
+  // ---- Reconnect gently: two hearts linked together
+
+  void _reconnect(Canvas canvas) {
+    final left = _heartPathAt(const Offset(40, 52), 44);
+    final right = _heartPathAt(const Offset(60, 54), 44);
+    for (final (path, colors) in [
+      (left, const [Color(0xFFFFC3D3), Color(0xFFEF6F98)]),
+      (right, const [Color(0xFFD8A6F0), Color(0xFFA35FC7)]),
+    ]) {
+      _shadow(canvas, path);
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 9
+          ..strokeJoin = StrokeJoin.round
+          ..shader = _vertical(path.getBounds(), colors),
+      );
+    }
+    // Gloss.
+    canvas.drawArc(
+      const Rect.fromLTRB(22, 34, 40, 50),
+      math.pi,
+      math.pi / 2,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round
+        ..color = Colors.white.withValues(alpha: 0.7),
+    );
+    _floating(canvas, const Offset(88, 26), 7);
+    _floating(canvas, const Offset(12, 76), 6);
   }
 
   @override

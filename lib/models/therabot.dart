@@ -35,10 +35,30 @@ TherabotProgress _progress(Object? p) => switch (p) {
 
 /// The four next steps. Shown equally; Therabot never ranks them.
 enum TherabotChoice {
-  comfort('comfort', '🫂', 'Comfort', 'Feel held, or hold them.'),
-  talk('talk', '💬', 'Talk', 'Talk it through, gently.'),
-  space('space', '⏸', 'Take Space', 'A little time apart, then check in.'),
-  reconnect('reconnect', '❤️', 'Reconnect', 'Small ways back to each other.');
+  comfort(
+    'comfort',
+    '🫂',
+    'Comfort each other',
+    'Feel held, or hold them. A little more warmth right now.',
+  ),
+  talk(
+    'talk',
+    '💬',
+    'Talk it through',
+    "I'm ready to have a calm and honest conversation together.",
+  ),
+  space(
+    'space',
+    '⏸',
+    'Take a breather',
+    'A little time apart, then check in again.',
+  ),
+  reconnect(
+    'reconnect',
+    '❤️',
+    'Reconnect gently',
+    'Small ways back to each other without reopening everything.',
+  );
 
   const TherabotChoice(this.value, this.emoji, this.label, this.blurb);
   final String value;
@@ -75,6 +95,7 @@ class TherabotSession {
     required this.partnerProgress,
     required this.myChoice,
     required this.partnerChoice,
+    this.partnerHasChosen = false,
     required this.title,
     required this.reflection,
     required this.createdAt,
@@ -91,7 +112,12 @@ class TherabotSession {
   final TherabotProgress myProgress;
   final TherabotProgress partnerProgress;
   final TherabotChoice? myChoice;
+
+  /// Only once you have BOTH chosen (migration 017); null before that.
   final TherabotChoice? partnerChoice;
+
+  /// Whether your partner has chosen yet, without saying what.
+  final bool partnerHasChosen;
   final String? title;
   final SharedReflection? reflection;
   final DateTime createdAt;
@@ -122,6 +148,8 @@ class TherabotSession {
       partnerProgress: _progress(row['partner_progress']),
       myChoice: TherabotChoice.from(row['my_choice']),
       partnerChoice: TherabotChoice.from(row['partner_choice']),
+      partnerHasChosen:
+          row['partner_has_chosen'] == true || row['partner_choice'] != null,
       title: row['title'] as String?,
       reflection: reflection is Map<String, dynamic>
           ? SharedReflection.fromMap(reflection)
@@ -469,3 +497,73 @@ const therabotQuestionHints = [
 const therabotMaxAnswerLength = 2000;
 const therabotMaxSummaries = 3;
 const therabotMaxInsightLength = 300;
+
+/// What the two private next-step choices add up to, once both are made.
+/// Fixed, neutral wording (no AI): the same step becomes a shared next step,
+/// two different ones get a gentle bridge that keeps something of each.
+({String title, String body}) nextStepOutcome(
+  TherabotChoice mine,
+  TherabotChoice theirs,
+) {
+  if (mine == theirs) {
+    return switch (mine) {
+      TherabotChoice.comfort => (
+        title: 'You both chose to comfort each other',
+        body:
+            'Take a few quiet minutes together today: a hug, sitting close, or a kind message. '
+            'There is no need to talk it all through yet.',
+      ),
+      TherabotChoice.talk => (
+        title: 'You both feel ready to talk it through',
+        body:
+            'Pick a calm moment today, start with one of your conversation starters, and take '
+            'turns listening without interrupting.',
+      ),
+      TherabotChoice.space => (
+        title: 'You both want a little breathing room',
+        body:
+            'Take some time apart, and agree on when you will check in again, for example '
+            'later this evening.',
+      ),
+      TherabotChoice.reconnect => (
+        title: 'You both want to reconnect gently',
+        body:
+            'Do one small, easy thing together today, like a walk, a meal or a song you both '
+            'like, without reopening everything.',
+      ),
+    };
+  }
+  final pair = {mine, theirs};
+  bool has(TherabotChoice a, TherabotChoice b) =>
+      pair.contains(a) && pair.contains(b);
+  final String bridge;
+  if (has(TherabotChoice.comfort, TherabotChoice.talk)) {
+    bridge =
+        'Start close, then talk: begin with a hug or a quiet moment together, and talk it '
+        'through once you both feel settled.';
+  } else if (has(TherabotChoice.comfort, TherabotChoice.space)) {
+    bridge =
+        'Give a little space, with warmth: a kind word or a hug before some time apart, and '
+        'a set time to check in.';
+  } else if (has(TherabotChoice.comfort, TherabotChoice.reconnect)) {
+    bridge =
+        'Let closeness lead: sit together, share something small and easy, and let the '
+        'warmth come back on its own.';
+  } else if (has(TherabotChoice.talk, TherabotChoice.space)) {
+    bridge =
+        'A short breather first, then talk: agree on a time later today when you will both '
+        'sit down calmly.';
+  } else if (has(TherabotChoice.talk, TherabotChoice.reconnect)) {
+    bridge =
+        'Reconnect first, then talk: share something easy together, and when it feels '
+        'lighter, open the conversation gently.';
+  } else {
+    bridge =
+        'Some time apart, then a small way back: take a breather, then meet for something '
+        'simple you both enjoy.';
+  }
+  return (
+    title: "You need slightly different things right now, and that's okay",
+    body: bridge,
+  );
+}
