@@ -56,6 +56,16 @@ abstract final class UsIcons {
   static const trash = UsIconData('trash');
   static const star = UsIconData('star');
   static const note = UsIconData('note');
+  static const check = UsIconData('check');
+  static const chevronUp = UsIconData('chevron-up');
+  static const copy = UsIconData('copy');
+  static const minusCircle = UsIconData('minus-circle');
+
+  // Chat composer.
+  static const send = UsIconData('send');
+  static const image = UsIconData('image');
+  static const smile = UsIconData('smile');
+  static const keyboard = UsIconData('keyboard');
 
   // Care (Therabot and Work it out).
   static const hug = UsIconData('hug');

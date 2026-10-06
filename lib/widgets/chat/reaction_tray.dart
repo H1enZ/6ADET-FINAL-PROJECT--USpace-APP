@@ -7,6 +7,7 @@ import '../../models/chat_reaction.dart';
 import '../../theme/app_effects.dart';
 import '../../theme/app_spacing.dart';
 import '../atoms/fit_label.dart';
+import '../atoms/us_icon.dart';
 import '../effects/motion.dart';
 import '../effects/soft_hearts_background.dart' show heartPath;
 import 'reaction_art.dart';
@@ -518,8 +519,9 @@ class _MoreButton extends StatelessWidget {
               shape: BoxShape.circle,
               color: scheme.primaryContainer.withValues(alpha: 0.6),
             ),
-            child: Icon(
-              expanded ? Icons.expand_less_rounded : Icons.add_rounded,
+            alignment: Alignment.center,
+            child: UsIcon(
+              expanded ? UsIcons.chevronUp : UsIcons.plus,
               size: artSize * 0.6,
               color: scheme.primary,
             ),
@@ -678,12 +680,12 @@ class _ActionRow extends StatelessWidget {
     final scheme = theme.colorScheme;
     final (icon, label) = switch (action) {
       MessageAction.removeReaction => (
-        Icons.remove_circle_outline,
+        UsIcons.minusCircle,
         'Remove my reaction',
       ),
-      MessageAction.copy => (Icons.copy_outlined, 'Copy text'),
-      MessageAction.edit => (Icons.edit_outlined, 'Edit'),
-      MessageAction.delete => (Icons.delete_outline, 'Delete for both of us'),
+      MessageAction.copy => (UsIcons.copy, 'Copy text'),
+      MessageAction.edit => (UsIcons.edit, 'Edit'),
+      MessageAction.delete => (UsIcons.trash, 'Delete for both of us'),
     };
     final color = action == MessageAction.delete
         ? scheme.error
@@ -699,7 +701,7 @@ class _ActionRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(icon, size: 20, color: color),
+              UsIcon(icon, size: 20, color: color),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(

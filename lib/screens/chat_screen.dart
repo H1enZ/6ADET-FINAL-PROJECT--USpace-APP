@@ -15,10 +15,11 @@ import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
 import '../utils/capsule_time.dart';
 import '../widgets/atoms/avatar_circle.dart';
+import '../widgets/atoms/us_icon.dart';
 import '../widgets/chat/reaction_chips.dart';
 import '../widgets/chat/reaction_tray.dart';
-import '../widgets/effects/heartbeat.dart';
 import '../widgets/effects/motion.dart';
+import '../widgets/molecules/us_confirm.dart';
 
 /// The couple's private chat. Messages arrive in real time; your partner's
 /// messages are marked read while this screen is open.
@@ -312,27 +313,14 @@ class _ChatScreenState extends State<ChatScreen> {
           if (text == null || text.trim() == m.body) return;
           await ChatService.edit(m.id, text);
         case MessageAction.delete:
-          final ok = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Delete this message?'),
-              content: const Text('It will be removed for both of you.'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel')),
-                // Destructive, so it reads as one: filled in the error colour.
-                FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.error,
-                      foregroundColor: Theme.of(context).colorScheme.onError,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Delete')),
-              ],
-            ),
+          final ok = await showUsConfirm(
+            context,
+            title: 'Delete this message?',
+            message: 'It will be removed for both of you.',
+            confirmLabel: 'Delete',
+            destructive: true,
           );
-          if (ok != true) return;
+          if (!ok) return;
           await ChatService.delete(m.id);
       }
       await _load();
@@ -442,7 +430,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: IconButton.filledTonal(
                 tooltip: 'Close',
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
+                icon: const UsIcon(UsIcons.close, size: 20),
               ),
             ),
           ],
@@ -508,7 +496,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0,
+        // Snug beside a back button; as a tab, off the screen edge.
+        titleSpacing: Navigator.of(context).canPop() ? 0 : AppSpacing.lg,
         title: Row(
           children: [
             AvatarCircle(name: p.displayName, imageUrl: p.avatarUrl, size: 36),
@@ -518,9 +507,20 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(p.displayName, style: theme.textTheme.titleMedium),
-                  Text('Private chat \u00B7 only you two',
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: scheme.onSurfaceVariant)),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      UsIcon(UsIcons.lock,
+                          size: 12, color: scheme.onSurfaceVariant),
+                      const SizedBox(width: AppSpacing.xs),
+                      Flexible(
+                        child: Text('Private \u00B7 only you two',
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall
+                                ?.copyWith(color: scheme.onSurfaceVariant)),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -581,8 +581,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? const SizedBox(width: double.infinity)
                 : Container(
               width: double.infinity,
-              color: scheme.surfaceContainerHighest,
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              constraints: const BoxConstraints(maxWidth: 720),
+              margin: const EdgeInsets.fromLTRB(
+                  AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.sm),
+              padding: const EdgeInsets.all(AppSpacing.xs),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+              ),
               child: Wrap(
                 alignment: WrapAlignment.center,
                 children: [
@@ -601,13 +607,14 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           SafeArea(
             top: false,
+            // A quiet bar on the screen colour; only the field is a surface.
             child: Container(
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
+                color: scheme.surface,
                 border: Border(top: BorderSide(color: scheme.outline)),
               ),
               padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xs, AppSpacing.xs, AppSpacing.xs, AppSpacing.xs),
+                  AppSpacing.xs, AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 720),
@@ -626,18 +633,17 @@ class _ChatScreenState extends State<ChatScreen> {
                               child: child,
                             ),
                           ),
-                          child: Icon(
-                            _showEmojis
-                                ? Icons.keyboard_outlined
-                                : Icons.emoji_emotions_outlined,
+                          child: UsIcon(
+                            _showEmojis ? UsIcons.keyboard : UsIcons.smile,
                             key: ValueKey(_showEmojis),
+                            size: 22,
                           ),
                         ),
                       ),
                       IconButton(
                         tooltip: 'Send a photo',
                         onPressed: _sending ? null : _sendPhoto,
-                        icon: const Icon(Icons.photo_outlined),
+                        icon: const UsIcon(UsIcons.image, size: 22),
                       ),
                       Expanded(
                         child: TextField(
@@ -648,10 +654,17 @@ class _ChatScreenState extends State<ChatScreen> {
                           textCapitalization: TextCapitalization.sentences,
                           textInputAction: TextInputAction.send,
                           onSubmitted: (_) => _send(),
-                          decoration: const InputDecoration(
+                          // A soft rounded field: a hairline at rest, rose
+                          // only while you type.
+                          decoration: InputDecoration(
                             hintText: 'Message',
                             counterText: '',
                             isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.lg, vertical: 11),
+                            border: _composerBorder(scheme.outline),
+                            enabledBorder: _composerBorder(scheme.outline),
+                            focusedBorder: _composerBorder(scheme.primary),
                           ),
                         ),
                       ),
@@ -692,8 +705,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                           child: CircularProgressIndicator(
                                               strokeWidth: 2,
                                               color: scheme.onSurfaceVariant))
-                                      : const Icon(Icons.send_rounded,
-                                          key: ValueKey('send')),
+                                      : const UsIcon(UsIcons.send,
+                                          key: ValueKey('send'), size: 20),
                                 ),
                               ),
                             ),
@@ -712,6 +725,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
+/// The composer field's outline: a soft rounded edge in [color].
+OutlineInputBorder _composerBorder(Color color) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.sheet),
+      borderSide: BorderSide(color: color),
+    );
+
+/// A quiet day marker: the label between two hairlines, no pill.
 class _DaySeparator extends StatelessWidget {
   const _DaySeparator({super.key, required this.label});
 
@@ -720,19 +740,22 @@ class _DaySeparator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final line = Expanded(child: Divider(height: 1, color: scheme.outline));
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
+      padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.md, horizontal: AppSpacing.xl),
+      child: Row(
+        children: [
+          line,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Text(label,
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: scheme.onSurfaceVariant)),
           ),
-          child: Text(label,
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: theme.colorScheme.onPrimaryContainer)),
-        ),
+          line,
+        ],
       ),
     );
   }
@@ -822,7 +845,8 @@ class _Bubble extends StatelessWidget {
                             width: 200,
                             height: 140,
                             color: scheme.primaryContainer,
-                            child: Icon(Icons.photo_outlined, color: scheme.primary),
+                            alignment: Alignment.center,
+                            child: UsIcon(UsIcons.image, color: scheme.primary),
                           )
                         : Image.network(
                             m.photoUrl!,
@@ -903,7 +927,6 @@ class _Bubble extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: bg,
                           borderRadius: radius,
-                          border: mine ? null : Border.all(color: scheme.outline),
                         ),
                         foregroundDecoration: focused
                             ? BoxDecoration(
@@ -971,18 +994,16 @@ class _EmptyChat extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: staggered([
-            // The app's own heart on a blush disc, not a generic chat icon.
+            // The app's own heart on a quiet disc, not a generic chat icon.
             Container(
-              width: 88,
-              height: 88,
+              width: 80,
+              height: 80,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: scheme.primaryContainer,
-                boxShadow: AppShadows.glow(scheme.primary),
               ),
-              child: Heartbeat(
-                child: Icon(Icons.favorite_rounded, size: 40, color: scheme.primary),
-              ),
+              child: UsIcon(UsIcons.heart, size: 36, color: scheme.primary),
             ),
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.xxl),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/chat_reaction.dart';
 import '../../theme/app_spacing.dart';
+import '../atoms/us_icon.dart';
 import '../effects/motion.dart';
 import 'reaction_art.dart';
 
@@ -151,8 +152,8 @@ class _Chip extends StatelessWidget {
                         // Yours is marked with a check, not only by colour.
                         if (g.mine) ...[
                           const SizedBox(width: 2),
-                          Icon(
-                            Icons.check_rounded,
+                          UsIcon(
+                            UsIcons.check,
                             size: 14,
                             color: scheme.onPrimaryContainer,
                           ),
