@@ -14,7 +14,9 @@ import '../services/couple_service.dart';
 import '../services/memory_service.dart';
 import '../services/scrapbook_service.dart';
 import '../theme/app_spacing.dart';
+import '../theme/app_typography.dart';
 import '../widgets/atoms/app_button.dart';
+import '../widgets/atoms/us_icon.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/home/quick_actions.dart';
@@ -83,6 +85,10 @@ class _TimelineScreenState extends State<TimelineScreen>
   ScrapbookLayout? _layout;
 
   final _view = TransformationController();
+
+  /// How visible the board's own month tags are; they hand over to the
+  /// floating tags as you zoom out (see [boardTagOpacity]).
+  final _tagOpacity = ValueNotifier<double>(1);
   late final AnimationController _anim = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 300),
@@ -183,6 +189,7 @@ class _TimelineScreenState extends State<TimelineScreen>
     _anim.dispose();
     _arrange.dispose();
     _view.dispose();
+    _tagOpacity.dispose();
     _live.dispose();
     _decoLive.dispose();
     _search.dispose();
@@ -394,16 +401,13 @@ class _TimelineScreenState extends State<TimelineScreen>
       (_viewport?.width ?? ScrapbookLayout.readingWidth) /
       ScrapbookLayout.readingWidth;
 
-  /// The zoom that fits all the content on screen, both ways.
-  double get _fitScale {
+  /// As far out as the board still fills the screen from side to side, so
+  /// no wall shows beside it; further back in time is a scroll down.
+  double get _minScale {
     final layout = _layout, vp = _viewport;
     if (layout == null || vp == null) return _defaultScale;
-    final c = layout.contentRect.inflate(_room);
-    return math.min(vp.width / c.width, vp.height / c.height);
+    return math.min(_defaultScale, vp.width / boardRect(layout).width);
   }
-
-  /// Far enough out to see the whole story at once (as small collages).
-  double get _minScale => math.min(_defaultScale * 0.16, _fitScale * 0.95);
 
   /// Close enough to study a photo, not so close it's just blur.
   double get _maxScale => _defaultScale * 3;
@@ -419,6 +423,10 @@ class _TimelineScreenState extends State<TimelineScreen>
   void _watchZoom() {
     final low = _scale < _defaultScale * 0.35;
     if (low != _lowRes) setState(() => _lowRes = low);
+    _tagOpacity.value = boardTagOpacity(
+      farOutProgress(_scale, _defaultScale),
+      still: motionOff(context),
+    );
   }
 
   Offset get _translation {
@@ -429,17 +437,14 @@ class _TimelineScreenState extends State<TimelineScreen>
   static Matrix4 _matrix(double s, Offset t) =>
       Matrix4.diagonal3Values(s, s, s)..setTranslationRaw(t.dx, t.dy, 0);
 
-  /// Breathing room kept around the content when panning (canvas units).
-  static const _room = 90.0;
-
-  /// Keeps the content on screen in both directions: the screen may not go
-  /// further than a little past the outermost memories, and content smaller
-  /// than the screen (along either axis) is centred. So you can explore the
+  /// Keeps the board on screen in both directions: the screen may not go
+  /// past the board's frame, and a board smaller than the screen (along
+  /// either axis) is centred. So you can explore the
   /// whole board sideways and down, but never get lost in empty space.
   Offset _clamp(double s, Offset t) {
     final layout = _layout, vp = _viewport;
     if (layout == null || vp == null) return t;
-    final c = layout.contentRect.inflate(_room);
+    final c = boardRect(layout);
     double axis(double lo, double hi, double screen, double value) {
       final size = (hi - lo) * s;
       if (size <= screen) return screen / 2 - (lo + hi) / 2 * s;
@@ -458,11 +463,26 @@ class _TimelineScreenState extends State<TimelineScreen>
     final layout = _layout, vp = _viewport;
     final s = _defaultScale;
     if (layout == null || vp == null) return _matrix(s, Offset.zero);
-    final first = layout.months.isEmpty
-        ? layout.contentRect
-        : layout.months.first.area;
-    final top = math.min(first.top, layout.contentRect.top);
-    final t = Offset(vp.width / 2 - first.center.dx * s, 12 - top * s);
+    final strip = layout.newStripRect;
+    final newest = layout.months.isEmpty ? null : layout.months.first;
+    // What to open on: the New memories strip, else the newest month's tag
+    // (it sits above that month's highest memory), else everything.
+    final Rect area;
+    final Rect anchor;
+    if (strip != null) {
+      area = anchor = strip;
+    } else if (newest != null) {
+      area = newest.area;
+      anchor = newest.headingRect;
+    } else {
+      area = anchor = layout.contentRect;
+    }
+    // Centre the month when it fits across the screen; otherwise start at
+    // its tag, so the month's name is the first thing you see.
+    final x = area.width * s <= vp.width
+        ? vp.width / 2 - area.center.dx * s
+        : AppSpacing.lg - (anchor.left - 8) * s;
+    final t = Offset(x, 12 - (anchor.top - 8) * s);
     return _matrix(s, _clamp(s, t));
   }
 
@@ -1384,6 +1404,7 @@ class _TimelineScreenState extends State<TimelineScreen>
               onTapDeco: _tapDeco,
               onDecoGestureStart: _decoGestureStart,
               showDates: !_hideDates,
+              tagOpacity: _tagOpacity,
             ),
             onInteractionStart: _anim.stop,
             onInteractionEnd: _settle,
@@ -1597,8 +1618,8 @@ class _Header extends StatelessWidget {
                     if (!editing &&
                         MediaQuery.sizeOf(context).width >= 360) ...[
                       const SizedBox(width: 6),
-                      const Icon(
-                        Icons.favorite_border_rounded,
+                      const UsIcon(
+                        UsIcons.heart,
                         size: 20,
                         color: NotePalette.rose,
                       ),
@@ -1610,6 +1631,8 @@ class _Header extends StatelessWidget {
                   editing
                       ? 'Tap to select, hold to move.'
                       : 'The little moments that became us.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: NotePalette.muted,
                   ),
@@ -1621,8 +1644,8 @@ class _Header extends StatelessWidget {
             IconButton(
               tooltip: 'Undo',
               onPressed: onUndo,
-              icon: Icon(
-                Icons.undo_rounded,
+              icon: UsIcon(
+                UsIcons.undo,
                 color: onUndo == null
                     ? NotePalette.muted.withValues(alpha: 0.35)
                     : NotePalette.cream,
@@ -1633,10 +1656,7 @@ class _Header extends StatelessWidget {
               IconButton(
                 tooltip: 'Arrange',
                 onPressed: onArrange,
-                icon: const Icon(
-                  Icons.auto_awesome_mosaic_outlined,
-                  color: NotePalette.cream,
-                ),
+                icon: const UsIcon(UsIcons.arrange, color: NotePalette.cream),
               )
             else
               OutlinedButton.icon(
@@ -1649,7 +1669,7 @@ class _Header extends StatelessWidget {
                   minimumSize: const Size(0, 40),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
-                icon: const Icon(Icons.auto_awesome_mosaic_outlined, size: 18),
+                icon: const UsIcon(UsIcons.arrange, size: 18),
                 label: const Text('Arrange'),
               ),
           ] else ...[
@@ -1657,13 +1677,13 @@ class _Header extends StatelessWidget {
               IconButton(
                 tooltip: 'Edit scrapbook',
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined, color: NotePalette.cream),
+                icon: const UsIcon(UsIcons.edit, color: NotePalette.cream),
               ),
             IconButton(
               tooltip: searching ? 'Close search' : 'Find a memory',
               onPressed: onSearch,
-              icon: Icon(
-                searching ? Icons.search_off_rounded : Icons.search_rounded,
+              icon: UsIcon(
+                searching ? UsIcons.close : UsIcons.search,
                 color: NotePalette.cream,
               ),
             ),
@@ -1685,10 +1705,12 @@ class _Header extends StatelessWidget {
                       onTap: onAdd,
                       child: const SizedBox.square(
                         dimension: 48,
-                        child: Icon(
-                          Icons.add_rounded,
-                          color: UsPalette.onRose,
-                          size: 28,
+                        child: Center(
+                          child: UsIcon(
+                            UsIcons.plus,
+                            color: UsPalette.onRose,
+                            size: 26,
+                          ),
                         ),
                       ),
                     ),
@@ -1745,6 +1767,9 @@ class _ScrapbookViewport extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
+        // The wall the framed board hangs on: soft plum, seen only above or
+        // below a board shorter than the screen.
+        const Positioned.fill(child: ColoredBox(color: UsPalette.surface)),
         InteractiveViewer(
           transformationController: view,
           constrained: false,
@@ -1836,10 +1861,8 @@ class _DatesToggle extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        hidden
-                            ? Icons.event_available_outlined
-                            : Icons.event_busy_outlined,
+                      const UsIcon(
+                        UsIcons.calendar,
                         size: 18,
                         color: NotePalette.pink,
                       ),
@@ -1862,8 +1885,10 @@ class _DatesToggle extends StatelessWidget {
   }
 }
 
-/// Far out, month names at readable size over each chapter. Tap one to
-/// zoom into that month.
+/// Far out, each month's paper tag at readable size over its chapter
+/// (taking over from the board's own tags, which fade out first). Tap one
+/// to zoom into that month. Tags never overlap: crowded ones move down,
+/// and any that would fall off screen wait until you zoom in.
 class _MonthLabels extends StatelessWidget {
   const _MonthLabels({
     required this.layout,
@@ -1879,48 +1904,85 @@ class _MonthLabels extends StatelessWidget {
   final double defaultScale;
   final void Function(ScrapMonth) onMonth;
 
+  /// Lettering size of a floating tag (screen pixels).
+  static const _size = 16.0;
+
+  /// Room above and below a tag so it is easy to tap.
+  static const _pad = 10.0;
+
+  /// A tag's on-screen size, from its text.
+  static Size _measure(String label) {
+    final text = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: AppTypography.monthTag(size: _size),
+      ),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final size = Size(
+      text.width + _size * 1.8 + 4,
+      text.height + _size * 0.2 + _pad * 2,
+    );
+    text.dispose();
+    return size;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final still = motionOff(context);
+    final sizes = {
+      for (final m in layout.months)
+        (m.year, m.month): _measure(monthTitle(m.year, m.month)),
+    };
     return AnimatedBuilder(
       animation: view,
       builder: (context, _) {
         final m = view.value;
         final s = m.getMaxScaleOnAxis();
-        // Fade in between 60% and 45% of the normal size.
-        final t = ((defaultScale * 0.6 - s) / (defaultScale * 0.15)).clamp(
-          0.0,
-          1.0,
+        final opacity = floatingTagOpacity(
+          farOutProgress(s, defaultScale),
+          still: still,
         );
-        if (t == 0) return const SizedBox.shrink();
+        if (opacity == 0) return const SizedBox.shrink();
         final tr = m.getTranslation();
-        return Stack(
-          children: [
-            for (final month in layout.months)
-              if (month.top * s + tr.y > -30 &&
-                  month.top * s + tr.y < viewport.height)
-                Positioned(
-                  left: (month.headingRect.left * s + tr.x).clamp(
-                    8.0,
-                    math.max(8.0, viewport.width - 120),
-                  ),
-                  top: month.top * s + tr.y,
-                  child: Opacity(
-                    opacity: t,
-                    child: _MonthChip(
-                      month: month,
-                      onTap: () => onMonth(month),
+        final shown = <ScrapMonth>[];
+        final boxes = <Rect>[];
+        for (final month in layout.months) {
+          final size = sizes[(month.year, month.month)]!;
+          final top = month.headingRect.top * s + tr.y - _pad;
+          if (top < -size.height || top > viewport.height) continue;
+          final left = (month.headingRect.left * s + tr.x).clamp(
+            8.0,
+            math.max(8.0, viewport.width - size.width - 8),
+          ).toDouble();
+          shown.add(month);
+          boxes.add(Offset(left, top) & size);
+        }
+        final spots = spreadTags(boxes, maxBottom: viewport.height);
+        return Opacity(
+          opacity: opacity,
+          child: Stack(
+            children: [
+              for (var i = 0; i < shown.length; i++)
+                if (spots[i] case final spot?)
+                  Positioned.fromRect(
+                    rect: spot,
+                    child: _FloatingTag(
+                      month: shown[i],
+                      onTap: () => onMonth(shown[i]),
                     ),
                   ),
-                ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
 }
 
-class _MonthChip extends StatelessWidget {
-  const _MonthChip({required this.month, required this.onTap});
+class _FloatingTag extends StatelessWidget {
+  const _FloatingTag({required this.month, required this.onTap});
 
   final ScrapMonth month;
   final VoidCallback onTap;
@@ -1930,26 +1992,16 @@ class _MonthChip extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '${monthLabel(month.year, month.month)}, ${month.count} memories. Zoom in',
+          '${monthTitle(month.year, month.month)}, ${month.count} memories. Zoom in',
       excludeSemantics: true,
-      child: Material(
-        color: UsPalette.card.withValues(alpha: 0.93),
-        shape: StadiumBorder(
-          side: BorderSide(color: NotePalette.pink.withValues(alpha: 0.5)),
-        ),
-        child: InkWell(
-          customBorder: const StadiumBorder(),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            child: Text(
-              shortMonthLabel(month.year, month.month),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: NotePalette.cream,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.4,
-              ),
-            ),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: _MonthLabels._pad),
+          child: MonthTag(
+            label: monthTitle(month.year, month.month),
+            size: _MonthLabels._size,
           ),
         ),
       ),

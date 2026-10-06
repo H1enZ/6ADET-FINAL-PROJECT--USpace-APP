@@ -6,6 +6,7 @@ import '../notes/note_style.dart';
 import 'scrap_frames.dart';
 import 'scrapbook_layout.dart';
 import '../../theme/us_palette.dart';
+import '../atoms/us_icon.dart';
 
 /// The compact editing toolbar shown while arranging the scrapbook (Undo
 /// and Arrange sit in the header).
@@ -56,7 +57,7 @@ class ScrapEditToolbar extends StatelessWidget {
     final narrow = MediaQuery.sizeOf(context).width < 360;
     Widget tool(
       String label,
-      IconData icon,
+      UsIconData icon,
       VoidCallback? onTap, {
       bool on = false,
     }) {
@@ -76,7 +77,7 @@ class ScrapEditToolbar extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 21, color: color),
+                UsIcon(icon, size: 21, color: color),
                 const SizedBox(height: 2),
                 Text(
                   label,
@@ -113,41 +114,41 @@ class ScrapEditToolbar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
                 children: [
-                  tool('Add', Icons.add_circle_outline_rounded, onAdd),
+                  tool('Add', UsIcons.plus, onAdd),
                   if (deco) ...[
                     if (onEditNote != null)
-                      tool('Write', Icons.edit_note_rounded, onEditNote),
+                      tool('Write', UsIcons.note, onEditNote),
                     if (onColor != null)
-                      tool('Colour', Icons.palette_outlined, onColor),
-                    tool('Turn', Icons.rotate_90_degrees_ccw_rounded, onTurn),
-                    tool('Layer', Icons.layers_outlined, onLayer),
-                    tool('Delete', Icons.delete_outline_rounded, onDelete),
+                      tool('Colour', UsIcons.palette, onColor),
+                    tool('Turn', UsIcons.rotate, onTurn),
+                    tool('Layer', UsIcons.layers, onLayer),
+                    tool('Delete', UsIcons.trash, onDelete),
                   ] else ...[
                     if (onEditMemory != null)
-                      tool('Edit', Icons.edit_outlined, onEditMemory),
+                      tool('Edit', UsIcons.edit, onEditMemory),
                     tool(
                       'Frame',
-                      Icons.filter_frames_outlined,
+                      UsIcons.frame,
                       hasSelection ? onFrame : null,
                     ),
                     tool(
                       'Size',
-                      Icons.photo_size_select_large_rounded,
+                      UsIcons.resize,
                       hasSelection ? onSize : null,
                     ),
                     tool(
                       'Turn',
-                      Icons.rotate_90_degrees_ccw_rounded,
+                      UsIcons.rotate,
                       hasSelection ? onTurn : null,
                     ),
                     tool(
                       'Layer',
-                      Icons.layers_outlined,
+                      UsIcons.layers,
                       hasSelection ? onLayer : null,
                     ),
                     tool(
                       'Connect',
-                      Icons.timeline_rounded,
+                      UsIcons.link,
                       hasSelection || connecting ? onConnect : null,
                       on: connecting,
                     ),

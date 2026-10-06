@@ -61,6 +61,18 @@ abstract final class UsIcons {
   static const copy = UsIconData('copy');
   static const minusCircle = UsIconData('minus-circle');
 
+  static const search = UsIconData('search');
+  static const undo = UsIconData('undo');
+
+  // Timeline editor.
+  static const arrange = UsIconData('arrange');
+  static const frame = UsIconData('frame');
+  static const resize = UsIconData('resize');
+  static const rotate = UsIconData('rotate');
+  static const layers = UsIconData('layers');
+  static const link = UsIconData('link');
+  static const palette = UsIconData('palette');
+
   // Chat composer.
   static const send = UsIconData('send');
   static const image = UsIconData('image');

@@ -29,6 +29,9 @@ The reference I open every time I build a screen. Everything below is what goes 
 | `line` | `#F6A9C1` at 20% | Card and input borders (`outline`) | non-text |
 | `sage` | `#7FBFA0` | Done, ready to open (`tertiary`) | 8.04:1 on card |
 | `error` | `#F2A0A6` | Errors | 8.44:1 on card |
+| `cork` | `#6A4438` | Timeline corkboard surface | surface only, never under text |
+| `corkLight` | `#7A5040` | Lighter cork patches | surface only |
+| `corkDeep` | `#3E2228` | Board frame shading, tag string holes | surface only |
 
 `primaryContainer` is `#4A1F36`: blush text on it measures 9.84:1. Mood gradients stay in `AppMoodColors` and are used only by the Home mood hero.
 
@@ -36,7 +39,7 @@ The reference I open every time I build a screen. Everything below is what goes 
 
 ## Type scale
 
-Poppins was retired on 6 Oct 2026. **Playfair Display** is for major headings only: countdowns, hero titles, the capsule reveal and the wordmark. It never goes on labels, buttons, chips or body text. **Inter** is everything else. **Lora** is for letter bodies (Love Notes, Time Capsules) and **Caveat** for Timeline handwriting, nowhere else. All live in `lib/theme/app_typography.dart`.
+Poppins was retired on 6 Oct 2026. **Playfair Display** is for major headings only: countdowns, hero titles, the capsule reveal and the wordmark. It never goes on labels, buttons, chips or body text. **Inter** is everything else. **Lora** is for letter bodies (Love Notes, Time Capsules), **Caveat** for Timeline handwriting (captions, notes, tape), and **La Belle Aurore**, a lightly joined pen script, for Timeline month tags only (`AppTypography.monthTag`), nowhere else. All live in `lib/theme/app_typography.dart`.
 
 | Slot | Font | Size | Weight | Used for |
 |---|---|---|---|---|
@@ -112,6 +115,13 @@ Nineteen widgets, every one used on more than one screen or more than once on a 
 **Deliberately not components:** `HomeSummaryPanel` (it was the whole screen wearing a component's name), screen scaffolds (the shared part is already `AppShell`), and Splash (a route that decides where to go, so its logic belongs in routing).
 
 ## Changes since the last version
+
+**6 Oct 2026 — redesign batch 5 (Timeline corkboard).**
+
+- The Timeline board is warm cocoa cork with a fine speckle (`CorkSurface`, `lib/widgets/timeline/cork_surface.dart`), anchored to board coordinates, in a thin wooden frame (`BoardFrame`) sized to what is on the board and hung on the plum background. The floating hearts, month glow and doodles behind the board are gone.
+- One month label everywhere: a cream paper tag with a rose pin, lettered in La Belle Aurore (`MonthTag`). The year stamp is retired. When zoomed out, the board's tags fade out before the floating ones fade in, so a month never shows twice; floating tags never overlap.
+- The Timeline opens on the newest month's tag (or the New memories strip).
+- Header, dates toggle and editor toolbar use the USpace icon set (57 icons).
 
 **6 Oct 2026 — v3, redesign batch 1 (foundation).**
 

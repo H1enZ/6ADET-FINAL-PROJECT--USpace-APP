@@ -69,4 +69,8 @@ class AppTypography {
   /// Handwriting: Timeline captions and tape labels only.
   static TextStyle hand({Color? color, double size = 20}) =>
       GoogleFonts.caveat(fontSize: size, height: 1.2, color: color);
+
+  /// Pen script, lightly joined: Timeline month tags only.
+  static TextStyle monthTag({Color? color, double size = 22}) =>
+      GoogleFonts.laBelleAurore(fontSize: size, height: 1.25, color: color);
 }

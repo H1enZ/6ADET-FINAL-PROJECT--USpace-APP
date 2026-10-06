@@ -1,12 +1,16 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/scrap_decoration.dart';
 import '../../models/scrapbook.dart';
+import '../../theme/app_typography.dart';
+import '../../theme/us_palette.dart';
 import '../../utils/anniversary.dart';
+import '../atoms/us_icon.dart';
 import '../notes/note_style.dart';
+import 'cork_surface.dart';
 import 'scrap_decorations.dart';
 import 'scrap_frames.dart';
 import 'scrapbook_layout.dart';
@@ -21,6 +25,12 @@ const _shortMonths = [
 ];
 
 String monthLabel(int year, int month) => '${_monthNames[month - 1]} $year';
+
+/// "October 2026", as handwritten on a month tag.
+String monthTitle(int year, int month) {
+  final name = _monthNames[month - 1];
+  return '${name[0]}${name.substring(1).toLowerCase()} $year';
+}
 String shortMonthLabel(int year, int month) =>
     '${_shortMonths[month - 1].toUpperCase()} $year';
 
@@ -64,10 +74,16 @@ class ScrapbookCanvas extends StatefulWidget {
     this.onTapDeco,
     this.onDecoGestureStart,
     this.showDates = true,
+    this.tagOpacity,
   });
 
-  /// The year stamps and month headings on the board (hidden on request).
+  /// The month tags on the board (hidden on request).
   final bool showDates;
+
+  /// How visible the month tags on the board are (1 = fully). They fade out
+  /// as the viewer zooms far out, where floating tags take over, so a month
+  /// never shows twice. Only the tags repaint as it changes.
+  final ValueListenable<double>? tagOpacity;
 
   final ScrapbookLayout layout;
 
@@ -144,6 +160,13 @@ class _ScrapbookCanvasState extends State<ScrapbookCanvas> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // The corkboard: framed, and only as big as what is on it.
+          Positioned.fromRect(
+            rect: boardRect(layout),
+            child: BoardFrame(
+              origin: layout.origin + corkRect(layout).topLeft,
+            ),
+          ),
           if (editing)
             Positioned.fill(
               child: GestureDetector(
@@ -151,22 +174,18 @@ class _ScrapbookCanvasState extends State<ScrapbookCanvas> {
                 onTap: w.onTapEmpty,
               ),
             ),
-          for (final m in layout.months) ...[
-            Positioned.fromRect(
-              rect: m.area.inflate(24),
-              child: _MonthDecor(month: m),
-            ),
-            if (w.showDates && m.yearRect != null)
-              Positioned.fromRect(
-                rect: m.yearRect!,
-                child: _YearStamp(year: m.year),
-              ),
-            if (w.showDates)
+          if (w.showDates)
+            for (final m in layout.months)
               Positioned.fromRect(
                 rect: m.headingRect,
-                child: _MonthHeading(label: monthLabel(m.year, m.month)),
+                child: _FadingTag(
+                  opacity: w.tagOpacity,
+                  child: MonthTag(
+                    label: monthTitle(m.year, m.month),
+                    turn: _tagTurn(m),
+                  ),
+                ),
               ),
-          ],
           if (layout.newStripRect != null)
             Positioned.fromRect(
               rect: layout.newStripRect!,
@@ -924,243 +943,324 @@ class _GuidePainter extends CustomPainter {
 
 // ------------------------------------------------------------- headings
 
-class _YearStamp extends StatelessWidget {
-  const _YearStamp({required this.year});
-
-  final int year;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    header: true,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Transform.rotate(
-        angle: -0.04,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: NotePalette.rose.withValues(alpha: 0.8),
-              width: 2,
-            ),
-          ),
-          child: Text(
-            '$year',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 3,
-              color: NotePalette.rose,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
 class _NewStripLabel extends StatelessWidget {
   const _NewStripLabel();
 
   @override
   Widget build(BuildContext context) => Semantics(
     header: true,
-    child: Row(
-      children: [
-        const Icon(
-          Icons.auto_awesome_rounded,
-          size: 16,
-          color: NotePalette.pink,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          'NEW MEMORIES',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: NotePalette.cream,
-            letterSpacing: 2,
-            fontWeight: FontWeight.w700,
+    // On a soft dark band, so the words stay readable on the cork.
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: UsPalette.ink.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const UsIcon(UsIcons.sparkle, size: 16, color: NotePalette.pink),
+          const SizedBox(width: 6),
+          Text(
+            'NEW MEMORIES',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: NotePalette.cream,
+              letterSpacing: 2,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'Drag them into place, or organize by date',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: NotePalette.muted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Drag them into place, or organize by date',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: NotePalette.muted),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
 
-/// "OCTOBER 2026" on a torn strip of paper with tape.
-class _MonthHeading extends StatelessWidget {
-  const _MonthHeading({required this.label});
+/// A small fixed tilt per month, so the tags look pinned by hand.
+double _tagTurn(ScrapMonth m) => ((m.year * 12 + m.month) % 5 - 2) * 0.012;
 
-  final String label;
+/// A month tag on the board, faded by [opacity] while the viewer is far
+/// out. Gestures always pass through it, and once it is mostly faded it
+/// leaves the semantics tree (the floating tag speaks for the month then).
+class _FadingTag extends StatelessWidget {
+  const _FadingTag({required this.opacity, required this.child});
+
+  final ValueListenable<double>? opacity;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
+    final tag = IgnorePointer(child: RepaintBoundary(child: child));
+    final o = opacity;
+    if (o == null) return tag;
+    return ValueListenableBuilder<double>(
+      valueListenable: o,
+      child: tag,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: ExcludeSemantics(excluding: value < 0.5, child: child),
+      ),
+    );
+  }
+}
+
+/// A month's name handwritten on a cream paper tag, held to the cork by a
+/// small rose pin, with a string hole at its square end. Used on the board
+/// and, smaller, as the floating month buttons when zoomed out.
+class MonthTag extends StatelessWidget {
+  const MonthTag({
+    super.key,
+    required this.label,
+    this.turn = 0,
+    this.size = 22,
+  });
+
+  /// "October 2026".
+  final String label;
+
+  /// Tilt in radians.
+  final double turn;
+
+  /// Lettering size; the tag grows with it.
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final hole = size * 0.26;
+    final pin = size * 0.5;
     return Semantics(
       header: true,
-      child: Transform.rotate(
-        angle: -0.03,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            ClipPath(
-              clipper: _TornEdge(),
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFF1DCCF), Color(0xFFE6C8BC)],
+      label: label,
+      excludeSemantics: true,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Transform.rotate(
+          angle: turn,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: EdgeInsets.fromLTRB(
+                  size * 1.05,
+                  size * 0.12,
+                  size * 0.75,
+                  size * 0.08,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [NotePalette.paper, NotePalette.paperEdge],
+                  ),
+                  borderRadius: BorderRadius.horizontal(
+                    left: Radius.circular(size * 0.14),
+                    right: Radius.circular(size * 0.55),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x66000000),
+                      blurRadius: 7,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: AppTypography.monthTag(
+                    color: NotePalette.ink,
+                    size: size,
                   ),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                alignment: Alignment.centerLeft,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 2,
-                      color: NotePalette.ink,
+              ),
+              // The string hole.
+              Positioned(
+                left: size * 0.38,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Container(
+                    width: hole,
+                    height: hole,
+                    decoration: const BoxDecoration(
+                      color: UsPalette.corkDeep,
+                      shape: BoxShape.circle,
                     ),
                   ),
                 ),
               ),
-            ),
-            const Positioned(
-              left: -6,
-              top: -6,
-              child: ScrapTape(width: 42, turn: -0.5),
-            ),
-          ],
+              // The pin, just right of the hole and over the top edge.
+              Positioned(
+                left: size * 0.62,
+                top: -pin * 0.35,
+                child: Container(
+                  width: pin,
+                  height: pin,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: Alignment(-0.35, -0.35),
+                      colors: [UsPalette.blush, UsPalette.roseDeep],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x80000000),
+                        blurRadius: 3,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _TornEdge extends CustomClipper<Path> {
-  static const _teeth = [
-    0.0,
-    2.0,
-    0.5,
-    2.5,
-    1.0,
-    0.0,
-    2.2,
-    0.8,
-    1.6,
-    0.3,
-    2.4,
-    1.1,
-  ];
+// ------------------------------------------------------------- board
 
-  @override
-  Path getClip(Size size) {
-    final w = size.width, h = size.height;
-    final p = Path()..moveTo(0, _teeth[0]);
-    for (var i = 1; i < _teeth.length; i++) {
-      p.lineTo(w * i / (_teeth.length - 1), _teeth[i]);
-    }
-    for (var i = 0; i < 6; i++) {
-      p.lineTo(w - (i.isEven ? 0 : 3), h * (i + 1) / 6);
-    }
-    for (var i = _teeth.length - 1; i >= 0; i--) {
-      p.lineTo(
-        w * i / (_teeth.length - 1),
-        h - _teeth[(i + 3) % _teeth.length],
-      );
-    }
-    for (var i = 6; i > 0; i--) {
-      p.lineTo(i.isEven ? 0 : 3, h * (i - 1) / 6);
-    }
-    return p..close();
-  }
-
-  @override
-  bool shouldReclip(_TornEdge old) => false;
+/// The framed board (canvas units): everything on it (memories, month
+/// tags, the New strip, stickers) plus a cork margin and the frame. It grows
+/// as soon as something is placed past it, and is never narrower than the
+/// reading width, so at reading size it always fills the screen across.
+/// Panning stops at its edges.
+Rect boardRect(ScrapbookLayout layout) {
+  final r = layout.contentRect.inflate(BoardFrame.margin + BoardFrame.width);
+  const minWidth = ScrapbookLayout.readingWidth;
+  if (r.width >= minWidth) return r;
+  return Rect.fromCenter(center: r.center, width: minWidth, height: r.height);
 }
 
-/// A soft glow and a few outline hearts and a dashed doodle around each
-/// month, so every chapter looks a little hand-made (fixed per month).
-class _MonthDecor extends StatelessWidget {
-  const _MonthDecor({required this.month});
+/// The cork inside the frame.
+Rect corkRect(ScrapbookLayout layout) =>
+    boardRect(layout).deflate(BoardFrame.width);
 
-  final ScrapMonth month;
+/// A real pinboard: cocoa cork in a thin dark wooden frame with a soft
+/// shadow, hanging on the app's plum. Gestures pass through it.
+class BoardFrame extends StatelessWidget {
+  const BoardFrame({super.key, required this.origin});
+
+  /// Where the cork's top-left sits in saved board units (keeps the grain
+  /// fixed to the board).
+  final Offset origin;
+
+  /// Cork between the outermost things on the board and the frame.
+  static const margin = 76.0;
+
+  /// The wooden frame's width.
+  static const width = 14.0;
 
   @override
   Widget build(BuildContext context) => IgnorePointer(
     child: ExcludeSemantics(
-      child: CustomPaint(
-        painter: _DecorPainter(seed: month.year * 12 + month.month),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          // Dark wood: deeper than the cork, lighter than the wall, with a
+          // faint bevel on its outer edge so it reads as a frame.
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              UsPalette.corkDeep,
+              Color.lerp(UsPalette.corkDeep, UsPalette.ink, 0.55)!,
+              UsPalette.corkDeep,
+            ],
+            stops: const [0, 0.55, 1],
+          ),
+          border: Border.all(
+            color: UsPalette.cream.withValues(alpha: 0.10),
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x8C000000),
+              blurRadius: 28,
+              offset: Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(width),
+          child: DecoratedBox(
+            // A thin dark line where the cork meets the wood.
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: const Color(0x66140C14), width: 1.5),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: CorkSurface(origin: origin),
+            ),
+          ),
+        ),
       ),
     ),
   );
 }
 
-class _DecorPainter extends CustomPainter {
-  _DecorPainter({required this.seed});
+// ------------------------------------------------------- tag handoff
 
-  final int seed;
+/// How far the viewer is into "zoomed out" (0 at normal size, 1 from 45%
+/// of it), where the floating month tags take over from the board's own.
+double farOutProgress(double scale, double defaultScale) =>
+    ((defaultScale * 0.6 - scale) / (defaultScale * 0.15)).clamp(0.0, 1.0);
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rnd = math.Random(seed);
-    final rect = Offset.zero & size;
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = RadialGradient(
-          center: Alignment(rnd.nextBool() ? -0.6 : 0.6, -0.2),
-          radius: 0.9,
-          colors: [
-            NotePalette.rose.withValues(alpha: 0.07),
-            NotePalette.rose.withValues(alpha: 0),
-          ],
-        ).createShader(rect),
-    );
-    final left = rnd.nextBool();
-    final x = left ? 8.0 : size.width - 8;
-    final path = Path()..moveTo(x, 60);
-    path.cubicTo(
-      x + (left ? 14 : -14),
-      size.height * 0.35,
-      x + (left ? -6 : 6),
-      size.height * 0.65,
-      x,
-      size.height - 30,
-    );
-    final dash = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = NotePalette.pink.withValues(alpha: 0.22);
-    for (final metric in path.computeMetrics()) {
-      for (var d = 0.0; d < metric.length; d += 10) {
-        canvas.drawPath(metric.extractPath(d, d + 5), dash);
+/// The board's month tags fade out over the first half of the handoff and
+/// the floating ones fade in over the second, so a month is never shown
+/// twice. With reduced motion they simply swap at the midpoint.
+double boardTagOpacity(double progress, {bool still = false}) => still
+    ? (progress < 0.5 ? 1 : 0)
+    : (1 - 2 * progress).clamp(0.0, 1.0);
+
+double floatingTagOpacity(double progress, {bool still = false}) => still
+    ? (progress < 0.5 ? 0 : 1)
+    : (2 * progress - 1).clamp(0.0, 1.0);
+
+/// Floating month tags, kept from overlapping: taken top to bottom (then
+/// left to right), each moves down just below any tag it would cover.
+/// Same order in and out; a tag pushed past [maxBottom] is dropped (null),
+/// so a crowded overview never stacks tags off screen.
+List<Rect?> spreadTags(
+  List<Rect> boxes, {
+  required double maxBottom,
+  double gap = 6,
+}) {
+  final order = List.generate(boxes.length, (i) => i)
+    ..sort((a, b) {
+      final byTop = boxes[a].top.compareTo(boxes[b].top);
+      return byTop != 0 ? byTop : boxes[a].left.compareTo(boxes[b].left);
+    });
+  final placed = <Rect>[];
+  final out = List<Rect?>.filled(boxes.length, null);
+  for (final i in order) {
+    var r = boxes[i];
+    var moved = true;
+    while (moved) {
+      moved = false;
+      for (final p in placed) {
+        if (r.overlaps(p.inflate(gap / 2))) {
+          r = r.translate(0, p.bottom + gap - r.top);
+          moved = true;
+        }
       }
     }
-    final heart = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
-      ..color = NotePalette.pink.withValues(alpha: 0.35);
-    for (var i = 0; i < 2; i++) {
-      final hx = i == 0 ? size.width - 30.0 : 14.0 + rnd.nextDouble() * 10;
-      final hy = 30 + rnd.nextDouble() * math.max(1, size.height - 80);
-      final s = 12 + rnd.nextDouble() * 8;
-      canvas.drawPath(_heartShape(Rect.fromLTWH(hx, hy, s, s)), heart);
-    }
+    if (r.bottom > maxBottom) continue;
+    placed.add(r);
+    out[i] = r;
   }
-
-  @override
-  bool shouldRepaint(_DecorPainter old) => old.seed != seed;
+  return out;
 }

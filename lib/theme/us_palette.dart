@@ -53,6 +53,17 @@ class UsPalette {
   /// A selected or focused border.
   static const lineStrong = Color(0x99F6A9C1);
 
+  // Timeline corkboard. Surfaces only: no text sits directly on cork, so
+  // month names and captions are always on paper.
+  /// The board's warm cocoa cork.
+  static const cork = Color(0xFF6A4438);
+
+  /// Lighter cork, for the board's soft tonal patches.
+  static const corkLight = Color(0xFF7A5040);
+
+  /// Deep cork: the board frame's shading and tag string holes.
+  static const corkDeep = Color(0xFF3E2228);
+
   // Status.
   static const sage = Color(0xFF7FBFA0);
   static const error = Color(0xFFF2A0A6);
