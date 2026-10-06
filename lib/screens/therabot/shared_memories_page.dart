@@ -153,7 +153,7 @@ class _SharedMemoriesPageState extends State<SharedMemoriesPage> {
     try {
       await NoteService.send(
         coupleId: widget.coupleId,
-        title: 'Remember this? 📸',
+        title: 'Remember this?',
         category: NoteCategory.love,
         body: [
           '${memory.caption} · $when',
@@ -243,7 +243,7 @@ class _SharedMemoriesPageState extends State<SharedMemoriesPage> {
     }
 
     return TherabotPage(
-      title: '📸 Shared memories',
+      title: 'Shared memories',
       onRefresh: _load,
       children: [
         Text('A moment you shared', style: theme.textTheme.titleLarge),
@@ -273,8 +273,8 @@ class _MemoryCard extends StatelessWidget {
     final today = DateTime.now();
     final url = memory.photoUrl;
     final badges = [
-      if (isOnThisDay(memory.memoryDate, today)) '🗓 On this day',
-      if (memory.isFavorite) '★ Favourite',
+      if (isOnThisDay(memory.memoryDate, today)) 'On this day',
+      if (memory.isFavorite) 'Favourite',
     ];
     final description = memory.description?.trim() ?? '';
     final location = memory.location?.trim() ?? '';

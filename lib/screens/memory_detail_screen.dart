@@ -8,8 +8,11 @@ import '../utils/anniversary.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/molecules/memory_card.dart';
 import '../widgets/effects/motion.dart';
+import '../theme/app_effects.dart';
+import '../widgets/molecules/us_confirm.dart';
 import 'add_memory_sheet.dart';
 import 'memory_tags_sheet.dart';
+import '../widgets/atoms/us_icon.dart';
 
 /// One memory, full size: swipe through its photos, read the story.
 /// Either partner can favourite, tag or edit it; only the author can delete it.
@@ -75,7 +78,10 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
       useSafeArea: true,
       showDragHandle: true,
       builder: (_) => AddMemorySheet(
-          coupleId: _memory.coupleId, memory: _memory, knownTags: widget.knownTags),
+        coupleId: _memory.coupleId,
+        memory: _memory,
+        knownTags: widget.knownTags,
+      ),
     );
     if (saved != true) return;
     try {
@@ -116,21 +122,14 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   }
 
   Future<void> _delete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this memory?'),
-        content: const Text('It will be removed for both of you, with all its '
-            'photos. This cannot be undone.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete')),
-        ],
-      ),
+    final confirmed = await showUsConfirm(
+      context,
+      title: 'Delete this memory?',
+      message:
+          'It will be removed for both of you, with all its photos. '
+          'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
     );
     if (confirmed != true) return;
     setState(() => _busy = true);
@@ -150,7 +149,20 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final m = _memory;
-    final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    final still = motionOff(context);
+
+    // One quiet line under the title: date, place, who added it.
+    Widget meta(UsIconData icon, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        UsIcon(icon, size: 16, color: scheme.onSurfaceVariant),
+        const SizedBox(width: AppSpacing.xs),
+        Flexible(child: Text(text, style: muted)),
+      ],
+    );
 
     return PopScope<Object?>(
       canPop: false,
@@ -162,12 +174,9 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
           title: const Text('Memory'),
           actions: [
             IconButton(
-              tooltip: 'Move to a category',
-              onPressed: _busy ? null : _retag,
-              icon: const Icon(Icons.sell_outlined),
-            ),
-            IconButton(
-              tooltip: m.isFavorite ? 'Remove from favorites' : 'Add to favorites',
+              tooltip: m.isFavorite
+                  ? 'Remove from favorites'
+                  : 'Add to favorites',
               onPressed: _busy ? null : _toggleFavourite,
               icon: AnimatedHeartIcon(filled: m.isFavorite),
             ),
@@ -175,96 +184,195 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
             IconButton(
               tooltip: 'Edit memory',
               onPressed: _busy ? null : _edit,
-              icon: const Icon(Icons.edit_outlined),
+              icon: const UsIcon(UsIcons.edit, size: 22),
             ),
-            if (widget.isMine) ...[
-              IconButton(
-                tooltip: 'Delete memory',
-                onPressed: _busy ? null : _delete,
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ],
+            PopupMenuButton<String>(
+              tooltip: 'More',
+              enabled: !_busy,
+              icon: const UsIcon(UsIcons.more, size: 22),
+              onSelected: (v) => v == 'delete' ? _delete() : _retag(),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'tags',
+                  child: Row(
+                    children: [
+                      const UsIcon(UsIcons.tag, size: 20),
+                      const SizedBox(width: AppSpacing.md),
+                      const Text('Change tags'),
+                    ],
+                  ),
+                ),
+                if (widget.isMine)
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        UsIcon(UsIcons.trash, size: 20, color: scheme.error),
+                        const SizedBox(width: AppSpacing.md),
+                        Text(
+                          'Delete memory',
+                          style: TextStyle(color: scheme.error),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: ListView(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
               children: [
-                if (m.photos.isNotEmpty) ...[
-                  AspectRatio(
-                    aspectRatio: 4 / 3,
-                    child: PageView.builder(
-                      controller: _pages,
-                      itemCount: m.photos.length,
-                      onPageChanged: (i) => setState(() => _page = i),
-                      itemBuilder: (_, i) => MemoryPhoto(url: m.photos[i].url),
+                if (m.photos.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.screenMargin,
                     ),
-                  ),
-                  if (m.photos.length > 1)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.sm),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          for (var i = 0; i < m.photos.length; i++)
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              width: i == _page ? 18 : 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: i == _page ? scheme.primary : scheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      child: AspectRatio(
+                        aspectRatio: 4 / 3,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            PageView.builder(
+                              controller: _pages,
+                              itemCount: m.photos.length,
+                              onPageChanged: (i) => setState(() => _page = i),
+                              itemBuilder: (_, i) =>
+                                  MemoryPhoto(url: m.photos[i].url),
                             ),
-                        ],
+                            if (m.photos.length > 1)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: AppSpacing.sm,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.sm,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                      borderRadius: BorderRadius.circular(
+                                        AppRadius.pill,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        for (
+                                          var i = 0;
+                                          i < m.photos.length;
+                                          i++
+                                        )
+                                          AnimatedContainer(
+                                            duration: still
+                                                ? Duration.zero
+                                                : AppMotion.fade,
+                                            margin: const EdgeInsets.symmetric(
+                                              horizontal: 2.5,
+                                            ),
+                                            width: i == _page ? 14 : 5,
+                                            height: 5,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(
+                                                alpha: i == _page ? 1 : 0.55,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(3),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                ],
+                  ),
                 Padding(
-                  padding: const EdgeInsets.all(AppSpacing.screenMargin),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenMargin,
+                    AppSpacing.xl,
+                    AppSpacing.screenMargin,
+                    0,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(longDate(m.memoryDate).toUpperCase(),
-                          style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary)),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(m.title, style: theme.textTheme.titleLarge),
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          m.title,
+                          style: theme.textTheme.headlineSmall,
+                        ),
+                      ),
                       const SizedBox(height: AppSpacing.sm),
-                      if (m.location != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: Row(
-                            children: [
-                              Icon(Icons.place_outlined, size: 18, color: scheme.primary),
-                              const SizedBox(width: AppSpacing.xs),
-                              Expanded(child: Text(m.location!, style: muted)),
-                            ],
+                      Wrap(
+                        spacing: AppSpacing.lg,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          meta(UsIcons.calendar, longDate(m.memoryDate)),
+                          if (m.location != null)
+                            meta(UsIcons.pin, m.location!),
+                          meta(
+                            UsIcons.profile,
+                            'Added by ${widget.authorName}',
                           ),
-                        ),
-                      if (m.tags.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: Wrap(
-                            spacing: AppSpacing.xs,
-                            runSpacing: AppSpacing.xs,
-                            children: [
-                              for (final t in m.tags)
-                                ActionChip(
-                                  label: Text(tagLabel(t)),
-                                  onPressed: _busy ? null : _retag,
-                                  visualDensity: VisualDensity.compact,
+                        ],
+                      ),
+                      if (m.tags.isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.md),
+                        Wrap(
+                          spacing: AppSpacing.xs,
+                          runSpacing: AppSpacing.xs,
+                          children: [
+                            for (final t in m.tags)
+                              ActionChip(
+                                avatar: UsIcon(
+                                  tagIcon(t),
+                                  size: 16,
+                                  color: scheme.primary,
                                 ),
-                            ],
-                          ),
+                                label: Text(tagLabel(t)),
+                                onPressed: _busy ? null : _retag,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                          ],
                         ),
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      Divider(color: scheme.outline),
+                      const SizedBox(height: AppSpacing.lg),
                       if (m.description != null)
                         Text(m.description!, style: theme.textTheme.bodyLarge)
                       else
-                        Text('Tap ✏️ to add the story behind this memory.', style: muted),
-                      const SizedBox(height: AppSpacing.xl),
-                      Text('Added by ${widget.authorName}', style: muted),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'No story yet. What do you want to remember about this day?',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            OutlinedButton.icon(
+                              onPressed: _busy ? null : _edit,
+                              icon: const UsIcon(UsIcons.edit, size: 18),
+                              label: const Text('Add the story'),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),

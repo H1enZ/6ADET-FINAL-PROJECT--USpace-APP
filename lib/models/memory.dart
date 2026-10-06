@@ -1,19 +1,23 @@
+import '../theme/us_icons.dart';
+
 /// Built-in tags, offered as one-tap chips. Couples can also type their
 /// own (1 to 30 characters, up to 10 per memory; see migration 009).
 enum MemoryTag {
-  firstDate('first_date', 'First date', '💕'),
-  anniversary('anniversary', 'Anniversary', '💍'),
-  outing('outing', 'Outing', '🧺'),
-  travel('travel', 'Travel', '✈️'),
-  celebration('celebration', 'Celebration', '🎉'),
-  everyday('everyday', 'Everyday moment', '☕'),
-  special('special', 'Special moment', '✨');
+  firstDate('first_date', 'First date', UsIcons.tagFirstDate),
+  anniversary('anniversary', 'Anniversary', UsIcons.tagAnniversary),
+  outing('outing', 'Outing', UsIcons.tagOuting),
+  travel('travel', 'Travel', UsIcons.tagTravel),
+  celebration('celebration', 'Celebration', UsIcons.tagCelebration),
+  everyday('everyday', 'Everyday moment', UsIcons.tagEveryday),
+  special('special', 'Special moment', UsIcons.tagSpecial);
 
-  const MemoryTag(this.dbName, this.label, this.emoji);
+  const MemoryTag(this.dbName, this.label, this.icon);
 
   final String dbName;
   final String label;
-  final String emoji;
+
+  /// Shown beside the label on tag chips (an icon, never an emoji).
+  final UsIconData icon;
 
   static MemoryTag? fromDb(String name) {
     for (final tag in MemoryTag.values) {
@@ -26,12 +30,13 @@ enum MemoryTag {
 const maxTags = 10;
 const maxTagLength = 30;
 
-/// How a stored tag is shown: "💍 Anniversary" for built-ins,
-/// "🏷️ Special date" for your own.
-String tagLabel(String tag) {
-  final builtIn = MemoryTag.fromDb(tag);
-  return builtIn == null ? '🏷️ $tag' : '${builtIn.emoji} ${builtIn.label}';
-}
+/// How a stored tag is named: "Anniversary" for built-ins, the typed text
+/// ("Special date") for your own.
+String tagLabel(String tag) => MemoryTag.fromDb(tag)?.label ?? tag;
+
+/// The icon shown with a stored tag; your own tags get a plain tag icon.
+UsIconData tagIcon(String tag) =>
+    MemoryTag.fromDb(tag)?.icon ?? UsIcons.tag;
 
 /// Cleans up a typed tag: trims, squeezes spaces, caps the length, and
 /// turns a built-in's name ("outing", "First Date") into its stored name.

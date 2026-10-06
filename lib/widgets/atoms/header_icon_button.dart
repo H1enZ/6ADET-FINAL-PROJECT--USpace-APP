@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_effects.dart';
 import '../../theme/app_spacing.dart';
 import '../effects/motion.dart';
+import 'us_icon.dart';
 
 /// A round header button (Chat, Notifications) with an optional unread
 /// marker: a small dot, or a count when [count] is given. Screen readers
@@ -17,9 +18,9 @@ class HeaderIconButton extends StatelessWidget {
     this.count,
   });
 
-  static const double _iconSize = 22;
+  static const double _iconSize = 21;
 
-  final IconData icon;
+  final UsIconData icon;
 
   /// What the button does, e.g. "Chat", "Notifications".
   final String label;
@@ -58,6 +59,7 @@ class HeaderIconButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: scheme.surfaceContainerHighest,
               shape: BoxShape.circle,
+              border: Border.all(color: scheme.outline),
               boxShadow: AppShadows.soft(scheme),
             ),
             child: Material(
@@ -76,11 +78,11 @@ class HeaderIconButton extends StatelessWidget {
                       backgroundColor: scheme.primary,
                       textColor: scheme.onPrimary,
                       label: n > 0 ? Text(n > 99 ? '99+' : '$n') : null,
-                      child: Icon(
+                      child: UsIcon(
                         icon,
                         size: _iconSize,
                         color: onPressed == null
-                            ? scheme.outline
+                            ? scheme.onSurfaceVariant.withValues(alpha: 0.5)
                             : scheme.onSurface,
                       ),
                     ),

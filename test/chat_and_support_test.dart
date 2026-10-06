@@ -56,7 +56,7 @@ void main() {
   test('feed wording for affection and listening', () {
     Activity a(String d) => Activity(
         id: 'x', actorId: 'u', kind: 'affection_sent', detail: d, createdAt: t);
-    expect(a('kiss').describe(name: 'Ana', isMe: false), 'Ana sent a kiss 💋');
-    expect(a('listen').describe(name: 'Ana', isMe: false), 'Ana wants to talk 👂');
+    expect(a('kiss').describe(name: 'Ana', isMe: false), 'Ana sent a kiss');
+    expect(a('listen').describe(name: 'Ana', isMe: false), 'Ana wants to talk');
   });
 }

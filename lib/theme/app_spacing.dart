@@ -32,11 +32,17 @@ class AppSpacing {
 class AppRadius {
   AppRadius._();
 
-  static const double chipBar = 4;
-  static const double input = 13;
-  static const double bubble = 16;
-  static const double card = 18;
-  static const double tile = 20; // mood tiles, quick-action tiles
-  static const double panel = 22;
-  static const double hero = 28; // the Home mood hero
+  // The five USpace radii (docs/03-design-system.md).
+  static const double chip = 8;
+  static const double input = 12;
+  static const double card = 16;
+  static const double sheet = 24;
+  static const double pill = 999;
+
+  // Older names, kept so existing screens follow the new scale.
+  static const double chipBar = 4; // thin progress bars only
+  static const double bubble = card;
+  static const double tile = card; // mood tiles, quick-action tiles
+  static const double panel = sheet;
+  static const double hero = sheet; // the Home hero cards
 }

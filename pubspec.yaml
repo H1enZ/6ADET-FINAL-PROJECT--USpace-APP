@@ -23,6 +23,7 @@ dependencies:
   image_picker: ^1.1.2
   # Remembers the Light / Dark / System choice on this device.
   shared_preferences: ^2.3.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -37,6 +38,9 @@ flutter:
   # app draws a placeholder in its place.
   # Chat reaction artwork works the same way: assets/reactions/<key>.png
   # (love.png, in_love.png, puppy_eyes.png, ...).
+  # USpace's own line icons (lib/widgets/atoms/us_icon.dart): 24 px grid,
+  # 1.75 stroke, tinted at runtime. Preview: docs/03-design-system.md.
   assets:
     - assets/moods/
     - assets/reactions/
+    - assets/icons/

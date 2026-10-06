@@ -218,8 +218,7 @@ class _HistoryCard extends StatelessWidget {
         ? fullDate(when)
         : '${fullDate(when)} ${when.year}';
 
-    String choice(TherabotChoice? c) =>
-        c == null ? "Didn't choose" : '${c.emoji} ${c.label}';
+    String choice(TherabotChoice? c) => c?.label ?? "Didn't choose";
 
     return TherabotCard(
       child: Column(

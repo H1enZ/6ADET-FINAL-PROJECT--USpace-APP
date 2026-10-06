@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/memory.dart';
 import '../../theme/app_spacing.dart';
+import '../atoms/us_icon.dart';
 
 /// [selected] plus whatever is still typed in [typed] (not yet added with
 /// Enter or +), so pressing Save never loses a typed tag.
@@ -96,6 +97,7 @@ class _TagPickerState extends State<TagPicker> {
           children: [
             for (final t in [...builtIns, ...own])
               FilterChip(
+                avatar: _isOn(t) ? null : UsIcon(tagIcon(t), size: 16),
                 label: Text(tagLabel(t)),
                 selected: _isOn(t),
                 onSelected: widget.enabled ? (_) => _toggle(t) : null,

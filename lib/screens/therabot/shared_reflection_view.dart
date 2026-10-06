@@ -95,7 +95,7 @@ class SharedReflectionView extends StatelessWidget {
           label: 'Where your perspectives overlap',
           child: SoftList(
             items: reflection.commonGround,
-            marker: '♡',
+            marker: '•',
             names: names,
           ),
         ),

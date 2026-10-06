@@ -7,8 +7,9 @@ import '../atoms/fit_label.dart';
 import '../atoms/soft_tile.dart';
 import 'mood_art.dart';
 
-/// Mood Today: the eight Home moods, two rows of four, at every width.
-/// Tapping one only previews it (see MoodHero); nothing is saved here.
+/// The mood picker on Home: the eight moods in one row that scrolls
+/// sideways, the next tile peeking in at the edge. Tapping one only
+/// previews it (see MoodHero); nothing is saved here.
 class MoodGrid extends StatelessWidget {
   const MoodGrid({
     super.key,
@@ -25,42 +26,35 @@ class MoodGrid extends StatelessWidget {
   final ValueChanged<Mood> onSelect;
 
   static const _gap = AppSpacing.sm;
+  static const _tileWidth = 72.0;
+  static const _artSize = 40.0;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final moods = Mood.selectableMoods; // exactly eight, in grid order
-    // No label here: the "Mood today" heading above already names it.
+    final moods = Mood.selectableMoods;
+    final labelWidth = _tileWidth - (AppSpacing.xs + SoftTile.borderWidth) * 2;
+    // No label here: the "Today's mood" heading above already names it.
     return Semantics(
       container: true,
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final tileWidth = (box.maxWidth - _gap * 3) / 4;
-          final artSize = (tileWidth * 0.62).clamp(32.0, 64.0);
-          // Inside the tile: horizontal padding plus the 2 px border each side.
-          final labelWidth =
-              tileWidth - (AppSpacing.xs + SoftTile.borderWidth) * 2;
-          Widget row(List<Mood> four) => IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < four.length; i++) ...[
-                  if (i > 0) const SizedBox(width: _gap),
-                  Expanded(
-                    child: _tile(context, theme, four[i], artSize, labelWidth),
-                  ),
-                ],
-              ],
-            ),
-          );
-          return Column(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        // Lets the selected outline and shadow show at the ends.
+        clipBehavior: Clip.none,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              row(moods.sublist(0, 4)),
-              const SizedBox(height: _gap),
-              row(moods.sublist(4, 8)),
+              for (var i = 0; i < moods.length; i++) ...[
+                if (i > 0) const SizedBox(width: _gap),
+                SizedBox(
+                  width: _tileWidth,
+                  child: _tile(context, theme, moods[i], _artSize, labelWidth),
+                ),
+              ],
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -94,9 +88,12 @@ class MoodGrid extends StatelessWidget {
           FitLabel(
             mood.label,
             maxWidth: labelWidth,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-              color: theme.colorScheme.onSurface,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              letterSpacing: 0,
+              color: isSelected
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],

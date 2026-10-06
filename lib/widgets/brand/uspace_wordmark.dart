@@ -47,10 +47,10 @@ class USpaceWordmark extends StatelessWidget {
     children: [
       Text(
         'USpace',
-        style: GoogleFonts.poppins(
+        style: GoogleFonts.playfairDisplay(
           fontSize: size,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.3,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
           height: 1.1,
           color: color ?? scheme.secondary,
         ),

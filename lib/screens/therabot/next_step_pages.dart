@@ -18,6 +18,7 @@ import '../../widgets/therabot/therabot_widgets.dart';
 import '../../models/love_note.dart';
 import '../write_love_note_screen.dart';
 import 'shared_memories_page.dart';
+import '../../widgets/atoms/us_icon.dart';
 
 // The four next steps after a shared reflection. Each is a choice for one
 // person; none is better than another. Nothing here is ever sent without a
@@ -40,8 +41,8 @@ class TherabotComfortPage extends StatefulWidget {
 }
 
 class _ComfortOption {
-  const _ComfortOption(this.emoji, this.label, this.kind, this.template);
-  final String emoji;
+  const _ComfortOption(this.icon, this.label, this.kind, this.template);
+  final UsIconData icon;
   final String label;
 
   /// The affection kind it is sent as (see migration 006).
@@ -53,26 +54,26 @@ class _ComfortOption {
 
 class _TherabotComfortPageState extends State<TherabotComfortPage> {
   static const _options = [
-    _ComfortOption('🫂', 'Hug', 'hug', ''),
+    _ComfortOption(UsIcons.hug, 'Hug', 'hug', ''),
     _ComfortOption(
-      '💗',
+      UsIcons.heart,
       'Reassuring message',
       'comfort',
       "I'm here, and I care about you. We'll find our way through this together.",
     ),
     _ComfortOption(
-      '👂',
+      UsIcons.listen,
       'Listen',
       'listen',
       "Could you just listen for a little while? I don't need it fixed, I just need you.",
     ),
     _ComfortOption(
-      '🤍',
+      UsIcons.sparkle,
       "Remind me we're okay",
       'comfort',
       "Can you remind me we're okay? I just need to hear it from you.",
     ),
-    _ComfortOption('✏️', 'Something else', 'comfort', ''),
+    _ComfortOption(UsIcons.edit, 'Something else', 'comfort', ''),
   ];
 
   _ComfortOption? _picked;
@@ -108,7 +109,7 @@ class _TherabotComfortPageState extends State<TherabotComfortPage> {
         message: text,
       );
       if (!mounted) return;
-      showGesturePulse(context, o.emoji);
+      showGesturePulse(context, o.icon);
       setState(() {
         _picked = null;
         _message.clear();
@@ -127,7 +128,7 @@ class _TherabotComfortPageState extends State<TherabotComfortPage> {
     final scheme = theme.colorScheme;
     final o = _picked;
     return TherabotPage(
-      title: '🫂 Comfort',
+      title: 'Comfort',
       children: [
         Text('Comfort can go both ways', style: theme.textTheme.titleLarge),
         const SizedBox(height: AppSpacing.xs),
@@ -144,7 +145,8 @@ class _TherabotComfortPageState extends State<TherabotComfortPage> {
           children: [
             for (final option in _options)
               ChoiceChip(
-                label: Text('${option.emoji}  ${option.label}'),
+                avatar: UsIcon(option.icon, size: 18),
+                label: Text(option.label),
                 selected: option == o,
                 onSelected: _sending ? null : (_) => _pick(option),
               ),
@@ -157,7 +159,7 @@ class _TherabotComfortPageState extends State<TherabotComfortPage> {
               tinted: true,
               child: Column(
                 children: [
-                  const Text('🫂', style: TextStyle(fontSize: 48)),
+                  UsIcon(UsIcons.hug, size: 48, color: scheme.primary),
                   const SizedBox(height: AppSpacing.md),
                   AppButton(
                     label: 'Send ${widget.partnerName} a hug',
@@ -260,7 +262,7 @@ class _TherabotTalkPageState extends State<TherabotTalkPage> {
       color: scheme.onSurfaceVariant,
     );
     return TherabotPage(
-      title: '💬 Talk',
+      title: 'Talk',
       children: [
         Text('Talk it through, gently', style: theme.textTheme.titleLarge),
         const SizedBox(height: AppSpacing.xs),
@@ -477,7 +479,7 @@ class _TherabotSpacePageState extends State<TherabotSpacePage> {
   }
 
   String _defaultNote(DateTime until) =>
-      "I'm taking a little space for now. I'll check in around ${_clock(until)}. 💗";
+      "I'm taking a little space for now. I'll check in around ${_clock(until)}.";
 
   /// "Tonight": a check-in at 9 PM, or tomorrow morning if it is already late.
   DateTime _tonight(DateTime now) {
@@ -679,7 +681,7 @@ class _TherabotSpacePageState extends State<TherabotSpacePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Check-in time 💗',
+                    'Check-in time',
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: scheme.onPrimaryContainer,
                     ),
@@ -776,7 +778,7 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
     final scheme = theme.colorScheme;
 
     Widget tile(
-      String emoji,
+      UsIconData icon,
       String title,
       String subtitle,
       VoidCallback? onTap, {
@@ -800,7 +802,7 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
                 enabled: enabled,
                 child: Row(
                   children: [
-                    Text(emoji, style: const TextStyle(fontSize: 30)),
+                    UsIcon(icon, size: 28, color: scheme.primary),
                     const SizedBox(width: AppSpacing.lg),
                     Expanded(
                       child: Column(
@@ -834,7 +836,7 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
     }
 
     return TherabotPage(
-      title: '❤️ Reconnect',
+      title: 'Reconnect',
       children: [
         Text(
           'Small ways back to each other',
@@ -849,13 +851,13 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
         ),
         const SizedBox(height: AppSpacing.xl),
         tile(
-          '📸',
+          UsIcons.addMemory,
           'Shared memories',
           'Look back on a favourite moment from your Timeline together.',
           _memories,
         ),
         tile(
-          '💌',
+          UsIcons.loveNotes,
           'Write an appreciation letter',
           'Tell ${widget.partnerName} what you appreciate about them.',
           _appreciation,
@@ -1062,7 +1064,7 @@ class _TherabotCompletionPageState extends State<TherabotCompletionPage> {
     try {
       await TherabotService.saveInsight(text, sessionId: widget.sessionId);
       if (!mounted) return;
-      showFloatingHearts(context, emoji: '✨');
+      showFloatingHearts(context, icon: UsIcons.sparkle);
       setState(() => _saved = true);
     } catch (e) {
       if (!mounted) return;
@@ -1113,7 +1115,7 @@ class _TherabotCompletionPageState extends State<TherabotCompletionPage> {
             tinted: true,
             child: Text(
               "Thank you for being honest. Some days are just hard, and that's okay. "
-              'You showed up for each other, and that counts. 💗',
+              'You showed up for each other, and that counts.',
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: scheme.onPrimaryContainer,
               ),
@@ -1185,7 +1187,7 @@ class _TherabotCompletionPageState extends State<TherabotCompletionPage> {
                     TherabotCard(
                       tinted: true,
                       child: Text(
-                        'Saved to your insights ✨',
+                        'Saved to your insights',
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: scheme.onPrimaryContainer,
                         ),
@@ -1216,11 +1218,7 @@ class _TherabotCompletionPageState extends State<TherabotCompletionPage> {
     return TherabotPage(
       title: "We're okay for now",
       children: [
-        Text(
-          '💗',
-          style: theme.textTheme.displayLarge,
-          textAlign: TextAlign.center,
-        ),
+        Center(child: UsIcon(UsIcons.heart, size: 44, color: scheme.primary)),
         const SizedBox(height: AppSpacing.md),
         Text(
           "Thank you for taking care of each other today. You don't have to have it "

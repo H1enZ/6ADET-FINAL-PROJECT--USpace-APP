@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/love_note.dart';
 import '../../theme/app_spacing.dart';
+import '../../theme/app_typography.dart';
+import '../../theme/us_palette.dart';
 import '../effects/soft_hearts_background.dart';
 import '../home/quick_actions.dart';
 
@@ -13,39 +14,38 @@ import '../home/quick_actions.dart';
 class NotePalette {
   NotePalette._();
 
-  static const background = Color(0xFF140C14);
-  static const backgroundTop = Color(0xFF221221);
-  static const card = Color(0xFF2A1426);
-  static const cardTop = Color(0xFF34182F);
-  static const border = Color(0x33F6A9C1);
-  static const borderBright = Color(0x99F6A9C1);
-  static const cream = Color(0xFFFFF3EC);
-  static const muted = Color(0xFFCDB3C0);
-  static const pink = Color(0xFFF6A9C1);
-  static const rose = Color(0xFFEF6F98);
-  static const deepRose = Color(0xFFC23F66);
+  // Shared USpace tokens (lib/theme/us_palette.dart) under the names the
+  // Love Notes, Capsule and Therabot screens already use.
+  static const background = UsPalette.ink;
+  static const backgroundTop = UsPalette.surface;
+  static const card = UsPalette.card;
+  static const cardTop = UsPalette.cardRaised;
+  static const border = UsPalette.line;
+  static const borderBright = UsPalette.lineStrong;
+  static const cream = UsPalette.cream;
+  static const muted = UsPalette.muted;
+  static const pink = UsPalette.roseLight;
+  static const rose = UsPalette.rose;
+  static const deepRose = UsPalette.roseDeep;
+
+  // Letter paper: only on an opened note or capsule letter.
   static const paper = Color(0xFFF8E6E4);
   static const paperEdge = Color(0xFFEBCFCF);
   static const ink = Color(0xFF3B1F2E);
   static const inkSoft = Color(0xFF7A5566);
 
-  /// The big pink button.
+  /// The big rose button (dark text on it).
   static const buttonGradient = LinearGradient(
-    colors: [Color(0xFFF7A8BE), Color(0xFFEC7FA0)],
+    colors: [UsPalette.roseLight, UsPalette.rose],
   );
 
   /// Screen titles ("Love Notes") and the letter's title.
   static TextStyle display(double size, {Color color = cream}) =>
-      GoogleFonts.playfairDisplay(
-        fontSize: size,
-        fontWeight: FontWeight.w600,
-        height: 1.15,
-        color: color,
-      );
+      AppTypography.display(size, color: color);
 
   /// The letter itself, on paper.
   static TextStyle letter({Color color = ink}) =>
-      GoogleFonts.lora(fontSize: 16.5, height: 1.6, color: color);
+      AppTypography.letter(color: color);
 }
 
 /// The dark plum page with the slow, faint hearts used on Splash and

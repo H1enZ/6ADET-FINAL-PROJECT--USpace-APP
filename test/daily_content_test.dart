@@ -97,9 +97,9 @@ void main() {
       expect(a('question_answered').describe(name: 'Ana', isMe: true),
           "You answered today's question");
       expect(a('mood_updated', 'loved').describe(name: 'Ana', isMe: false),
-          'Ana is feeling loved 🥰');
+          'Ana is feeling loved');
       expect(a('affection_sent', 'hug').describe(name: 'Ben', isMe: false),
-          'Ben sent a hug 🫂');
+          'Ben sent a hug');
     });
   });
 }

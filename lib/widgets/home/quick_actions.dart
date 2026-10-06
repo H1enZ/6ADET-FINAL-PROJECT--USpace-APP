@@ -3,8 +3,11 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../theme/us_palette.dart';
+
 import '../../theme/app_spacing.dart';
 import '../atoms/fit_label.dart';
+import '../atoms/us_icon.dart';
 import '../effects/motion.dart';
 
 /// Which drawing sits at the top of a quick-action card.
@@ -20,7 +23,7 @@ enum QuickActionArt {
   reconnect,
 }
 
-/// One of the four big Home cards.
+/// One of the "For us" cards on Home.
 class QuickAction {
   const QuickAction({
     required this.title,
@@ -48,7 +51,7 @@ class MoreAction {
     this.disabledReason,
   });
   final String label;
-  final IconData icon;
+  final UsIconData icon;
   final VoidCallback? onTap;
 
   /// A small dot on the icon, and this text read by screen readers
@@ -61,55 +64,49 @@ class MoreAction {
 class _Palette {
   static const cardTop = Color(0xFF3A1932);
   static const cardBottom = Color(0xFF241225);
-  static const border = Color(0x40F6A9C1);
+  static const border = UsPalette.line;
   static const borderPressed = Color(0x80F6A9C1);
   static const glow = Color(0x33EF6F98);
-  static const cream = Color(0xFFFFF3EC);
-  static const blush = Color(0xFFFFD6E1);
-  static const pink = Color(0xFFF6A9C1);
-  static const rose = Color(0xFFEF6F98);
-  static const deepRose = Color(0xFFC23F66);
+  static const cream = UsPalette.cream;
+  static const blush = UsPalette.blush;
+  static const pink = UsPalette.roseLight;
+  static const rose = UsPalette.rose;
+  static const deepRose = UsPalette.roseDeep;
   static const plum = Color(0xFF6E2D61);
-  static const subtitle = Color(0xFFD9BFCB);
 }
 
-/// The four big cards in a 2 x 2 grid, then an optional row of small
-/// shortcuts.
+/// "For us": the cards side by side in one row (three on Home), then an
+/// optional row of small shortcuts. Each card keeps its painted drawing.
 class QuickActions extends StatelessWidget {
   const QuickActions({super.key, required this.actions, this.more = const []});
 
   final List<QuickAction> actions;
   final List<MoreAction> more;
 
-  static const _gap = AppSpacing.md;
+  static const _gap = AppSpacing.sm;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, box) {
-        final cardWidth = (box.maxWidth - _gap) / 2;
+        final n = actions.length;
+        final cardWidth = (box.maxWidth - _gap * (n - 1)) / n;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (var i = 0; i < actions.length; i += 2) ...[
-              if (i > 0) const SizedBox(height: _gap),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < n; i++) ...[
+                    if (i > 0) const SizedBox(width: _gap),
                     Expanded(child: _ActionCard(actions[i], width: cardWidth)),
-                    const SizedBox(width: _gap),
-                    Expanded(
-                      child: i + 1 < actions.length
-                          ? _ActionCard(actions[i + 1], width: cardWidth)
-                          : const SizedBox.shrink(),
-                    ),
                   ],
-                ),
+                ],
               ),
-            ],
+            ),
             if (more.isNotEmpty) ...[
-              const SizedBox(height: _gap),
+              const SizedBox(height: AppSpacing.md),
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
@@ -136,8 +133,7 @@ class _ActionCard extends StatefulWidget {
 class _ActionCardState extends State<_ActionCard> {
   bool _pressed = false;
 
-  static const _radius = AppRadius.tile + 4;
-  static const _chevron = 30.0;
+  static const _radius = AppRadius.card;
 
   @override
   Widget build(BuildContext context) {
@@ -146,9 +142,9 @@ class _ActionCardState extends State<_ActionCard> {
     final enabled = a.onTap != null;
     final still = motionOff(context);
     // Narrow phones get a little less padding and a smaller drawing.
-    final pad = widget.width < 150 ? AppSpacing.md : AppSpacing.lg;
+    final pad = widget.width < 100 ? AppSpacing.sm : AppSpacing.md;
     final inner = widget.width - pad * 2;
-    final artHeight = (widget.width * 0.5).clamp(60.0, 92.0);
+    final artHeight = (widget.width * 0.52).clamp(44.0, 64.0);
     const duration = Duration(milliseconds: 140);
 
     final card = AnimatedContainer(
@@ -206,49 +202,25 @@ class _ActionCardState extends State<_ActionCard> {
                 ),
               ),
               Padding(
-                padding: EdgeInsets.all(pad),
+                padding: EdgeInsets.fromLTRB(pad, AppSpacing.md, pad, AppSpacing.md),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(
                       height: artHeight,
                       width: double.infinity,
                       child: _CachedArt(a.art),
                     ),
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.sm),
                     const Spacer(),
                     FitLabel(
                       a.title,
                       maxWidth: inner,
-                      maxLines: 1,
-                      textAlign: TextAlign.start,
-                      alignment: Alignment.centerLeft,
-                      style: theme.textTheme.titleMedium?.copyWith(
+                      maxLines: 2,
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: _Palette.cream,
-                        fontSize: 16,
-                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: FitLabel(
-                            a.subtitle,
-                            maxWidth: inner - _chevron - AppSpacing.sm,
-                            textAlign: TextAlign.start,
-                            alignment: Alignment.centerLeft,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: _Palette.subtitle,
-                              fontSize: 12.5,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        _Chevron(size: _chevron, pressed: _pressed),
-                      ],
                     ),
                   ],
                 ),
@@ -273,32 +245,6 @@ class _ActionCardState extends State<_ActionCard> {
           curve: Curves.easeOut,
           child: card,
         ),
-      ),
-    );
-  }
-}
-
-class _Chevron extends StatelessWidget {
-  const _Chevron({required this.size, required this.pressed});
-
-  final double size;
-  final bool pressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 140),
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Color.lerp(_Palette.plum, _Palette.rose, pressed ? 0.45 : 0.15),
-        border: Border.all(color: _Palette.pink.withValues(alpha: 0.35)),
-      ),
-      child: const Icon(
-        Icons.chevron_right_rounded,
-        size: 20,
-        color: _Palette.cream,
       ),
     );
   }
@@ -334,7 +280,12 @@ class _MorePill extends StatelessWidget {
                 minHeight: AppSpacing.touchTarget - 4,
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md + 2,
+                  0,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -342,12 +293,12 @@ class _MorePill extends StatelessWidget {
                       isLabelVisible: action.badge != null,
                       backgroundColor: _Palette.rose,
                       smallSize: 8,
-                      child: Icon(action.icon, size: 18, color: _Palette.pink),
+                      child: UsIcon(action.icon, size: 18, color: _Palette.pink),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Text(
                       action.label,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: _Palette.cream,
                         fontWeight: FontWeight.w600,
                       ),

@@ -94,7 +94,7 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 2));
 
-      expect(find.text('Happy 3rd Anniversary ♥'), findsOneWidget);
+      expect(find.text('Happy 3rd Anniversary'), findsOneWidget);
       expect(find.text('0'), findsNothing);
     });
   });

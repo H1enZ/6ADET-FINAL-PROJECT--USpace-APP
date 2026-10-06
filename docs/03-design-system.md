@@ -10,55 +10,50 @@ The reference I open every time I build a screen. Everything below is what goes 
 
 ## Palette
 
-Roles, not colour names. Every pairing was measured with the WCAG 2.1 relative-luminance formula.
+**USpace ships dark only** (`main.dart` pins `ThemeMode.dark`). One palette lives in `lib/theme/us_palette.dart` (`UsPalette`); `AppColors.dark` maps it onto Material roles, and `NotePalette` and the Home quick-action palette now point at the same tokens. Contrast was measured with the WCAG 2.1 relative-luminance formula.
 
-### Light
-
-| Role | Hex | Used for | Contrast |
+| Token | Hex | Used for | Contrast |
 |---|---|---|---|
-| `primary` | `#C93A5F` | Buttons, active tab, links, countdown ring | 4.94:1 with white |
-| `secondary` | `#4A2545` | Countdown card, app bar, high-emphasis headings | 12.79:1 with white |
-| `tertiary` | `#4F7A67` | Completed bucket items, a capsule ready to open | 4.87:1 with white |
-| `error` | `#C6404F` | Validation errors, destructive actions | 4.94:1 with white |
-| `primaryContainer` | `#F3D8DF` | Selected tab pill, countdown chips, badges | 11.52:1 with Charcoal |
-| `surface` | `#FFF8F5` | Screen background | base |
-| `surfaceContainerHighest` | `#FFFFFF` | Cards, sheets, dialogs, inputs | 1.02:1 on Cream — separated by outline, not contrast |
-| `onSurface` | `#2B2130` | Body text and titles | **14.67:1 on Cream** |
-| `onSurfaceVariant` | `#7D6873` | Timestamps, captions, secondary labels | 4.88:1 on Cream |
-| `outline` | `#E2D6DC` | Card and input borders | non-text |
+| `ink` | `#140C14` | Screen background (`surface`) | base |
+| `surface` | `#1E1320` | Sections, nav bar, quiet cards | raised |
+| `card` | `#2A1426` | Cards, sheets, inputs (`surfaceContainerHighest`) | raised |
+| `cardRaised` | `#34182F` | Selected or raised cards | raised |
+| `rose` | `#E39AAE` | Primary actions, active nav, links (`primary`) | 8.70:1 on ink |
+| `onRose` | `#2A0F1C` | Text and icons on rose | 8.03:1 on rose |
+| `roseLight` | `#EDB6C4` | Accent text and icons on dark | 10+:1 on ink |
+| `roseDeep` | `#C23F66` | The single strongest call to action, with cream text | 4.59:1 with cream |
+| `blush` | `#F3D3DB` | Accent text (`secondary`, `onPrimaryContainer`) | 13.87:1 on ink |
+| `cocoa` | `#5A3440` | Dividers and paper shadows only | 1.63:1, never text |
+| `cream` | `#FFF3EC` | Primary text (`onSurface`) | 15.72:1 on card |
+| `muted` | `#CDB3C0` | Secondary text (`onSurfaceVariant`) | 8.81:1 on card |
+| `line` | `#F6A9C1` at 20% | Card and input borders (`outline`) | non-text |
+| `sage` | `#7FBFA0` | Done, ready to open (`tertiary`) | 8.04:1 on card |
+| `error` | `#F2A0A6` | Errors | 8.44:1 on card |
 
-**Rose is `#C93A5F`, not `#E8547A`.** The lighter one measured 3.51:1 against white button text and failed AA. It survives only as the top of the countdown-card gradient, where it carries no text.
+`primaryContainer` is `#4A1F36`: blush text on it measures 9.84:1. Mood gradients stay in `AppMoodColors` and are used only by the Home mood hero.
 
-### Dark
-
-| Role | Hex | Contrast on surface |
-|---|---|---|
-| `primary` | `#F2708F` | 6.65:1 |
-| `onPrimary` | `#3A0A19` | 6.05:1 on primary |
-| `primaryContainer` / `onPrimaryContainer` | `#5E2238` / `#FFD9E2` | 9.24:1 |
-| `secondary` | `#E3BFD4` | 11.26:1 |
-| `tertiary` | `#7FBFA0` | 8.76:1 |
-| `error` | `#F2A0A6` | 9.20:1 |
-| `surface` / `surfaceContainerHighest` | `#17101A` / `#241A28` | base / raised |
-| `onSurface` | `#F4EAEE` | 15.86:1 |
-| `onSurfaceVariant` | `#C6AEBA` | 9.03:1 |
-
-Both live in `lib/theme/app_colors.dart` as `AppColors.light` and `AppColors.dark`, wired up by `AppTheme` in `lib/theme/app_theme.dart`. `themeMode` comes from the Profile switch, stored in `shared_preferences`.
+**Rule:** no `Color(0x...)` in screens. Colours come from `Theme.of(context).colorScheme` or `UsPalette`. Painted illustrations (wax seal, envelope, quick-action art, scrapbook paper) may keep local shades.
 
 ## Type scale
 
-Six styles on named Material slots, in `lib/theme/app_typography.dart`. Used by name — `Theme.of(context).textTheme.titleLarge` — never as an inline `fontSize`.
+Poppins was retired on 6 Oct 2026. **Playfair Display** is for major headings only: countdowns, hero titles, the capsule reveal and the wordmark. It never goes on labels, buttons, chips or body text. **Inter** is everything else. **Lora** is for letter bodies (Love Notes, Time Capsules) and **Caveat** for Timeline handwriting, nowhere else. All live in `lib/theme/app_typography.dart`.
 
 | Slot | Font | Size | Weight | Used for |
 |---|---|---|---|---|
-| `displayLarge` | Poppins | 44 sp | 700 | Countdown numerals on Home and the capsule detail |
-| `titleLarge` | Poppins | 21 sp | 700 | Screen titles in the app bar |
-| `titleMedium` | Poppins | 15 sp | 700 | Card titles and dialog headings |
+| `displayLarge` | Playfair Display | 36 sp | 600 | Countdown numerals, capsule reveal |
+| `headlineMedium` | Playfair Display | 26 sp | 600 | Hero titles, the Home mood word |
+| `headlineSmall` | Playfair Display | 22 sp | 600 | Smaller hero titles |
+| `titleLarge` | Inter | 18 sp | 600 | Screen and sheet titles |
+| `titleMedium` | Inter | 15 sp | 600 | Card titles, dialog headings |
+| `titleSmall` | Inter | 14 sp | 600 | Small card titles |
 | `labelLarge` | Inter | 15 sp | 600 | Button labels |
-| `bodyMedium` | Inter | 13 sp | 400 | Notes, captions, list rows — the default |
-| `labelSmall` | Inter | 10.5 sp | 500 | Timestamps and small-caps section labels |
+| `labelMedium` | Inter | 12 sp | 600 | Section labels, chips |
+| `bodyLarge` | Inter | 15 sp | 400 | Input text, chat |
+| `bodyMedium` | Inter | 14 sp | 400 | Default reading text |
+| `bodySmall` | Inter | 13 sp | 400 | Supporting text |
+| `labelSmall` | Inter | 11 sp | 500 | Timestamps and captions |
 
-**10.5 sp is the floor.** Nothing goes below it. All six use relative line heights and no fixed-height text boxes, so `textScaleFactor` up to 2.0 grows rows instead of clipping them; the countdown numeral is capped with `maxLines: 1` inside a `FittedBox`.
+**11 sp is the floor.** Helpers: `AppTypography.display(size)`, `.letter()`, `.hand()`.
 
 ## Spacing
 
@@ -77,8 +72,12 @@ Six styles on named Material slots, in `lib/theme/app_typography.dart`. Used by 
 
 Semantic aliases: `screenMargin` (20), `screenMarginWide` (24), `cardPadding` (16), `touchTarget` (48), `railWidth` (220), `navBarHeight` (64).
 
-**Radius** (`AppRadius`): `chipBar` 4, `input` 13, `bubble` 16, `card` 18, `panel` 22, `pill` stadium.
-**Elevation** (`AppElevation.card`): one shadow, on cards and the seal dialog. Everything else is separated by `outline`.
+**Radius** (`AppRadius`): `chip` 8, `input` 12, `card` 16, `sheet` 24, `pill` 999. The older names (`bubble`, `tile`, `panel`, `hero`) now alias these; `chipBar` 4 is only for thin progress bars.
+**Depth:** three levels. Flat with a `line` border, `AppShadows.soft`, and `AppShadows.raised` for the one hero card on a screen. No glass or blur.
+
+**Motion** (`AppMotion`): press 90 / 160 ms, `fade` 200 ms, `sheet` 320 ms, `ceremony` 900 ms for rare celebrations. Curves: `enter` easeOutCubic, `snappy` for touch responses; no elastic or bouncing curves. Loops run only on ceremony screens and only while visible. With reduced motion every duration is zero.
+
+**Icons:** USpace's own line set in `assets/icons/` (34 SVGs: 24 px grid, 1.75 stroke, round caps and joins), drawn with `UsIcon(UsIcons.home)` from `lib/widgets/atoms/us_icon.dart`. No emoji in UI chrome; emoji remain only as message content in Chat. Exceptions: the Home 3D mood art and the painted "For us" quick-action art.
 
 **Breakpoints:** Compact `< 600 dp` — single column, bottom nav, seal picker as a bottom sheet. Medium `600–840 dp` — Timeline becomes two columns. Expanded `≥ 840 dp` — side rail, three-column Timeline, seal picker as a centred dialog, and the capsule list and detail share one screen.
 
@@ -113,6 +112,15 @@ Nineteen widgets, every one used on more than one screen or more than once on a 
 **Deliberately not components:** `HomeSummaryPanel` (it was the whole screen wearing a component's name), screen scaffolds (the shared part is already `AppShell`), and Splash (a route that decides where to go, so its logic belongs in routing).
 
 ## Changes since the last version
+
+**6 Oct 2026 — v3, redesign batch 1 (foundation).**
+
+- Dark-only palette in `UsPalette`; primary moves from hot pink `#F2708F` to dusty rose `#E39AAE`. Love Notes, quick-action and Therabot colours now read the same tokens.
+- Poppins dropped: Playfair Display for major headings only, Inter elsewhere; body text 13 to 14 sp.
+- Radii collapsed to five values; motion tokens added; the gesture pulse no longer uses an elastic bounce.
+- Emoji replaced by the USpace icon set in memory tags, mood picker, activity lines, Therabot, Work it out and the celebration effects.
+- Button, chip, divider and progress themes set once in `AppTheme`, so raw Material buttons match `AppButton`.
+
 
 **20 Sep 2026 — v2, written after the mockup.**
 

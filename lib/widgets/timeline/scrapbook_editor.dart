@@ -5,6 +5,7 @@ import '../../theme/app_spacing.dart';
 import '../notes/note_style.dart';
 import 'scrap_frames.dart';
 import 'scrapbook_layout.dart';
+import '../../theme/us_palette.dart';
 
 /// The compact editing toolbar shown while arranging the scrapbook (Undo
 /// and Arrange sit in the header).
@@ -94,7 +95,7 @@ class ScrapEditToolbar extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xF22A1426),
+        color: UsPalette.card.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: NotePalette.pink.withValues(alpha: 0.35)),
         boxShadow: [
@@ -161,7 +162,7 @@ class ScrapEditToolbar extends StatelessWidget {
               onPressed: onDone,
               style: FilledButton.styleFrom(
                 backgroundColor: NotePalette.rose,
-                foregroundColor: const Color(0xFF3A0A19),
+                foregroundColor: UsPalette.onRose,
                 minimumSize: const Size(0, 40),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
               ),
@@ -170,7 +171,7 @@ class ScrapEditToolbar extends StatelessWidget {
                       dimension: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Color(0xFF3A0A19),
+                        color: UsPalette.onRose,
                       ),
                     )
                   : const Text('Done'),
@@ -441,7 +442,7 @@ Future<double?> pickTurn(
                   onPressed: () => Navigator.of(context).pop(value),
                   style: FilledButton.styleFrom(
                     backgroundColor: NotePalette.rose,
-                    foregroundColor: const Color(0xFF3A0A19),
+                    foregroundColor: UsPalette.onRose,
                   ),
                   child: const Text('Done'),
                 ),

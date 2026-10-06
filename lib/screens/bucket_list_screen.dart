@@ -115,7 +115,7 @@ class _BucketListScreenState extends State<BucketListScreen> {
           current.id == item.id ? current.withDone(newValue) : current,
       ];
     });
-    if (newValue) showConfetti(context); // ticked off together 🎉
+    if (newValue) showConfetti(context); // ticked off together
 
     try {
       await BucketService.setDone(item.id, newValue);

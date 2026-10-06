@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../../theme/app_effects.dart';
 import 'floating_hearts.dart';
+import '../../theme/us_palette.dart';
+import '../atoms/us_icon.dart';
 
 // USpace motion: "playful but quick". Everyday movement is short and calm
 // (150-450 ms); celebrations (hugs, confetti, the wax seal) are bouncier.
@@ -383,19 +385,19 @@ OverlayEntry? _insert(BuildContext context, Widget Function(VoidCallback done) b
   return entry;
 }
 
-/// A hug, kiss or cuddle: the emoji grows big in the middle, pulses like a
-/// heartbeat, then floats away with hearts.
-void showGesturePulse(BuildContext context, String emoji) {
-  final entry = _insert(context, (done) => _Pulse(emoji: emoji, onDone: done));
+/// A hug, kiss or cuddle: its icon grows in the middle, beats softly once
+/// or twice, then floats away with hearts.
+void showGesturePulse(BuildContext context, UsIconData icon) {
+  final entry = _insert(context, (done) => _Pulse(icon: icon, onDone: done));
   if (entry == null) return; // reduced motion: nothing moves
   Future<void>.delayed(const Duration(milliseconds: 650), () {
-    if (context.mounted) showFloatingHearts(context, emoji: emoji);
+    if (context.mounted) showFloatingHearts(context);
   });
 }
 
 class _Pulse extends StatefulWidget {
-  const _Pulse({required this.emoji, required this.onDone});
-  final String emoji;
+  const _Pulse({required this.icon, required this.onDone});
+  final UsIconData icon;
   final VoidCallback onDone;
   @override
   State<_Pulse> createState() => _PulseState();
@@ -421,15 +423,16 @@ class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
       animation: _c,
       builder: (context, _) {
         final t = _c.value;
-        final grow = Curves.elasticOut.transform((t / 0.4).clamp(0.0, 1.0));
-        final beat = t > 0.4 && t < 0.8 ? 1 + 0.12 * math.sin((t - 0.4) / 0.4 * 2 * math.pi * 2).abs() : 1.0;
+        // Soft and deliberate: a quick settle, then a gentle beat.
+        final grow = AppMotion.snappy.transform((t / 0.4).clamp(0.0, 1.0));
+        final beat = t > 0.4 && t < 0.8 ? 1 + 0.06 * math.sin((t - 0.4) / 0.4 * 2 * math.pi * 2).abs() : 1.0;
         final fade = t < 0.8 ? 1.0 : 1 - (t - 0.8) / 0.2;
         return Center(
           child: Opacity(
             opacity: fade.clamp(0.0, 1.0),
             child: Transform.scale(
               scale: grow * beat,
-              child: Text(widget.emoji, style: const TextStyle(fontSize: 120)),
+              child: UsIcon(widget.icon, size: 96, color: UsPalette.rose),
             ),
           ),
         );
@@ -439,13 +442,16 @@ class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
 }
 
 /// An envelope that flies up and away after sending a love note.
-void showEnvelopeFly(BuildContext context, {String emoji = '💌'}) {
-  _insert(context, (done) => _EnvelopeFly(emoji: emoji, onDone: done));
+void showEnvelopeFly(
+  BuildContext context, {
+  UsIconData icon = UsIcons.loveNotes,
+}) {
+  _insert(context, (done) => _EnvelopeFly(icon: icon, onDone: done));
 }
 
 class _EnvelopeFly extends StatefulWidget {
-  const _EnvelopeFly({required this.emoji, required this.onDone});
-  final String emoji;
+  const _EnvelopeFly({required this.icon, required this.onDone});
+  final UsIconData icon;
   final VoidCallback onDone;
   @override
   State<_EnvelopeFly> createState() => _EnvelopeFlyState();
@@ -484,7 +490,7 @@ class _EnvelopeFlyState extends State<_EnvelopeFly> with SingleTickerProviderSta
                   angle: -0.25 + t * 0.6,
                   child: Transform.scale(
                     scale: appear * (1 - t * 0.4),
-                    child: Text(widget.emoji, style: const TextStyle(fontSize: 80)),
+                    child: UsIcon(widget.icon, size: 72, color: UsPalette.rose),
                   ),
                 ),
               ),

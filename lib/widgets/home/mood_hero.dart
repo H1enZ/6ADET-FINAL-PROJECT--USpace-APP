@@ -5,6 +5,7 @@ import '../../models/mood_visual.dart';
 import '../../theme/app_effects.dart';
 import '../../theme/app_spacing.dart';
 import '../atoms/fit_label.dart';
+import '../atoms/us_icon.dart';
 import '../effects/motion.dart';
 import 'mood_art.dart';
 import 'mood_particles.dart';
@@ -34,6 +35,7 @@ class MoodHero extends StatelessWidget {
     this.otherMood,
     this.otherNote,
     this.actionsKey,
+    this.viewIndex,
   });
 
   /// The signed-in person's first name.
@@ -71,6 +73,10 @@ class MoodHero extends StatelessWidget {
 
   /// On the Share / Add a note row, so Home can scroll it into view.
   final Key? actionsKey;
+
+  /// Which of Home's three mood views this is (0 both, 1 you, 2 partner),
+  /// shown as dots at the bottom. Null hides them.
+  final int? viewIndex;
 
   static const double _accentBarWidth = 28;
   static const double _accentBarHeight = 4;
@@ -245,11 +251,12 @@ class MoodHero extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(
+                  padding: EdgeInsets.fromLTRB(
                     AppSpacing.xl,
                     AppSpacing.xl,
                     AppSpacing.md,
-                    AppSpacing.lg,
+                    // Room for the view dots under the actions.
+                    viewIndex == null ? AppSpacing.lg : AppSpacing.xxl,
                   ),
                   child: LayoutBuilder(
                     builder: (context, box) {
@@ -357,15 +364,17 @@ class MoodHero extends StatelessWidget {
                   Positioned(
                     top: AppSpacing.xs,
                     right: AppSpacing.xs,
-                    child: IconButton(
-                      tooltip: switchLabel,
+                    child: MoodFlipButton(
+                      label: switchLabel!,
                       onPressed: saving ? null : onSwitch,
-                      icon: const Icon(Icons.undo_rounded, size: 18),
-                      style: IconButton.styleFrom(
-                        foregroundColor: ink.withValues(alpha: 0.55),
-                        minimumSize: const Size.square(AppSpacing.touchTarget),
-                      ),
                     ),
+                  ),
+                if (viewIndex != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: AppSpacing.sm,
+                    child: MoodViewDots(index: viewIndex!),
                   ),
               ],
             ),
@@ -442,6 +451,64 @@ class _Actions extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+/// The arrow at the top right of the Home mood hero: flips between both of
+/// you, you, and your partner.
+class MoodFlipButton extends StatelessWidget {
+  const MoodFlipButton({super.key, required this.label, this.onPressed});
+
+  /// What the next view is, e.g. "See Alex's mood".
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = Theme.of(context).colorScheme.onSurface;
+    return IconButton(
+      tooltip: label,
+      onPressed: onPressed,
+      icon: UsIcon(UsIcons.flip, size: 18, color: ink),
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.black.withValues(alpha: 0.28),
+        minimumSize: const Size.square(36),
+        fixedSize: const Size.square(36),
+        tapTargetSize: MaterialTapTargetSize.padded,
+      ),
+    );
+  }
+}
+
+/// Three small dots under the mood hero; the current view is a short bar.
+class MoodViewDots extends StatelessWidget {
+  const MoodViewDots({super.key, required this.index});
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = Theme.of(context).colorScheme.onSurface;
+    final still = motionOff(context);
+    return ExcludeSemantics(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < 3; i++)
+            AnimatedContainer(
+              duration: still ? Duration.zero : AppMotion.quick,
+              margin: const EdgeInsets.symmetric(horizontal: 2.5),
+              width: i == index ? 14 : 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: ink.withValues(alpha: i == index ? 1 : 0.4),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

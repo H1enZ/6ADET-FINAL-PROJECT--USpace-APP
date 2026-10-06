@@ -5,32 +5,30 @@
 /// anyone can pick. The rest come from the earlier mood list: they stay so
 /// older check-ins still show in history and the activity feed.
 ///
-/// [emoji] is only for short text (history, activity lines). The Home hero
-/// and grid use MoodVisual's artwork instead.
+/// Moods are shown with MoodVisual's artwork, never an emoji.
 enum Mood {
-  loved('loved', 'Loved', '🥰'),
-  happy('happy', 'Happy', '😊'),
-  calm('calm', 'Calm', '😌'),
-  emotional('emotional', 'Emotional', '🥹'),
-  needAHug('need_a_hug', 'Need a Hug', '🫂'),
-  flirty('flirty', 'Flirty', '😘'),
-  romantic('romantic', 'Romantic', '💞'),
-  excited('excited', 'Excited', '🤩'),
+  loved('loved', 'Loved'),
+  happy('happy', 'Happy'),
+  calm('calm', 'Calm'),
+  emotional('emotional', 'Emotional'),
+  needAHug('need_a_hug', 'Need a Hug'),
+  flirty('flirty', 'Flirty'),
+  romantic('romantic', 'Romantic'),
+  excited('excited', 'Excited'),
 
   // History only: never offered for a new check-in.
-  relaxed('relaxed', 'Relaxed', '😌', selectable: false),
-  tired('tired', 'Tired', '😴', selectable: false),
-  stressed('stressed', 'Stressed', '😣', selectable: false),
-  sad('sad', 'Sad', '😔', selectable: false),
-  anxious('anxious', 'Anxious', '😟', selectable: false),
-  lonely('lonely', 'Lonely', '🥺', selectable: false),
-  upset('upset', 'Upset', '😞', selectable: false);
+  relaxed('relaxed', 'Relaxed', selectable: false),
+  tired('tired', 'Tired', selectable: false),
+  stressed('stressed', 'Stressed', selectable: false),
+  sad('sad', 'Sad', selectable: false),
+  anxious('anxious', 'Anxious', selectable: false),
+  lonely('lonely', 'Lonely', selectable: false),
+  upset('upset', 'Upset', selectable: false);
 
-  const Mood(this.dbValue, this.label, this.emoji, {this.selectable = true});
+  const Mood(this.dbValue, this.label, {this.selectable = true});
 
   final String dbValue;
   final String label;
-  final String emoji;
 
   /// False for the older moods kept only for history.
   final bool selectable;

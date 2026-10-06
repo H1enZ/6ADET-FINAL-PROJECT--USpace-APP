@@ -21,6 +21,7 @@ import 'love_note_detail_screen.dart';
 import 'time_capsules/time_capsule_screen.dart';
 import 'write_love_note_screen.dart';
 import '../widgets/effects/smooth_scroll.dart';
+import '../widgets/atoms/us_icon.dart';
 
 /// Love Notes: every note you can read, filtered by type, plus Previous
 /// Capsules (the older notes-based Time Capsules, which still open by
@@ -113,7 +114,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
           preview: first.body,
         );
         if (!mounted) return;
-        showFloatingHearts(context, emoji: '💌');
+        showFloatingHearts(context, icon: UsIcons.loveNotes);
       }
     } catch (e) {
       if (!mounted) return;
@@ -137,7 +138,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
     if (!sent) return;
     await _load();
     if (!mounted) return;
-    showEnvelopeFly(context, emoji: '💌');
+    showEnvelopeFly(context);
   }
 
   Future<void> _open(LoveNote note) async {

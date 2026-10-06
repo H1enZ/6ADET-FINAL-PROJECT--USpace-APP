@@ -10,6 +10,7 @@ import '../../widgets/effects/motion.dart';
 import '../../widgets/effects/soft_hearts_background.dart';
 import '../../widgets/notes/note_style.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
+import '../../theme/us_palette.dart';
 
 enum ChatMode { talk, couple }
 
@@ -1014,7 +1015,7 @@ class _Composer extends StatelessWidget {
                     color: NotePalette.muted,
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF2A1426),
+                  fillColor: UsPalette.card,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.lg,
@@ -1066,7 +1067,7 @@ class _Composer extends StatelessWidget {
                   icon: Icon(
                     Icons.send_rounded,
                     color: canSend
-                        ? const Color(0xFF3A0A19)
+                        ? UsPalette.onRose
                         : NotePalette.muted.withValues(alpha: 0.5),
                   ),
                 ),

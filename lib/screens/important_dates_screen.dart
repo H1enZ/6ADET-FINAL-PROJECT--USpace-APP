@@ -178,7 +178,7 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
 String _countdown(ImportantDate d) {
   final days = d.daysUntil();
   if (days == null) return 'Passed';
-  if (days == 0) return 'Today! 🎉';
+  if (days == 0) return 'Today';
   if (days == 1) return 'Tomorrow';
   return 'In $days days';
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -30,16 +31,17 @@ import '../utils/daily_content.dart';
 import '../utils/special_events.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/header_icon_button.dart';
-import '../widgets/brand/uspace_wordmark.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/home/mood_grid.dart';
 import '../widgets/home/mood_hero.dart';
+import '../widgets/home/mood_split_hero.dart';
+import '../widgets/home/therabot_card.dart';
 import '../widgets/home/quick_actions.dart';
 import '../widgets/molecules/special_event_card.dart';
 import 'add_memory_sheet.dart';
 import 'bucket_list_screen.dart';
-import 'chat_screen.dart';
+import 'therabot/therabot_tab.dart';
 import 'important_dates_screen.dart';
 import 'memory_detail_screen.dart';
 import 'mood_history_screen.dart';
@@ -48,20 +50,32 @@ import 'notifications_screen.dart';
 import 'question_archive_screen.dart';
 import 'question_sheet.dart';
 import 'time_capsules/time_capsule_screen.dart';
-import 'write_love_note_screen.dart';
 import '../widgets/effects/smooth_scroll.dart';
+import '../widgets/atoms/us_icon.dart';
 
 /// Home: how you are feeling today, front and centre, then shortcuts and
 /// the next special day. Recent activity lives behind the bell.
 /// Updates live when your partner does something; pull down to refresh.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.profile, this.onOpenTab});
+  const HomeScreen({
+    super.key,
+    required this.profile,
+    this.onOpenTab,
+    this.refresh,
+    this.onUnreadChanged,
+  });
 
   final Profile profile;
 
-  /// Switches the bottom tab (1 Timeline, 2 Love Notes, 3 Therabot), so a
-  /// notification can open the right place. Provided by MainShell.
+  /// Switches the bottom tab (1 Chat, 2 Timeline, 3 Love Notes), so a
+  /// notification or a shortcut can open the right place. From MainShell.
   final ValueChanged<int>? onOpenTab;
+
+  /// Bumped by MainShell when you leave Chat, so Home recounts unread.
+  final ValueListenable<int>? refresh;
+
+  /// Unread chat messages, for the badge on the Chat tab.
+  final ValueChanged<int>? onUnreadChanged;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -77,7 +91,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<QuestionAnswer> _answers = [];
   List<ImportantDate> _dates = [];
   bool _partnerAnswered = false;
-  int _unread = 0;
 
   /// New notifications: the bell's count.
   int _newNotifications = 0;
@@ -93,8 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Mood? _preview;
   bool _savingMood = false;
 
-  /// The hero shows your partner's mood instead of yours (tap to switch).
-  bool _showPartner = false;
+  /// Which mood view the hero shows: both of you split down the middle,
+  /// just you, or just your partner. The arrow flips through them.
+  _MoodView _moodView = _MoodView.both;
 
   /// On the hero's Share / Add a note row, to scroll it into view.
   final _heroActionsKey = GlobalKey();
@@ -145,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    widget.refresh?.addListener(_load);
     _load();
     try {
       _live = ActivityService.listen(_coupleId, () {
@@ -162,6 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    widget.refresh?.removeListener(_load);
     _scroll.dispose();
     _liveDebounce?.cancel();
     final live = _live;
@@ -238,11 +254,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _answers = answers;
         _dates = dates;
         _partnerAnswered = partnerAnswered;
-        _unread = unread;
         _newNotifications = newNotifications;
         _error = null;
         _loading = false;
       });
+      widget.onUnreadChanged?.call(unread);
       _celebrateIfToday();
     } catch (e) {
       if (!mounted || generation != _loadGeneration) return;
@@ -278,7 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final preview = mood == _savedMood ? null : mood;
     setState(() {
       _preview = preview;
-      _showPartner = false;
+      // Your own view, so the Share button is right there.
+      if (preview != null) _moodView = _MoodView.mine;
     });
 
     // Make it clear nothing is shared yet: say so to screen readers, and
@@ -352,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
     setState(() {
       _preview = null;
-      _showPartner = false;
+      _moodView = _MoodView.both;
     });
   }
 
@@ -389,33 +406,18 @@ class _HomeScreenState extends State<HomeScreen> {
     if (saved != true) return;
     await _load();
     if (!mounted) return;
-    showFloatingHearts(context, emoji: '💌');
+    showFloatingHearts(context, icon: UsIcons.loveNotes);
   }
 
-  Future<void> _writeNote() async {
-    if (_partner == null) return;
-    final sent = await openWriteLoveNote(
-      context,
-      coupleId: _coupleId,
-      partnerName: _partnerName,
-    );
-    if (!sent) return;
-    await _load();
-    if (!mounted) return;
-    showEnvelopeFly(context, emoji: '💌');
-  }
-
+  /// Chat is a tab: switching to it is what opening it means now.
   Future<void> _openChat() async {
-    final partner = _partner;
-    if (partner == null) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            ChatScreen(coupleId: _coupleId, me: _me, partner: partner),
-      ),
-    );
-    await _load(); // clears the unread badge
+    if (_partner == null) return;
+    widget.onOpenTab?.call(1);
   }
+
+  /// Therabot is no longer a tab: it opens as its own page from Home.
+  Future<void> _openTherabot() =>
+      _push(TherabotTab(profile: widget.profile));
 
   /// Builds the notifications. Home passes what it already loaded; the
   /// Notifications screen calls it without, so it fetches fresh data.
@@ -502,13 +504,13 @@ class _HomeScreenState extends State<HomeScreen> {
             // fall back to the timeline
           }
         }
-        tab(1);
+        tab(2);
       case NotificationTarget.timeline:
-        tab(1);
+        tab(2);
       case NotificationTarget.moodHistory:
         await _openMoodHistory();
       case NotificationTarget.loveNotes:
-        tab(2);
+        tab(3);
       case NotificationTarget.timeCapsules:
         // A "ready" reminder opens Ready, pointing at that capsule; other
         // capsule news opens the screen as you left it.
@@ -537,7 +539,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case NotificationTarget.answerQuestion:
         await _answerQuestion();
       case NotificationTarget.therabot:
-        tab(3);
+        await _openTherabot();
       case NotificationTarget.chat:
         await _openChat();
       case NotificationTarget.sendHugBack:
@@ -570,7 +572,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await AffectionService.send(coupleId: _coupleId, kind: 'hug');
       if (!mounted) return true;
-      showGesturePulse(context, '🫂');
+      showGesturePulse(context, UsIcons.hug);
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -675,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final saved = _savedMood;
     final shown = _preview ?? saved;
     final pending = _preview != null && _preview != saved;
-    final showPartner = _showPartner && partner != null;
+    final view = partner == null ? _MoodView.mine : _moodView;
     final myAnswered = _answers.any((a) => a.userId == _myId);
     const gap = AppSpacing.xl;
 
@@ -721,52 +723,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       if (couple != null) ...[
-        // Mood hero: what you are feeling (or previewing).
+        // What matters to us today: the next special day first.
         section(
-          'hero',
-          MoodHero(
-            name: showPartner ? partnerFirst! : _first(_me.displayName),
-            mood: showPartner
-                ? latestMoodOn(_moods, partner.userId, today)?.mood
-                : shown,
-            // A preview shows the mood's own quote until it is shared.
-            note: showPartner
-                ? _noteToday(partner.userId)
-                : pending
-                ? null
-                : _noteToday(_myId),
-            pending: !showPartner && pending,
-            saving: _savingMood,
-            hasPartner: partner != null,
-            showingPartner: showPartner,
-            switchLabel: partner == null
-                ? null
-                : showPartner
-                ? 'See yours'
-                : 'See $partnerFirst',
-            onSwitch: partner == null
-                ? null
-                : () => setState(() => _showPartner = !_showPartner),
-            // The other side, laid out invisibly so both are the same size.
-            otherName: partner == null
-                ? null
-                : showPartner
-                ? _first(_me.displayName)
-                : partnerFirst,
-            otherMood: partner == null
-                ? null
-                : showPartner
-                ? shown
-                : latestMoodOn(_moods, partner.userId, today)?.mood,
-            otherNote: partner == null
-                ? null
-                : showPartner
-                ? (pending ? null : _noteToday(_myId))
-                : _noteToday(partner.userId),
-            onShare: _shareMood,
-            onAddNote: _checkMood,
-            actionsKey: _heroActionsKey,
-          ),
+          'countdown',
+          KeyedSubtree(key: _countdownKey, child: _specialEventCard(today)),
           after: AppSpacing.md,
         ),
         if (partner == null)
@@ -775,41 +735,93 @@ class _HomeScreenState extends State<HomeScreen> {
             _InviteBanner(code: couple.pairingCode),
             after: AppSpacing.md,
           ),
-        const SizedBox(key: ValueKey('hero-gap'), height: gap - AppSpacing.md),
+        const SizedBox(key: ValueKey('event-gap'), height: gap - AppSpacing.md),
 
-        // Mood today: two rows of four.
+        // Today's mood: both of you, or one of you; then the picker.
         section(
           'moods',
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _SectionTitle(
-                'Mood today',
+                "Today's mood",
                 actionLabel: 'History',
                 onAction: _openMoodHistory,
               ),
+              AnimatedSwitcher(
+                duration: motionOff(context) ? Duration.zero : AppMotion.quick,
+                child: view == _MoodView.both
+                    ? MoodSplitHero(
+                        key: const ValueKey('both'),
+                        myName: _first(_me.displayName),
+                        myMood: shown,
+                        myNote: pending ? null : _noteToday(_myId),
+                        myPending: pending,
+                        partnerName: partnerFirst!,
+                        partnerMood:
+                            latestMoodOn(_moods, partner!.userId, today)?.mood,
+                        partnerNote: _noteToday(partner.userId),
+                        onOpenMine: () =>
+                            setState(() => _moodView = _MoodView.mine),
+                        onOpenPartner: () =>
+                            setState(() => _moodView = _MoodView.partner),
+                        onAddNote: _checkMood,
+                        flipLabel: 'See your mood',
+                        onFlip: () =>
+                            setState(() => _moodView = _MoodView.mine),
+                      )
+                    : MoodHero(
+                        key: ValueKey(view),
+                        name: view == _MoodView.partner
+                            ? partnerFirst!
+                            : _first(_me.displayName),
+                        mood: view == _MoodView.partner
+                            ? latestMoodOn(_moods, partner!.userId, today)?.mood
+                            : shown,
+                        // A preview shows the mood's own quote until shared.
+                        note: view == _MoodView.partner
+                            ? _noteToday(partner!.userId)
+                            : pending
+                            ? null
+                            : _noteToday(_myId),
+                        pending: view == _MoodView.mine && pending,
+                        saving: _savingMood,
+                        hasPartner: partner != null,
+                        showingPartner: view == _MoodView.partner,
+                        viewIndex: partner == null ? null : view.index,
+                        switchLabel: partner == null
+                            ? null
+                            : view == _MoodView.mine
+                            ? "See $partnerFirst's mood"
+                            : 'See both moods',
+                        onSwitch: partner == null
+                            ? null
+                            : () => setState(
+                                () => _moodView = view == _MoodView.mine
+                                    ? _MoodView.partner
+                                    : _MoodView.both,
+                              ),
+                        onShare: _shareMood,
+                        onAddNote: _checkMood,
+                        actionsKey: _heroActionsKey,
+                      ),
+              ),
+              const SizedBox(height: AppSpacing.md),
               MoodGrid(selected: shown, saved: saved, onSelect: _previewMood),
             ],
           ),
         ),
 
         section(
-          'quick-actions',
+          'for-us',
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _SectionTitle('Quick actions'),
+              const _SectionTitle('For us'),
               QuickActions(
                 actions: [
                   QuickAction(
-                    title: 'Love Note',
-                    subtitle: 'Say something sweet',
-                    art: QuickActionArt.loveNote,
-                    onTap: partner == null ? null : _writeNote,
-                    disabledReason: _needsPartner,
-                  ),
-                  QuickAction(
-                    title: 'Add Memory',
+                    title: 'Add memory',
                     subtitle: 'Save this moment',
                     art: QuickActionArt.memory,
                     onTap: _addMemory,
@@ -817,7 +829,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // There is no separate date planner: the bucket list is
                   // where the two of you keep the things you want to do.
                   QuickAction(
-                    title: 'Plan a Date',
+                    title: 'Plan a date',
                     subtitle: 'Make time together',
                     art: QuickActionArt.date,
                     onTap: () => _push(
@@ -826,7 +838,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   QuickAction(
-                    title: 'Time Capsule',
+                    title: 'Time capsule',
                     subtitle: 'Send something for later',
                     art: QuickActionArt.capsule,
                     onTap: partner == null
@@ -844,7 +856,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 more: [
                   MoreAction(
                     'Daily question',
-                    Icons.forum_outlined,
+                    UsIcons.question,
                     _answerQuestion,
                     // A dot when your partner has answered and you haven't.
                     badge: _partnerAnswered && !myAnswered
@@ -853,7 +865,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   MoreAction(
                     'Our questions',
-                    Icons.history_edu_outlined,
+                    UsIcons.history,
                     () => _push(
                       QuestionArchiveScreen(
                         coupleId: _coupleId,
@@ -868,12 +880,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // The nearest special day.
-        section(
-          'countdown',
-          KeyedSubtree(key: _countdownKey, child: _specialEventCard(today)),
-          after: 0,
-        ),
+        section('therabot', TherabotCard(onTap: _openTherabot), after: 0),
       ],
     ];
 
@@ -900,31 +907,35 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Header: wordmark, then chat and the bell.
+                      // Header: today's date and a greeting, then the bell.
                       Row(
                         children: [
-                          // Shrinks rather than overflowing with very
-                          // large text on a narrow phone.
-                          const Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: USpaceWordmark(size: 26, isHeader: true),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _dateLine(today),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Semantics(
+                                  header: true,
+                                  child: Text(
+                                    '${_greeting(today)}, ${_first(_me.displayName)}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleLarge,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
-                          const Spacer(),
                           HeaderIconButton(
-                            icon: Icons.chat_bubble_outline_rounded,
-                            label: partner == null
-                                ? 'Chat. $_needsPartner'
-                                : 'Chat',
-                            count: _unread,
-                            onPressed: partner == null ? null : _openChat,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          HeaderIconButton(
-                            icon: Icons.notifications_none_rounded,
+                            icon: UsIcons.bell,
                             label: 'Notifications',
                             count: _newNotifications,
                             onPressed: _openNotifications,
@@ -956,6 +967,29 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 }
 
+/// The three ways the Home mood hero can be shown. The order is the order
+/// of the dots under it.
+enum _MoodView { both, mine, partner }
+
+const _weekdays = [
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', //
+];
+const _months = [
+  'January', 'February', 'March', 'April', 'May', 'June', //
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+/// "Tuesday, 6 October"
+String _dateLine(DateTime d) =>
+    '${_weekdays[d.weekday - 1]}, ${d.day} ${_months[d.month - 1]}';
+
+/// Good morning until noon, good afternoon until six, then good evening.
+String _greeting(DateTime d) => d.hour < 12
+    ? 'Good morning'
+    : d.hour < 18
+    ? 'Good afternoon'
+    : 'Good evening';
+
 /// A quiet section heading on Home ("Mood today", "Quick actions"), with an
 /// optional small action on the right.
 class _SectionTitle extends StatelessWidget {
@@ -969,13 +1003,18 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Row(
         children: [
           Expanded(
             child: Semantics(
               header: true,
-              child: Text(text, style: theme.textTheme.titleMedium),
+              child: Text(
+                text.toUpperCase(),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
           ),
           if (actionLabel != null)
@@ -983,6 +1022,8 @@ class _SectionTitle extends StatelessWidget {
               onPressed: onAction,
               style: TextButton.styleFrom(
                 minimumSize: const Size(0, AppSpacing.touchTarget),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                textStyle: theme.textTheme.bodySmall,
               ),
               child: Text(actionLabel!),
             ),

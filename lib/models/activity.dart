@@ -1,3 +1,4 @@
+import '../theme/us_icons.dart';
 import 'mood.dart';
 
 /// One entry in the couple's activity feed. Written only by the database.
@@ -37,21 +38,21 @@ class Activity {
         final mood = Mood.fromName(d);
         return mood == null
             ? '$who updated ${isMe ? 'your' : 'their'} mood'
-            : '$who ${isMe ? 'are' : 'is'} feeling ${mood.label.toLowerCase()} ${mood.emoji}';
+            : '$who ${isMe ? 'are' : 'is'} feeling ${mood.label.toLowerCase()}';
       case 'note_sent':
         return d == 'capsule'
-            ? '$who sealed a time capsule 🔒'
+            ? '$who sealed a time capsule'
             : '$who sent a love note';
       case 'affection_sent':
         final gesture = switch (d) {
-          'hug' => 'a hug 🫂',
-          'kiss' => 'a kiss 💋',
-          'cuddle' => 'a cuddle 🤗',
-          'comfort' => 'some comfort 💗',
-          'listen' => 'something to listen to 👂',
-          _ => 'some love ❤️',
+          'hug' => 'a hug',
+          'kiss' => 'a kiss',
+          'cuddle' => 'a cuddle',
+          'comfort' => 'some comfort',
+          'listen' => 'something to listen to',
+          _ => 'some love',
         };
-        if (d == 'listen') return '$who wants to talk 👂';
+        if (d == 'listen') return '$who wants to talk';
         return '$who sent $gesture';
       case 'date_added':
         return d == null ? '$who saved a special date' : '$who saved a date: $d';
@@ -64,14 +65,15 @@ class Activity {
     }
   }
 
-  String get emoji => switch (kind) {
-        'memory_added' => '📸',
-        'question_answered' => '💬',
-        'mood_updated' => Mood.fromName(detail)?.emoji ?? '🙂',
-        'note_sent' => detail == 'capsule' ? '🔒' : '💌',
-        'affection_sent' => '💗',
-        'date_added' => '📅',
-        'bucket_added' => '✅',
-        _ => '✨',
+  /// The USpace icon for this kind of activity.
+  UsIconData get icon => switch (kind) {
+        'memory_added' => UsIcons.addMemory,
+        'question_answered' => UsIcons.question,
+        'mood_updated' => UsIcons.mood,
+        'note_sent' => detail == 'capsule' ? UsIcons.lock : UsIcons.loveNotes,
+        'affection_sent' => UsIcons.heart,
+        'date_added' => UsIcons.planDate,
+        'bucket_added' => UsIcons.sparkle,
+        _ => UsIcons.sparkle,
       };
 }

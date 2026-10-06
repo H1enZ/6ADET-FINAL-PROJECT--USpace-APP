@@ -25,6 +25,7 @@ import 'therabot_chat_screen.dart';
 import 'shared_reflection_view.dart';
 import 'therabot_history_screen.dart';
 import '../../widgets/effects/smooth_scroll.dart';
+import '../../widgets/atoms/us_icon.dart';
 
 /// Therabot: "A private relationship reflection assistant".
 ///
@@ -197,7 +198,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       await _load();
       if (!mounted) return;
       if (status == 'reflection_ready') {
-        showFloatingHearts(context, emoji: '💗');
+        showFloatingHearts(context);
       }
     } catch (e) {
       if (!mounted) return;
@@ -329,7 +330,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
     );
     if (!mounted) return;
     if (approved == true) {
-      showFloatingHearts(context, emoji: '💗');
+      showFloatingHearts(context);
     }
     await _load();
   }
@@ -507,10 +508,11 @@ class _TherabotScreenState extends State<TherabotScreen> {
             if (!safetyMode) ...[
               Text(
                 'A quiet space to reflect before you come back together.',
-                style: GoogleFonts.poppins(
-                  fontSize: MediaQuery.sizeOf(context).width < 360 ? 23 : 27,
+                // Therabot is the quiet screen: Inter, not a display face.
+                style: GoogleFonts.inter(
+                  fontSize: MediaQuery.sizeOf(context).width < 360 ? 20 : 22,
                   fontWeight: FontWeight.w400,
-                  height: 1.25,
+                  height: 1.3,
                   color: NotePalette.cream,
                 ),
               ),
@@ -1085,9 +1087,20 @@ class _HubHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Therabot opens as a page from Home, so it needs its own way back.
+    final canPop = ModalRoute.of(context)?.canPop ?? false;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (canPop)
+          Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
+            child: IconButton(
+              tooltip: 'Back',
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const UsIcon(UsIcons.back, size: 22),
+            ),
+          ),
         Container(
           width: 40,
           height: 40,

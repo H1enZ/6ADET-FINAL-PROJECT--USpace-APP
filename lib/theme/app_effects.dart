@@ -86,6 +86,15 @@ class AppMotion {
   static const Duration pressOut = Duration(milliseconds: 160);
 
   static const Duration quick = Duration(milliseconds: 200);
+
+  /// State swaps and list items fading in.
+  static const Duration fade = Duration(milliseconds: 200);
+
+  /// Sheets, dialogs and page transitions.
+  static const Duration sheet = Duration(milliseconds: 320);
+
+  /// Rare celebrations only: opening a capsule, breaking a seal.
+  static const Duration ceremony = Duration(milliseconds: 900);
   static const Duration medium = Duration(milliseconds: 450);
   static const Duration slow = Duration(milliseconds: 600);
 

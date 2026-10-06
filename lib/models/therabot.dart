@@ -4,6 +4,8 @@
 // therabot Edge Function return. Parsing is defensive: an unexpected shape
 // becomes an empty list or null, never a crash, and never invented content.
 
+import '../theme/us_icons.dart';
+
 /// Session statuses from migration 011.
 enum TherabotStatus {
   collecting,
@@ -37,32 +39,32 @@ TherabotProgress _progress(Object? p) => switch (p) {
 enum TherabotChoice {
   comfort(
     'comfort',
-    '🫂',
+    UsIcons.hug,
     'Comfort each other',
     'Feel held, or hold them. A little more warmth right now.',
   ),
   talk(
     'talk',
-    '💬',
+    UsIcons.chat,
     'Talk it through',
     "I'm ready to have a calm and honest conversation together.",
   ),
   space(
     'space',
-    '⏸',
+    UsIcons.breathe,
     'Take a breather',
     'A little time apart, then check in again.',
   ),
   reconnect(
     'reconnect',
-    '❤️',
+    UsIcons.heart,
     'Reconnect gently',
     'Small ways back to each other without reopening everything.',
   );
 
-  const TherabotChoice(this.value, this.emoji, this.label, this.blurb);
+  const TherabotChoice(this.value, this.icon, this.label, this.blurb);
   final String value;
-  final String emoji;
+  final UsIconData icon;
   final String label;
   final String blurb;
 

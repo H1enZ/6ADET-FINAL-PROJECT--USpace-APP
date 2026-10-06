@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:final_project/models/memory.dart';
+import 'package:final_project/theme/us_icons.dart';
 import 'package:final_project/widgets/molecules/tag_picker.dart';
 
 Map<String, dynamic> row({String? cover, List<String> tags = const []}) => {
@@ -43,9 +44,11 @@ void main() {
   });
 
   test('how tags are shown', () {
-    expect(tagLabel('anniversary'), '💍 Anniversary');
-    expect(tagLabel('outing'), '🧺 Outing');
-    expect(tagLabel('Special date'), '🏷️ Special date');
+    expect(tagLabel('anniversary'), 'Anniversary');
+    expect(tagLabel('outing'), 'Outing');
+    expect(tagLabel('Special date'), 'Special date');
+    expect(tagIcon('anniversary'), UsIcons.tagAnniversary);
+    expect(tagIcon('Special date'), UsIcons.tag);
   });
 
   test('typed tags are cleaned up', () {

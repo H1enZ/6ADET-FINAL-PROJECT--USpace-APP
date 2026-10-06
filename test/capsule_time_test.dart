@@ -54,7 +54,7 @@ void main() {
   test('activity feed says when a capsule was sealed', () {
     Activity a(String? detail) => Activity(
         id: 'x', actorId: 'u', kind: 'note_sent', detail: detail, createdAt: now);
-    expect(a('capsule').describe(name: 'Ana', isMe: false), 'Ana sealed a time capsule 🔒');
+    expect(a('capsule').describe(name: 'Ana', isMe: false), 'Ana sealed a time capsule');
     expect(a(null).describe(name: 'Ana', isMe: false), 'Ana sent a love note');
   });
 }

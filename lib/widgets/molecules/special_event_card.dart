@@ -77,17 +77,17 @@ class SpecialEventCard extends StatelessWidget {
     SpecialEventKind.custom => event.title,
   };
 
-  /// "Happy 1st Anniversary ♥"
+  /// "Happy 1st Anniversary"
   String get _celebration => switch (event.kind) {
     SpecialEventKind.anniversary =>
-      'Happy ${ordinal(event.count)} Anniversary ♥',
-    SpecialEventKind.monthsary => 'Happy ${ordinal(event.count)} Monthsary ♥',
+      'Happy ${ordinal(event.count)} Anniversary',
+    SpecialEventKind.monthsary => 'Happy ${ordinal(event.count)} Monthsary',
     SpecialEventKind.partnerBirthday =>
       partnerName == null
           ? 'It\'s your partner\'s birthday!'
           : 'Happy Birthday, $partnerName!',
     SpecialEventKind.myBirthday => 'Happy Birthday, $myName!',
-    SpecialEventKind.valentines => 'Happy Valentine\'s Day ♥',
+    SpecialEventKind.valentines => 'Happy Valentine\'s Day',
     SpecialEventKind.custom => '${event.title} is today!',
   };
 

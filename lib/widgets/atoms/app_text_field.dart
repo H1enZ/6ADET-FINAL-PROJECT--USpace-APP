@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_spacing.dart';
+import 'us_icon.dart';
 
 /// Labelled input with the small-caps label above it.
 class AppTextField extends StatelessWidget {
@@ -10,6 +11,7 @@ class AppTextField extends StatelessWidget {
     required this.controller,
     this.hintText,
     this.prefixIcon,
+    this.usIcon,
     this.obscureText = false,
     this.suffix,
     this.validator,
@@ -30,6 +32,9 @@ class AppTextField extends StatelessWidget {
   final TextEditingController controller;
   final String? hintText;
   final IconData? prefixIcon;
+
+  /// A USpace icon before the text; wins over [prefixIcon].
+  final UsIconData? usIcon;
   final bool obscureText;
   final Widget? suffix;
   final String? Function(String?)? validator;
@@ -88,7 +93,20 @@ class AppTextField extends StatelessWidget {
               hintText: hintText,
               helperText: helperText,
               helperMaxLines: 2,
-              prefixIcon: prefixIcon == null ? null : Icon(prefixIcon),
+              prefixIcon: usIcon != null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                      ),
+                      child: UsIcon(
+                        usIcon!,
+                        size: 20,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                  : prefixIcon == null
+                  ? null
+                  : Icon(prefixIcon),
               suffixIcon: suffix,
               counterText: '',
             ),

@@ -25,6 +25,7 @@ import '../widgets/timeline/scrapbook_editor.dart';
 import '../widgets/timeline/scrapbook_layout.dart';
 import 'add_memory_sheet.dart';
 import 'memory_detail_screen.dart';
+import '../theme/us_palette.dart';
 
 /// The couple's story as one big scrapbook: newest month at the top, each
 /// month a cluster of framed photos, paper notes and tickets. Pinch,
@@ -1510,7 +1511,7 @@ class _ConnectBanner extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.only(left: 14, right: 4),
     decoration: BoxDecoration(
-      color: const Color(0xF22A1426),
+      color: UsPalette.card.withValues(alpha: 0.95),
       borderRadius: BorderRadius.circular(99),
       border: Border.all(color: NotePalette.rose.withValues(alpha: 0.6)),
     ),
@@ -1686,7 +1687,7 @@ class _Header extends StatelessWidget {
                         dimension: 48,
                         child: Icon(
                           Icons.add_rounded,
-                          color: Color(0xFF3A0A19),
+                          color: UsPalette.onRose,
                           size: 28,
                         ),
                       ),
@@ -1818,7 +1819,7 @@ class _DatesToggle extends StatelessWidget {
                 ? Duration.zero
                 : const Duration(milliseconds: 200),
             child: Material(
-              color: const Color(0xE62A1426),
+              color: UsPalette.card.withValues(alpha: 0.9),
               shape: StadiumBorder(
                 side: BorderSide(
                   color: NotePalette.pink.withValues(alpha: 0.35),
@@ -1932,7 +1933,7 @@ class _MonthChip extends StatelessWidget {
           '${monthLabel(month.year, month.month)}, ${month.count} memories. Zoom in',
       excludeSemantics: true,
       child: Material(
-        color: const Color(0xEE2A1426),
+        color: UsPalette.card.withValues(alpha: 0.93),
         shape: StadiumBorder(
           side: BorderSide(color: NotePalette.pink.withValues(alpha: 0.5)),
         ),

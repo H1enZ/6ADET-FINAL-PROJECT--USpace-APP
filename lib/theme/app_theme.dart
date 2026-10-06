@@ -3,14 +3,23 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_spacing.dart';
 import 'app_typography.dart';
+import 'us_palette.dart';
 
-/// Builds light and dark ThemeData from the same rules, so every screen
-/// follows the design system in both modes.
+/// Builds the app's ThemeData from the USpace tokens. USpace ships dark
+/// only, so there is one theme.
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get light => _build(AppColors.light);
   static ThemeData get dark => _build(AppColors.dark);
+
+  static const _buttonShape = ButtonStyle(
+    minimumSize: WidgetStatePropertyAll(Size(64, AppSpacing.touchTarget)),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(AppRadius.input)),
+      ),
+    ),
+  );
 
   static ThemeData _build(ColorScheme scheme) {
     final inputBorder = OutlineInputBorder(
@@ -107,10 +116,62 @@ class AppTheme {
           AppSpacing.lg,
         ),
       ),
+      // Every button shape and height in one place, so a raw FilledButton
+      // looks the same as AppButton.
+      filledButtonTheme: FilledButtonThemeData(style: _buttonShape),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _buttonShape.copyWith(
+          side: WidgetStatePropertyAll(
+            BorderSide(color: UsPalette.lineStrong),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: ButtonStyle(
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.input),
+            ),
+          ),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: scheme.surfaceContainerHighest,
+        selectedColor: scheme.primaryContainer,
+        side: BorderSide(color: scheme.outline),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        labelStyle: AppTypography.textTheme(scheme).bodySmall,
+      ),
+      dividerTheme: DividerThemeData(color: scheme.outline, space: 1),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: scheme.primary,
+        linearTrackColor: scheme.primary.withValues(alpha: 0.16),
+        circularTrackColor: Colors.transparent,
+      ),
       navigationBarTheme: NavigationBarThemeData(
         height: AppSpacing.navBarHeight,
-        indicatorColor: scheme.primaryContainer,
-        backgroundColor: scheme.surfaceContainerHighest,
+        indicatorColor: scheme.primary.withValues(alpha: 0.16),
+        backgroundColor: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 22,
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.onSurfaceVariant,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => AppTypography.textTheme(scheme).labelSmall?.copyWith(
+            letterSpacing: 0.2,
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.onSurfaceVariant,
+          ),
+        ),
       ),
       navigationRailTheme: NavigationRailThemeData(
         indicatorColor: scheme.primaryContainer,

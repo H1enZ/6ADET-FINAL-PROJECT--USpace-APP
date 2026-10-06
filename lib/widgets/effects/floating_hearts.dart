@@ -2,24 +2,30 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../theme/us_palette.dart';
+import '../atoms/us_icon.dart';
+
 /// A short burst of hearts floating up over the screen, e.g. after sending
 /// a hug. Skipped when the device asks for reduced motion.
-void showFloatingHearts(BuildContext context, {String emoji = '❤️'}) {
+void showFloatingHearts(
+  BuildContext context, {
+  UsIconData icon = UsIcons.heart,
+}) {
   if (MediaQuery.of(context).disableAnimations) return;
   final overlay = Overlay.maybeOf(context);
   if (overlay == null) return;
 
   late final OverlayEntry entry;
   entry = OverlayEntry(
-    builder: (_) => _HeartBurst(emoji: emoji, onDone: () => entry.remove()),
+    builder: (_) => _HeartBurst(icon: icon, onDone: () => entry.remove()),
   );
   overlay.insert(entry);
 }
 
 class _HeartBurst extends StatefulWidget {
-  const _HeartBurst({required this.emoji, required this.onDone});
+  const _HeartBurst({required this.icon, required this.onDone});
 
-  final String emoji;
+  final UsIconData icon;
   final VoidCallback onDone;
 
   @override
@@ -87,8 +93,11 @@ class _HeartBurstState extends State<_HeartBurst>
                       opacity: t == 0 ? 0 : (1 - t),
                       child: Transform.scale(
                         scale: 0.6 + 0.6 * t,
-                        child: Text(widget.emoji,
-                            style: TextStyle(fontSize: h.size)),
+                        child: UsIcon(
+                          widget.icon,
+                          size: h.size,
+                          color: UsPalette.roseLight,
+                        ),
                       ),
                     ),
                   );

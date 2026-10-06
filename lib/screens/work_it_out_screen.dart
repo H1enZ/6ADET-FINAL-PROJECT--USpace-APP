@@ -14,6 +14,7 @@ import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/therabot/therabot_widgets.dart';
 import 'therabot/therabot_screen.dart';
+import '../widgets/atoms/us_icon.dart';
 
 /// "Let's work it out": us, not the problem. Not about who is right. It
 /// helps one partner say what they need right now, and lets the couple
@@ -48,22 +49,22 @@ class WorkItOutScreen extends StatelessWidget {
     final scheme = theme.colorScheme;
     final needs = [
       (
-        '💡', 'I need a solution',
+        UsIcons.idea, 'I need a solution',
         'Think it through calmly and find one next step together.',
         _SolutionPage(coupleId: coupleId, partnerName: partnerName),
       ),
       (
-        '🫂', 'I need comfort',
+        UsIcons.hug, 'I need comfort',
         'Be heard and held, not fixed. Or comfort your partner.',
         _ComfortPage(coupleId: coupleId, partnerName: partnerName),
       ),
       (
-        '❤️', 'I need affection',
+        UsIcons.heart, 'I need affection',
         'Send a hug, a kiss or a cuddle, only if it feels right.',
         _AffectionPage(coupleId: coupleId, partnerName: partnerName),
       ),
       (
-        '👂', 'I just need you to listen',
+        UsIcons.listen, 'I just need you to listen',
         'Say it all, without advice or interruptions.',
         _ListenPage(coupleId: coupleId, partnerName: partnerName),
       ),
@@ -156,7 +157,7 @@ class WorkItOutScreen extends StatelessWidget {
                             padding: const EdgeInsets.all(AppSpacing.lg),
                             child: Row(
                               children: [
-                                Text(n.$1, style: const TextStyle(fontSize: 32)),
+                                UsIcon(n.$1, size: 30, color: scheme.primary),
                                 const SizedBox(width: AppSpacing.lg),
                                 Expanded(
                                   child: Column(
@@ -450,7 +451,10 @@ class _ComfortPageState extends State<_ComfortPage> {
     try {
       await AffectionService.send(coupleId: widget.coupleId, kind: kind, message: text);
       if (!mounted) return;
-      showGesturePulse(context, kind == 'listen' ? '👂' : '💗');
+      showGesturePulse(
+        context,
+        kind == 'listen' ? UsIcons.listen : UsIcons.heart,
+      );
       _toast(context, done);
       _feelings.clear();
       _comfort.clear();
@@ -485,7 +489,7 @@ class _ComfortPageState extends State<_ComfortPage> {
           ),
           child: Text(
             "It's okay to not be okay. Whatever you're carrying right now, "
-            "you don't have to carry it alone. 🫂",
+            "you don't have to carry it alone.",
             style: theme.textTheme.titleMedium?.copyWith(color: scheme.onPrimaryContainer),
           ),
         ),
@@ -522,7 +526,7 @@ class _ComfortPageState extends State<_ComfortPage> {
                 label: Text(p),
                 onPressed: _sending
                     ? null
-                    : () => _send('comfort', p, 'Comfort sent to ${widget.partnerName} 💗'),
+                    : () => _send('comfort', p, 'Comfort sent to ${widget.partnerName}'),
               ),
           ],
         ),
@@ -540,7 +544,7 @@ class _ComfortPageState extends State<_ComfortPage> {
           variant: AppButtonVariant.outlined,
           onPressed: _sending
               ? null
-              : () => _send('comfort', _comfort.text, 'Comfort sent to ${widget.partnerName} 💗'),
+              : () => _send('comfort', _comfort.text, 'Comfort sent to ${widget.partnerName}'),
           fullWidth: true,
         ),
       ],
@@ -570,13 +574,13 @@ class _AffectionPageState extends State<_AffectionPage> {
     super.dispose();
   }
 
-  Future<void> _send(String kind, String emoji, String label) async {
+  Future<void> _send(String kind, UsIconData icon, String label) async {
     setState(() => _sending = true);
     try {
       await AffectionService.send(coupleId: widget.coupleId, kind: kind, message: _note.text);
       if (!mounted) return;
-      showGesturePulse(context, emoji);
-      _toast(context, '$label sent to ${widget.partnerName} $emoji');
+      showGesturePulse(context, icon);
+      _toast(context, '$label sent to ${widget.partnerName}');
       _note.clear();
     } catch (e) {
       if (!mounted) return;
@@ -591,9 +595,9 @@ class _AffectionPageState extends State<_AffectionPage> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final gestures = [
-      ('hug', '🫂', 'A big warm hug'),
-      ('kiss', '💋', 'A kiss'),
-      ('cuddle', '🤗', 'A cuddle'),
+      ('hug', UsIcons.hug, 'A big warm hug'),
+      ('kiss', UsIcons.heart, 'A kiss'),
+      ('cuddle', UsIcons.hug, 'A cuddle'),
     ];
     return _NeedPage(
       title: 'I need affection',
@@ -616,7 +620,7 @@ class _AffectionPageState extends State<_AffectionPage> {
                         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
                         child: Column(
                           children: [
-                            Text(g.$2, style: const TextStyle(fontSize: 40)),
+                            UsIcon(g.$2, size: 36, color: scheme.onPrimaryContainer),
                             const SizedBox(height: AppSpacing.sm),
                             Text('Send ${g.$1 == 'hug' ? 'a hug' : g.$1 == 'kiss' ? 'a kiss' : 'a cuddle'}',
                                 style: theme.textTheme.labelLarge
@@ -825,7 +829,7 @@ class _ResolutionPageState extends State<ResolutionPage> {
       );
       if (!mounted) return;
       if (done) showFloatingHearts(context);
-      _toast(context, done ? 'Saved. Thank you for working on this together 💗' : 'Saved. Come back whenever you are ready.');
+      _toast(context, done ? 'Saved. Thank you for working on this together.' : 'Saved. Come back whenever you are ready.');
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -961,10 +965,10 @@ class _ResolutionNotesPageState extends State<ResolutionNotesPage> {
     final scheme = theme.colorScheme;
     final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
     const needLabels = {
-      'solution': '💡 Solution',
-      'comfort': '🫂 Comfort',
-      'affection': '❤️ Affection',
-      'listen': '👂 Listen',
+      'solution': 'Solution',
+      'comfort': 'Comfort',
+      'affection': 'Affection',
+      'listen': 'Listen',
     };
 
     return Scaffold(
