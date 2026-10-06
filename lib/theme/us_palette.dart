@@ -53,6 +53,23 @@ class UsPalette {
   /// A selected or focused border.
   static const lineStrong = Color(0x99F6A9C1);
 
+  // Letter paper: love notes, capsule letters, scrapbook labels. Text on
+  // paper is always [paperInk] or [paperInkSoft].
+  /// Cream-blush letter paper.
+  static const paper = Color(0xFFF8E6E4);
+
+  /// The lighter, top-left side of a sheet.
+  static const paperLight = Color(0xFFFBEDE8);
+
+  /// Paper edges, fibres and folds.
+  static const paperEdge = Color(0xFFEBCFCF);
+
+  /// Text on paper (12.9:1 on [paper]).
+  static const paperInk = Color(0xFF3B1F2E);
+
+  /// Secondary text on paper (5.6:1 on [paper]).
+  static const paperInkSoft = Color(0xFF7A5566);
+
   // Timeline corkboard. Surfaces only: no text sits directly on cork, so
   // month names and captions are always on paper.
   /// The board's warm cocoa cork.

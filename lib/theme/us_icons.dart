@@ -73,6 +73,10 @@ abstract final class UsIcons {
   static const link = UsIconData('link');
   static const palette = UsIconData('palette');
 
+  // Love note types.
+  static const flower = UsIconData('flower');
+  static const moon = UsIconData('moon');
+
   // Chat composer.
   static const send = UsIconData('send');
   static const image = UsIconData('image');

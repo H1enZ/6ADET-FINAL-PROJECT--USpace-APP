@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_effects.dart';
 import '../../theme/app_spacing.dart';
 import '../effects/motion.dart';
+import 'us_icon.dart';
 
 enum AppButtonVariant { filled, outlined }
 
@@ -15,6 +16,7 @@ class AppButton extends StatelessWidget {
     required this.onPressed,
     this.variant = AppButtonVariant.filled,
     this.icon,
+    this.usIcon,
     this.isLoading = false,
     this.fullWidth = false,
   });
@@ -23,6 +25,9 @@ class AppButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final AppButtonVariant variant;
   final IconData? icon;
+
+  /// A USpace icon before the label; wins over [icon].
+  final UsIconData? usIcon;
   final bool isLoading;
   final bool fullWidth;
 
@@ -62,23 +67,28 @@ class AppButton extends StatelessWidget {
       ),
     );
 
+    final Widget? glyph = usIcon != null
+        ? UsIcon(usIcon!, size: 20)
+        : icon != null
+        ? Icon(icon)
+        : null;
     final Widget button;
     if (variant == AppButtonVariant.filled) {
-      button = icon == null || isLoading
+      button = glyph == null || isLoading
           ? FilledButton(onPressed: action, style: style, child: content)
           : FilledButton.icon(
               onPressed: action,
               style: style,
-              icon: Icon(icon),
+              icon: glyph,
               label: content,
             );
     } else {
-      button = icon == null || isLoading
+      button = glyph == null || isLoading
           ? OutlinedButton(onPressed: action, style: style, child: content)
           : OutlinedButton.icon(
               onPressed: action,
               style: style,
-              icon: Icon(icon),
+              icon: glyph,
               label: content,
             );
     }

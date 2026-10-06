@@ -7,7 +7,12 @@ import '../models/love_note.dart';
 import '../services/auth_service.dart';
 import '../services/memory_service.dart';
 import '../services/note_service.dart';
+import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
+import '../widgets/atoms/app_button.dart';
+import '../widgets/atoms/section_label.dart';
+import '../widgets/atoms/us_icon.dart';
+import '../widgets/effects/motion.dart';
 import '../widgets/notes/note_style.dart';
 
 /// Opens Write a Love Note. True once the note was sent.
@@ -118,26 +123,6 @@ class _WriteLoveNoteScreenState extends State<WriteLoveNoteScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = theme.textTheme.titleMedium?.copyWith(
-      color: NotePalette.cream,
-      fontSize: 16,
-    );
-    final optional = theme.textTheme.bodyMedium?.copyWith(
-      color: NotePalette.muted,
-    );
-
-    Widget heading(String text, {bool isOptional = false}) => Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Text.rich(
-        TextSpan(
-          text: text,
-          style: label,
-          children: [
-            if (isOptional) TextSpan(text: '  (optional)', style: optional),
-          ],
-        ),
-      ),
-    );
 
     return Scaffold(
       backgroundColor: NotePalette.background,
@@ -148,7 +133,7 @@ class _WriteLoveNoteScreenState extends State<WriteLoveNoteScreen> {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           tooltip: 'Back',
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const UsIcon(UsIcons.back),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
@@ -165,7 +150,7 @@ class _WriteLoveNoteScreenState extends State<WriteLoveNoteScreen> {
               Semantics(
                 header: true,
                 child: Text(
-                  'Write a Love Note',
+                  'Write a love note',
                   style: NotePalette.display(30),
                 ),
               ),
@@ -178,14 +163,14 @@ class _WriteLoveNoteScreenState extends State<WriteLoveNoteScreen> {
               ),
               const SizedBox(height: AppSpacing.xxl),
 
-              heading('Note Type'),
+              const SectionLabel(text: 'Note type'),
               _TypePicker(
                 selected: _category,
                 onSelect: (c) => setState(() => _category = c),
               ),
               const SizedBox(height: AppSpacing.xxl),
 
-              heading('Add a Photo', isOptional: true),
+              const SectionLabel(text: 'Photo (optional)'),
               _PhotoPicker(
                 bytes: _photo?.bytes,
                 onPick: _sending ? null : _pickPhoto,
@@ -193,7 +178,7 @@ class _WriteLoveNoteScreenState extends State<WriteLoveNoteScreen> {
               ),
               const SizedBox(height: AppSpacing.xxl),
 
-              heading('Title', isOptional: true),
+              const SectionLabel(text: 'Title (optional)'),
               _NoteField(
                 controller: _title,
                 hint: 'Give your note a title...',
@@ -202,7 +187,7 @@ class _WriteLoveNoteScreenState extends State<WriteLoveNoteScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              heading('Your Note'),
+              const SectionLabel(text: 'Your note'),
               _NoteField(
                 controller: _body,
                 hint: 'Write your love note...',
@@ -220,11 +205,12 @@ class _WriteLoveNoteScreenState extends State<WriteLoveNoteScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.xl),
-              NotePrimaryButton(
-                label: 'Send Love Note',
-                icon: Icons.send_rounded,
+              AppButton(
+                label: 'Send love note',
+                usIcon: UsIcons.send,
+                fullWidth: true,
+                isLoading: _sending,
                 onPressed: _send,
-                loading: _sending,
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
@@ -243,7 +229,8 @@ class _WriteLoveNoteScreenState extends State<WriteLoveNoteScreen> {
   }
 }
 
-/// The five note types as small cards in a sideways row.
+/// The five note types as quiet pills that wrap, so all of them show at
+/// once. The chosen one fills dusty rose and shows a check.
 class _TypePicker extends StatelessWidget {
   const _TypePicker({required this.selected, required this.onSelect});
 
@@ -253,63 +240,64 @@ class _TypePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
-      height: 104,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        itemCount: NoteCategory.values.length,
-        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
-        itemBuilder: (context, i) {
-          final c = NoteCategory.values[i];
-          final on = c == selected;
-          return Semantics(
-            button: true,
-            selected: on,
-            label: c.label,
-            excludeSemantics: true,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              width: 88,
-              decoration: noteCardDecoration(
+    final scheme = theme.colorScheme;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final c in NoteCategory.values)
+          Builder(
+            builder: (context) {
+              final on = c == selected;
+              final fg = on ? scheme.onPrimary : scheme.onSurface;
+              return Semantics(
+                button: true,
                 selected: on,
-                radius: AppRadius.tile,
-              ),
-              child: Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(AppRadius.tile),
-                  onTap: () => onSelect(c),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                      vertical: AppSpacing.md,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        NoteCategoryIcon(c, size: 28),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          c.label,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontSize: 12.5,
-                            height: 1.2,
-                            color: on ? NotePalette.cream : NotePalette.muted,
-                            fontWeight: on ? FontWeight.w600 : FontWeight.w400,
+                label: c.label,
+                excludeSemantics: true,
+                child: AnimatedContainer(
+                  duration: motionOff(context) ? Duration.zero : AppMotion.quick,
+                  curve: AppMotion.snappy,
+                  decoration: ShapeDecoration(
+                    color: on
+                        ? scheme.primary
+                        : scheme.primary.withValues(alpha: 0.12),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: InkWell(
+                      customBorder: const StadiumBorder(),
+                      onTap: () => onSelect(c),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 40),
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(on ? 10 : 14, 8, 14, 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (on) ...[
+                                UsIcon(UsIcons.check, size: 14, color: fg),
+                                const SizedBox(width: 5),
+                              ],
+                              Text(
+                                c.label,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: fg,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+      ],
     );
   }
 }
@@ -353,8 +341,8 @@ class _PhotoPicker extends StatelessWidget {
                 child: IconButton(
                   tooltip: 'Remove photo',
                   onPressed: onRemove,
-                  icon: const Icon(
-                    Icons.close_rounded,
+                  icon: const UsIcon(
+                    UsIcons.close,
                     color: NotePalette.cream,
                     size: 20,
                   ),
@@ -372,7 +360,7 @@ class _PhotoPicker extends StatelessWidget {
       child: CustomPaint(
         foregroundPainter: _DashedBorder(),
         child: Material(
-          color: Colors.black.withValues(alpha: 0.18),
+          color: NotePalette.card,
           borderRadius: BorderRadius.circular(AppRadius.panel),
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadius.panel),
@@ -383,11 +371,7 @@ class _PhotoPicker extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.add_photo_alternate_outlined,
-                    size: 36,
-                    color: NotePalette.pink,
-                  ),
+                  const UsIcon(UsIcons.image, size: 32, color: NotePalette.pink),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Add a photo',
@@ -437,6 +421,8 @@ class _DashedBorder extends CustomPainter {
   bool shouldRepaint(_DashedBorder old) => false;
 }
 
+/// A form field in the app's standard style. Its limit is always
+/// enforced; the count only shows once you are near it (80%).
 class _NoteField extends StatelessWidget {
   const _NoteField({
     required this.controller,
@@ -455,32 +441,26 @@ class _NoteField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AppRadius.card),
-      borderSide: BorderSide(color: c, width: w),
-    );
     return TextField(
       controller: controller,
       maxLength: maxLength,
       maxLines: maxLines,
       minLines: minLines,
       textCapitalization: TextCapitalization.sentences,
-      style: theme.textTheme.bodyLarge?.copyWith(color: NotePalette.cream),
-      cursorColor: NotePalette.rose,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: theme.textTheme.bodyLarge?.copyWith(
-          color: NotePalette.muted.withValues(alpha: 0.7),
-        ),
-        filled: true,
-        fillColor: Colors.black.withValues(alpha: 0.22),
-        contentPadding: const EdgeInsets.all(AppSpacing.lg),
-        enabledBorder: border(NotePalette.border),
-        focusedBorder: border(NotePalette.rose, 1.5),
-        counterStyle: theme.textTheme.labelSmall?.copyWith(
-          color: NotePalette.muted,
-        ),
-      ),
+      decoration: InputDecoration(hintText: hint),
+      buildCounter:
+          (context, {required currentLength, required isFocused, maxLength}) {
+            final max = maxLength;
+            if (max == null || currentLength < max * 0.8) return null;
+            return Text(
+              '$currentLength / $max',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: currentLength >= max
+                    ? theme.colorScheme.error
+                    : NotePalette.muted,
+              ),
+            );
+          },
     );
   }
 }

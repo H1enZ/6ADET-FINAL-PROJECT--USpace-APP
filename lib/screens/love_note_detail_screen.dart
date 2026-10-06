@@ -7,8 +7,12 @@ import '../services/auth_service.dart';
 import '../services/note_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
+import '../theme/us_palette.dart';
 import '../widgets/atoms/avatar_circle.dart';
+import '../widgets/atoms/us_icon.dart';
 import '../widgets/effects/floating_hearts.dart';
+import '../widgets/effects/motion.dart';
+import '../widgets/molecules/us_confirm.dart';
 import '../widgets/notes/note_style.dart';
 
 /// One love note, opened: its photo, then the letter on paper. Closes with
@@ -39,15 +43,21 @@ class _LoveNoteDetailScreenState extends State<LoveNoteDetailScreen> {
   bool _changed = false;
   bool _busy = false;
 
+  /// A favourite change still saving; further taps wait for it, so saves
+  /// can't overlap or roll back to an old state.
+  bool _savingFavorite = false;
+
   void _showMessage(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _toggleFavorite() async {
+    if (_savingFavorite || _busy) return;
     final before = _note;
     final value = !before.isFavorite;
     setState(() {
       _note = before.withFavorite(value);
       _changed = true;
+      _savingFavorite = true;
     });
     if (value) showFloatingHearts(context);
     try {
@@ -56,28 +66,23 @@ class _LoveNoteDetailScreenState extends State<LoveNoteDetailScreen> {
       if (!mounted) return;
       setState(() => _note = before);
       _showMessage(friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _savingFavorite = false);
     }
   }
 
   Future<void> _delete() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this note?'),
-        content: const Text('It will be removed for both of you.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep it'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    // Only the author deletes (the database enforces it too).
+    if (!widget.isMine || _busy) return;
+    final ok = await showUsConfirm(
+      context,
+      title: 'Delete this note?',
+      message: 'It will be removed for both of you.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep it',
+      destructive: true,
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     setState(() => _busy = true);
     try {
       await NoteService.delete(_note.id, photoPath: _note.photoPath);
@@ -92,7 +97,7 @@ class _LoveNoteDetailScreenState extends State<LoveNoteDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final note = _note;
     final when = note.unlockAt ?? note.sentAt;
     final hasPhoto = note.photoPath != null;
@@ -110,9 +115,46 @@ class _LoveNoteDetailScreenState extends State<LoveNoteDetailScreen> {
           surfaceTintColor: Colors.transparent,
           leading: IconButton(
             tooltip: 'Back',
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: const UsIcon(UsIcons.back),
             onPressed: () => Navigator.of(context).pop(_changed),
           ),
+          actions: [
+            // Either of you can keep a note as a favourite.
+            Semantics(
+              toggled: note.isFavorite,
+              child: IconButton(
+                tooltip: note.isFavorite
+                    ? 'Remove from favorites'
+                    : 'Add to favorites',
+                onPressed: _busy ? null : _toggleFavorite,
+                icon: AnimatedHeartIcon(filled: note.isFavorite),
+              ),
+            ),
+            // Only the author can delete; notes can't be edited.
+            if (widget.isMine)
+              PopupMenuButton<String>(
+                tooltip: 'More',
+                enabled: !_busy,
+                icon: const UsIcon(UsIcons.more, size: 22),
+                onSelected: (_) => _delete(),
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        UsIcon(UsIcons.trash, size: 20, color: scheme.error),
+                        const SizedBox(width: AppSpacing.md),
+                        Text(
+                          'Delete note',
+                          style: TextStyle(color: scheme.error),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(width: AppSpacing.xs),
+          ],
         ),
         body: NotesBackground(
           child: SafeArea(
@@ -144,42 +186,6 @@ class _LoveNoteDetailScreenState extends State<LoveNoteDetailScreen> {
                       authorAvatarUrl: widget.authorAvatarUrl,
                       when: when,
                     ),
-                    const SizedBox(height: AppSpacing.xl),
-                    Row(
-                      children: [
-                        if (widget.isMine)
-                          _RoundAction(
-                            tooltip: 'Delete note',
-                            icon: Icons.delete_outline_rounded,
-                            onPressed: _busy ? null : _delete,
-                          )
-                        else
-                          const SizedBox(width: 52),
-                        const Spacer(),
-                        _RoundAction(
-                          tooltip: note.isFavorite
-                              ? 'Remove from favorites'
-                              : 'Add to favorites',
-                          icon: note.isFavorite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          highlighted: note.isFavorite,
-                          onPressed: _busy ? null : _toggleFavorite,
-                        ),
-                        const Spacer(),
-                        const SizedBox(width: 52),
-                      ],
-                    ),
-                    if (note.isFavorite) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Kept in your favorites',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: NotePalette.muted,
-                        ),
-                      ),
-                    ],
                   ],
                 );
               },
@@ -365,7 +371,7 @@ class _PaperGrain extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFBEDE8), NotePalette.paper, Color(0xFFF2D7DA)],
+          colors: [UsPalette.paperLight, UsPalette.paper, UsPalette.paperEdge],
         ).createShader(rect),
     );
     final rnd = math.Random(7);
@@ -390,7 +396,7 @@ class _PaperGrain extends CustomPainter {
           radius: 1.1,
           colors: [
             Colors.transparent,
-            const Color(0xFFD9B3B8).withValues(alpha: 0.22),
+            UsPalette.paperInkSoft.withValues(alpha: 0.14),
           ],
           stops: const [0.75, 1],
         ).createShader(rect),
@@ -399,54 +405,4 @@ class _PaperGrain extends CustomPainter {
 
   @override
   bool shouldRepaint(_PaperGrain old) => false;
-}
-
-class _RoundAction extends StatelessWidget {
-  const _RoundAction({
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
-    this.highlighted = false,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback? onPressed;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Semantics(
-        button: true,
-        label: tooltip,
-        excludeSemantics: true,
-        child: Material(
-          color: highlighted
-              ? NotePalette.rose.withValues(alpha: 0.22)
-              : NotePalette.card,
-          shape: CircleBorder(
-            side: BorderSide(
-              color: highlighted
-                  ? NotePalette.borderBright
-                  : NotePalette.border,
-            ),
-          ),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onPressed,
-            child: SizedBox.square(
-              dimension: 52,
-              child: Icon(
-                icon,
-                size: 24,
-                color: highlighted ? NotePalette.rose : NotePalette.cream,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

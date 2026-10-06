@@ -10,6 +10,8 @@ import '../services/couple_service.dart';
 import '../services/note_service.dart';
 import '../services/profile_service.dart';
 import '../theme/app_spacing.dart';
+import '../theme/app_typography.dart';
+import '../theme/us_palette.dart';
 import '../utils/anniversary.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/effects/floating_hearts.dart';
@@ -206,9 +208,10 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
                                   children: [
                                     const _Header(),
                                     const SizedBox(height: AppSpacing.xl),
-                                    NotePrimaryButton(
-                                      label: 'Write a Love Note',
-                                      icon: Icons.add_rounded,
+                                    AppButton(
+                                      label: 'Write a love note',
+                                      usIcon: UsIcons.plus,
+                                      fullWidth: true,
                                       onPressed: _write,
                                     ),
                                     const SizedBox(height: AppSpacing.md),
@@ -248,6 +251,9 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
                                       for (final n in notes)
                                         _NoteCard(
                                           note: n,
+                                          from: n.authorId == _myId
+                                              ? 'you'
+                                              : _nameOf(n.authorId),
                                           onTap: () => _open(n),
                                         ),
                                   ],
@@ -275,51 +281,14 @@ class _Header extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Flexible(
-              child: Semantics(
-                header: true,
-                child: Text('Love Notes', style: NotePalette.display(36)),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            // Two small hearts beside the title.
-            ExcludeSemantics(
-              child: SizedBox(
-                width: 34,
-                height: 34,
-                child: Stack(
-                  children: [
-                    Positioned(
-                      left: 2,
-                      top: 0,
-                      child: Icon(
-                        Icons.favorite_rounded,
-                        size: 18,
-                        color: NotePalette.rose.withValues(alpha: 0.85),
-                      ),
-                    ),
-                    Positioned(
-                      right: 2,
-                      bottom: 2,
-                      child: Icon(
-                        Icons.favorite_rounded,
-                        size: 12,
-                        color: NotePalette.pink.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        Semantics(
+          header: true,
+          child: Text('Love Notes', style: NotePalette.display(36)),
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
           'Little words worth keeping.',
-          style: theme.textTheme.bodyLarge?.copyWith(color: NotePalette.pink),
+          style: theme.textTheme.bodyLarge?.copyWith(color: NotePalette.muted),
         ),
       ],
     );
@@ -355,7 +324,7 @@ class _CapsuleLink extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const QuickActionArtView(QuickActionArt.capsule, size: 50),
+                  const QuickActionArtView(QuickActionArt.capsule, size: 40),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
@@ -363,20 +332,24 @@ class _CapsuleLink extends StatelessWidget {
                       children: [
                         Text(
                           'Time Capsules',
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          style: theme.textTheme.titleSmall?.copyWith(
                             color: NotePalette.cream,
                           ),
                         ),
                         Text(
                           'Write a letter that opens later',
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: NotePalette.muted,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const _Chevron(),
+                  const UsIcon(
+                    UsIcons.chevronRight,
+                    size: 20,
+                    color: NotePalette.muted,
+                  ),
                 ],
               ),
             ),
@@ -387,12 +360,20 @@ class _CapsuleLink extends StatelessWidget {
   }
 }
 
-/// One note in the list: its photo (or the love-letter drawing), its type,
-/// title and first line, the date, and a chevron. Tap to open it.
+/// One note in the list, as a small letter on cream paper: its type, its
+/// title and first line in the letter hand, who it is from and when, and
+/// its photo as a little Polaroid. The whole letter opens it.
 class _NoteCard extends StatelessWidget {
-  const _NoteCard({required this.note, required this.onTap});
+  const _NoteCard({
+    required this.note,
+    required this.from,
+    required this.onTap,
+  });
 
   final LoveNote note;
+
+  /// "you", or your partner's name.
+  final String from;
   final VoidCallback onTap;
 
   @override
@@ -401,106 +382,135 @@ class _NoteCard extends StatelessWidget {
     final title = note.title;
     final firstLine = note.body.trim().split('\n').first;
     final when = note.unlockAt ?? note.sentAt;
+    final type =
+        note.category?.label ?? (note.wasCapsule ? 'Time capsule' : 'Love note');
+    const radius = BorderRadius.all(Radius.circular(6));
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Semantics(
         button: true,
         label: [
-          note.category?.label ??
-              (note.wasCapsule ? 'Time capsule' : 'Love note'),
+          type,
+          'From $from',
           ?title,
           firstLine,
           longDate(when),
+          if (note.photoPath != null) 'with a photo',
           if (note.isFavorite) 'favorite',
         ].join('. '),
         excludeSemantics: true,
-        child: DecoratedBox(
-          decoration: noteCardDecoration(),
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadius.panel),
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.lg,
-                  AppSpacing.md,
-                  AppSpacing.lg,
+        child: PressScale(
+          scale: 0.98,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
                 ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 80,
-                      height: 90,
-                      child: Center(
-                        child: note.photoPath != null
-                            ? NotePolaroid(
-                                url: note.photoUrl,
-                                width: 70,
-                                turn: -4,
-                              )
-                            : const NoteArtTile(size: 72),
-                      ),
+              ],
+            ),
+            child: Material(
+              borderRadius: radius,
+              clipBehavior: Clip.antiAlias,
+              color: Colors.transparent,
+              child: Ink(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      UsPalette.paperLight,
+                      UsPalette.paper,
+                      UsPalette.paperEdge,
+                    ],
+                    stops: [0, 0.6, 1],
+                  ),
+                ),
+                child: InkWell(
+                  onTap: onTap,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg,
+                      AppSpacing.md + 2,
+                      AppSpacing.md,
+                      AppSpacing.md + 2,
                     ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          NoteCategoryBadge(
-                            category: note.category,
-                            capsule: note.wasCapsule,
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          if (title != null)
-                            Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: NotePalette.cream,
-                              ),
-                            ),
-                          Text(
-                            firstLine,
-                            maxLines: title == null ? 2 : 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: title == null
-                                  ? NotePalette.cream
-                                  : NotePalette.muted,
-                              height: 1.35,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Row(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Flexible(
-                                child: Text(
-                                  longDate(when),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: NoteCategoryBadge(
+                                      category: note.category,
+                                      capsule: note.wasCapsule,
+                                      onPaper: true,
+                                    ),
+                                  ),
+                                  if (note.isFavorite) ...[
+                                    const SizedBox(width: AppSpacing.sm),
+                                    const UsIcon(
+                                      UsIcons.heart,
+                                      size: 14,
+                                      color: NotePalette.deepRose,
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              if (title != null)
+                                Text(
+                                  title,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: NotePalette.muted,
+                                  style: NotePalette.display(
+                                    18,
+                                    color: NotePalette.ink,
                                   ),
                                 ),
-                              ),
-                              if (note.isFavorite) ...[
-                                const SizedBox(width: AppSpacing.xs),
-                                const Icon(
-                                  Icons.favorite_rounded,
-                                  size: 14,
-                                  color: NotePalette.rose,
+                              Text(
+                                firstLine,
+                                maxLines: title == null ? 2 : 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.letter(
+                                  color: NotePalette.ink,
+                                  size: 15,
                                 ),
-                              ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                'From $from \u00B7 ${longDate(when)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: NotePalette.inkSoft,
+                                ),
+                              ),
                             ],
                           ),
+                        ),
+                        if (note.photoPath != null) ...[
+                          const SizedBox(width: AppSpacing.md),
+                          Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.xs),
+                            child: NotePolaroid(
+                              url: note.photoUrl,
+                              width: 66,
+                              turn: 4,
+                              heart: false,
+                            ),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    const _Chevron(),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -509,26 +519,6 @@ class _NoteCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Chevron extends StatelessWidget {
-  const _Chevron();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 32,
-    height: 32,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: Colors.white.withValues(alpha: 0.06),
-      border: Border.all(color: NotePalette.border),
-    ),
-    child: const Icon(
-      Icons.chevron_right_rounded,
-      size: 20,
-      color: NotePalette.cream,
-    ),
-  );
 }
 
 class _EmptyNotes extends StatelessWidget {

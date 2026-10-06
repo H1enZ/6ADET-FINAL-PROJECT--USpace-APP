@@ -6,6 +6,7 @@ import '../../models/love_note.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 import '../../theme/us_palette.dart';
+import '../atoms/us_icon.dart';
 import '../effects/soft_hearts_background.dart';
 import '../home/quick_actions.dart';
 
@@ -28,11 +29,11 @@ class NotePalette {
   static const rose = UsPalette.rose;
   static const deepRose = UsPalette.roseDeep;
 
-  // Letter paper: only on an opened note or capsule letter.
-  static const paper = Color(0xFFF8E6E4);
-  static const paperEdge = Color(0xFFEBCFCF);
-  static const ink = Color(0xFF3B1F2E);
-  static const inkSoft = Color(0xFF7A5566);
+  // Letter paper (the shared paper tokens).
+  static const paper = UsPalette.paper;
+  static const paperEdge = UsPalette.paperEdge;
+  static const ink = UsPalette.paperInk;
+  static const inkSoft = UsPalette.paperInkSoft;
 
   /// The big rose button (dark text on it).
   static const buttonGradient = LinearGradient(
@@ -68,56 +69,31 @@ class NotesBackground extends StatelessWidget {
   );
 }
 
-/// The icon for a note type. One family: rounded Material shapes filled
-/// with the same rose gradient; "Love" is two overlapping hearts.
+/// The icon for a note type, from the USpace line set.
 class NoteCategoryIcon extends StatelessWidget {
-  const NoteCategoryIcon(this.category, {super.key, this.size = 26});
+  const NoteCategoryIcon(
+    this.category, {
+    super.key,
+    this.size = 26,
+    this.color = NotePalette.rose,
+  });
 
   final NoteCategory? category;
   final double size;
+  final Color color;
 
-  static IconData iconOf(NoteCategory? c) => switch (c) {
-    NoteCategory.justBecause => Icons.favorite_rounded,
-    NoteCategory.thankYou => Icons.local_florist_rounded,
-    NoteCategory.missingYou => Icons.nightlight_round,
-    NoteCategory.proudOfYou => Icons.star_rounded,
-    NoteCategory.love => Icons.favorite_rounded,
-    null => Icons.mail_rounded,
+  static UsIconData iconOf(NoteCategory? c) => switch (c) {
+    NoteCategory.justBecause => UsIcons.sparkle,
+    NoteCategory.thankYou => UsIcons.flower,
+    NoteCategory.missingYou => UsIcons.moon,
+    NoteCategory.proudOfYou => UsIcons.star,
+    NoteCategory.love => UsIcons.heart,
+    null => UsIcons.loveNotes,
   };
 
   @override
-  Widget build(BuildContext context) {
-    final Widget glyph = category == NoteCategory.love
-        ? SizedBox.square(
-            dimension: size,
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  top: size * 0.04,
-                  child: Icon(Icons.favorite_rounded, size: size * 0.72),
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: size * 0.02,
-                  child: Icon(Icons.favorite_rounded, size: size * 0.62),
-                ),
-              ],
-            ),
-          )
-        : Icon(iconOf(category), size: size);
-    return ExcludeSemantics(
-      child: ShaderMask(
-        blendMode: BlendMode.srcIn,
-        shaderCallback: (r) => const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFB3C7), NotePalette.rose, NotePalette.deepRose],
-        ).createShader(r),
-        child: glyph,
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      UsIcon(iconOf(category), size: size, color: color);
 }
 
 /// A small rose pill with the note type: "Just Because".
@@ -140,40 +116,27 @@ class NoteCategoryBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = category?.label ?? (capsule ? 'Time Capsule' : 'Love Note');
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: onPaper
-            ? NotePalette.pink.withValues(alpha: 0.35)
-            : NotePalette.rose.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: onPaper
-              ? NotePalette.rose.withValues(alpha: 0.35)
-              : NotePalette.pink.withValues(alpha: 0.45),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          capsule && category == null
-              ? const Icon(
-                  Icons.lock_clock_rounded,
-                  size: 13,
-                  color: NotePalette.rose,
-                )
-              : NoteCategoryIcon(category, size: 13),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              letterSpacing: 0.2,
-              fontSize: 11.5,
-              color: onPaper ? NotePalette.ink : NotePalette.pink,
-            ),
+    final color = onPaper ? NotePalette.inkSoft : NotePalette.pink;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        capsule && category == null
+            ? UsIcon(UsIcons.timeCapsule, size: 14, color: NotePalette.rose)
+            : NoteCategoryIcon(
+                category,
+                size: 14,
+                color: onPaper ? NotePalette.deepRose : NotePalette.rose,
+              ),
+        const SizedBox(width: 6),
+        Text(
+          label.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w600,
+            color: color,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -205,7 +168,7 @@ class NotePolaroid extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFFFF4EF), Color(0xFFF5DEDF)],
+          colors: [UsPalette.cream, UsPalette.paper],
         ),
         borderRadius: BorderRadius.circular(3),
         boxShadow: [
@@ -252,8 +215,8 @@ class NotePolaroid extends StatelessWidget {
                 right: -width * 0.08,
                 bottom: -width * 0.06,
                 child: NoteCategoryIcon(
-                  NoteCategory.justBecause,
-                  size: width * 0.28,
+                  NoteCategory.love,
+                  size: width * 0.24,
                 ),
               ),
           ],
@@ -268,9 +231,9 @@ class _PhotoMissing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    color: const Color(0xFF4A1D42),
+    color: UsPalette.cardRaised,
     alignment: Alignment.center,
-    child: const Icon(Icons.image_outlined, color: NotePalette.pink),
+    child: const UsIcon(UsIcons.image, color: NotePalette.pink),
   );
 }
 
@@ -353,7 +316,7 @@ class NotePrimaryButton extends StatelessWidget {
                           dimension: 22,
                           child: CircularProgressIndicator(
                             strokeWidth: 2.5,
-                            color: Color(0xFF3A0A19),
+                            color: UsPalette.onRose,
                           ),
                         )
                       : Row(
@@ -363,7 +326,7 @@ class NotePrimaryButton extends StatelessWidget {
                               Icon(
                                 icon,
                                 size: 22,
-                                color: const Color(0xFF3A0A19),
+                                color: UsPalette.onRose,
                               ),
                               const SizedBox(width: AppSpacing.sm),
                             ],
@@ -372,7 +335,7 @@ class NotePrimaryButton extends StatelessWidget {
                               style: Theme.of(context).textTheme.labelLarge
                                   ?.copyWith(
                                     fontSize: 16,
-                                    color: const Color(0xFF3A0A19),
+                                    color: UsPalette.onRose,
                                   ),
                             ),
                             if (iconAfter) ...[
@@ -380,7 +343,7 @@ class NotePrimaryButton extends StatelessWidget {
                               Icon(
                                 icon,
                                 size: 22,
-                                color: const Color(0xFF3A0A19),
+                                color: UsPalette.onRose,
                               ),
                             ],
                           ],
@@ -405,7 +368,10 @@ BoxDecoration noteCardDecoration({
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: selected
-        ? [const Color(0xFF5A2244), const Color(0xFF3A1730)]
+        ? [
+            Color.lerp(NotePalette.cardTop, NotePalette.rose, 0.16)!,
+            NotePalette.cardTop,
+          ]
         : const [NotePalette.cardTop, NotePalette.card],
   ),
   border: Border.all(
