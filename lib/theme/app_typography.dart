@@ -70,6 +70,10 @@ class AppTypography {
   static TextStyle hand({Color? color, double size = 20}) =>
       GoogleFonts.caveat(fontSize: size, height: 1.2, color: color);
 
+  /// Pen script on parchment: Time Capsule letter bodies and sign-offs.
+  static TextStyle capsuleHand({Color? color, double size = 22}) =>
+      GoogleFonts.laBelleAurore(fontSize: size, height: 1.75, color: color);
+
   /// Pen script, lightly joined: Timeline month tags only.
   static TextStyle monthTag({Color? color, double size = 22}) =>
       GoogleFonts.laBelleAurore(fontSize: size, height: 1.25, color: color);

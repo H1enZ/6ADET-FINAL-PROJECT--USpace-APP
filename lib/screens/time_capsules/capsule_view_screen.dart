@@ -10,7 +10,10 @@ import '../../services/time_capsule_service.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/anniversary.dart';
 import '../../utils/capsule_time.dart';
+import '../../widgets/atoms/us_icon.dart';
+import '../../widgets/capsule/candle_ceremony.dart';
 import '../../widgets/capsule/envelope.dart';
+import '../../widgets/capsule/monogram_seal.dart';
 import '../../widgets/capsule/opened_capsule.dart';
 import '../../widgets/effects/motion.dart';
 import '../../widgets/notes/note_style.dart';
@@ -158,8 +161,14 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
       _Stage.envelope => Column(
         children: [
           const SizedBox(height: AppSpacing.xl),
-          EnvelopeOpening(
+          CapsuleOpeningCeremony(
             width: width,
+            // The sender's initial is pressed into the wax.
+            initial: sealInitial(
+              _iAmSender ? (widget.myName ?? '') : widget.partnerName,
+            ),
+            title: _contents?.title,
+            letter: _contents?.letter ?? '',
             photo: _photo,
             onReveal: () => setState(() {
               _stage = _Stage.reading;
@@ -220,7 +229,7 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
           centerTitle: true,
           leading: IconButton(
             tooltip: 'Back',
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+            icon: const UsIcon(UsIcons.back, size: 22),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
           title: Text(
@@ -235,8 +244,8 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
               ExcludeSemantics(
                 child: Padding(
                   padding: const EdgeInsets.only(right: AppSpacing.lg),
-                  child: Icon(
-                    Icons.favorite_border_rounded,
+                  child: UsIcon(
+                    UsIcons.heart,
                     size: 22,
                     color: NotePalette.rose.withValues(alpha: 0.55),
                   ),
@@ -290,7 +299,7 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
                     dimension: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.drafts_outlined),
+                : const UsIcon(UsIcons.loveNotes, size: 20),
             label: Text(_busy ? 'Opening...' : 'Open now'),
           )
         else
@@ -388,8 +397,8 @@ class _DetailsState extends State<_Details> {
               foregroundColor: NotePalette.muted,
               minimumSize: const Size(0, 44),
             ),
-            icon: Icon(
-              _open ? Icons.expand_less_rounded : Icons.info_outline_rounded,
+            icon: UsIcon(
+              _open ? UsIcons.chevronUp : UsIcons.chevronDown,
               size: 18,
             ),
             label: const Text('Details'),
@@ -589,9 +598,11 @@ class _RepliesState extends State<_Replies> {
           expanded: _expanded,
           child: ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.forum_outlined, color: scheme.primary),
+            leading: UsIcon(UsIcons.chat, color: scheme.primary),
             title: const Text('You both replied'),
-            trailing: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+            trailing: UsIcon(
+              _expanded ? UsIcons.chevronUp : UsIcons.chevronDown,
+            ),
             onTap: () => setState(() => _expanded = !_expanded),
           ),
         ),
@@ -639,7 +650,7 @@ class _RepliesState extends State<_Replies> {
                   _text.text = first.body;
                   _composing = true;
                 }),
-                icon: const Icon(Icons.edit_outlined, size: 18),
+                icon: const UsIcon(UsIcons.edit, size: 18),
                 label: const Text('Edit reply'),
               ),
             ],
@@ -652,7 +663,7 @@ class _RepliesState extends State<_Replies> {
         children = [
           Row(
             children: [
-              Icon(Icons.drafts_outlined, color: scheme.primary),
+              UsIcon(UsIcons.loveNotes, color: scheme.primary),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -683,7 +694,7 @@ class _RepliesState extends State<_Replies> {
                 _text.clear();
                 _composing = true;
               }),
-              icon: const Icon(Icons.reply),
+              icon: const UsIcon(UsIcons.send, size: 18),
               label: const Text('Reply'),
             ),
           ),

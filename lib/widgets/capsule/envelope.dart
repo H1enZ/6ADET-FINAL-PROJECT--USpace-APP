@@ -377,14 +377,36 @@ class _MiniEnvelopeState extends State<MiniEnvelope>
     }
   }
 
+  /// Whether this envelope already did its two invitation pulses while
+  /// ready, so a rebuild never starts them again.
+  bool _pulsed = false;
+
+  /// A ready envelope pulses gently twice to invite a tap, then rests.
+  /// Still with reduced motion on.
   void _syncPulse() {
-    final want = widget.look == EnvelopeLook.ready && !motionOff(context);
-    if (want && !_pulse.isAnimating) {
-      _pulse.repeat(reverse: true);
-    } else if (!want && _pulse.isAnimating) {
-      _pulse
-        ..stop()
-        ..value = 0;
+    final ready = widget.look == EnvelopeLook.ready;
+    if (!ready) {
+      _pulsed = false;
+      if (_pulse.isAnimating) {
+        _pulse
+          ..stop()
+          ..value = 0;
+      }
+      return;
+    }
+    if (_pulsed || motionOff(context)) return;
+    _pulsed = true;
+    _pulseTwice();
+  }
+
+  Future<void> _pulseTwice() async {
+    try {
+      for (var i = 0; i < 2; i++) {
+        await _pulse.forward(from: 0).orCancel;
+        await _pulse.reverse().orCancel;
+      }
+    } on TickerCanceled {
+      // Disposed or stopped mid-pulse: nothing to finish.
     }
   }
 
@@ -428,215 +450,6 @@ class _MiniEnvelopeState extends State<MiniEnvelope>
           );
         },
       ),
-    );
-  }
-}
-
-/// The first opening: the seal cracks, the flap opens, and the letter slides
-/// partly out (the photo, if any, peeking behind it). Tapping the letter
-/// calls [onReveal]. With reduce motion it starts already open.
-class EnvelopeOpening extends StatefulWidget {
-  const EnvelopeOpening({
-    super.key,
-    required this.width,
-    required this.onReveal,
-    this.photo,
-  });
-
-  final double width;
-  final VoidCallback onReveal;
-  final Uint8List? photo;
-
-  @override
-  State<EnvelopeOpening> createState() => _EnvelopeOpeningState();
-}
-
-class _EnvelopeOpeningState extends State<EnvelopeOpening>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: Duration(milliseconds: widget.photo == null ? 3000 : 3800),
-  );
-  bool _started = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (motionOff(context)) {
-      _c.value = 1;
-    } else {
-      _c.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  static bool _keyboardFocused(Set<WidgetState> states) =>
-      states.contains(WidgetState.focused) &&
-      FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
-
-  double _span(double from, double to, [Curve curve = Curves.easeInOutCubic]) =>
-      curve.transform(((_c.value - from) / (to - from)).clamp(0.0, 1.0));
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) {
-        final shake = _c.value < 0.16
-            ? math.sin(_c.value * 120) * (1 - _c.value / 0.16) * 0.06
-            : 0.0;
-        final done = _c.isCompleted;
-        // With a photo: seal, flap, then the photo rises out on its own,
-        // and only then the letter slides out below it.
-        final withPhoto = widget.photo != null;
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Transform.rotate(
-              angle: shake,
-              child: CapsuleEnvelope(
-                width: widget.width,
-                sealCrack: withPhoto
-                    ? _span(0.1, 0.22, Curves.easeOut)
-                    : _span(0.12, 0.28, Curves.easeOut),
-                seal: 1 - (withPhoto ? _span(0.2, 0.3) : _span(0.26, 0.4)),
-                flap: withPhoto ? _span(0.24, 0.44) : _span(0.3, 0.58),
-                photoOut: withPhoto ? _span(0.44, 0.7, Curves.easeOutCubic) : 0,
-                letterOut:
-                    0.8 *
-                    (withPhoto
-                        ? _span(0.74, 0.97, Curves.easeOutCubic)
-                        : _span(0.58, 0.92, Curves.easeOutCubic)),
-                photo: widget.photo,
-                onLetterTap: done ? widget.onReveal : null,
-                letterLabel: 'Read the letter',
-              ),
-            ),
-            const SizedBox(height: 16),
-            AnimatedOpacity(
-              opacity: done ? 1 : 0,
-              duration: const Duration(milliseconds: 400),
-              child: TextButton.icon(
-                onPressed: done ? widget.onReveal : null,
-                // A clear ring for keyboard focus (the default overlay is
-                // faint on the dark background). Only when focus came from
-                // the keyboard, so a mouse or touch never shows it.
-                style: ButtonStyle(
-                  side: WidgetStateProperty.resolveWith(
-                    (states) => _keyboardFocused(states)
-                        ? BorderSide(color: theme.colorScheme.primary, width: 3)
-                        : BorderSide.none,
-                  ),
-                  backgroundColor: WidgetStateProperty.resolveWith(
-                    (states) => _keyboardFocused(states)
-                        ? theme.colorScheme.primary.withValues(alpha: 0.16)
-                        : null,
-                  ),
-                ),
-                icon: const Icon(Icons.touch_app_outlined),
-                label: Text(
-                  'Tap the letter to read it',
-                  style: theme.textTheme.labelLarge,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// The sealing moment: the letter slides into the envelope, the flap closes
-/// and the wax seal is pressed down. Calls [onDone] when finished. With
-/// reduce motion it shows the sealed envelope straight away.
-class EnvelopeSealing extends StatefulWidget {
-  const EnvelopeSealing({super.key, required this.width, required this.onDone});
-
-  final double width;
-  final VoidCallback onDone;
-
-  @override
-  State<EnvelopeSealing> createState() => _EnvelopeSealingState();
-}
-
-class _EnvelopeSealingState extends State<EnvelopeSealing>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  );
-  bool _started = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (motionOff(context)) {
-      _c.value = 1;
-    } else {
-      _c.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  double _span(double from, double to, [Curve curve = Curves.easeInOutCubic]) =>
-      curve.transform(((_c.value - from) / (to - from)).clamp(0.0, 1.0));
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) {
-        final stamp = _span(0.62, 0.8, Curves.easeOutBack);
-        final impact = _c.value > 0.74 && _c.value < 0.84
-            ? math.sin((_c.value - 0.74) / 0.1 * math.pi) * 3
-            : 0.0;
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Transform.translate(
-              offset: Offset(0, impact),
-              child: CapsuleEnvelope(
-                width: widget.width,
-                letterOut: 0.8 * (1 - _span(0.0, 0.32)),
-                flap: 1 - _span(0.32, 0.6),
-                seal: _span(0.6, 0.7),
-                sealScale: 1.8 - 0.8 * stamp,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Opacity(
-              opacity: _span(0.82, 1),
-              child: Column(
-                children: [
-                  Text('Sealed', style: theme.textTheme.titleLarge),
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: _c.value >= 0.82 ? widget.onDone : null,
-                    child: const Text('Done'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }

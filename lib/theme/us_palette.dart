@@ -70,6 +70,22 @@ class UsPalette {
   /// Secondary text on paper (5.6:1 on [paper]).
   static const paperInkSoft = Color(0xFF7A5566);
 
+  // Aged parchment: Time Capsule letters. Text on it is [sepia].
+  /// Warm tan parchment.
+  static const parchment = Color(0xFFE9D3AE);
+
+  /// The lighter top-left of a sheet.
+  static const parchmentLight = Color(0xFFF3E2C2);
+
+  /// The deeper bottom-right of a sheet.
+  static const parchmentDeep = Color(0xFFD8B988);
+
+  /// Ink on parchment (11.2:1 on [parchment]).
+  static const sepia = Color(0xFF2E1B0F);
+
+  /// Dates, fibres and freckles on parchment (5.4:1 on [parchment]).
+  static const sepiaSoft = Color(0xFF6B4A30);
+
   // Timeline corkboard. Surfaces only: no text sits directly on cork, so
   // month names and captions are always on paper.
   /// The board's warm cocoa cork.

@@ -4,8 +4,12 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../theme/app_spacing.dart';
+import '../../theme/app_typography.dart';
+import '../../theme/us_palette.dart';
+import '../atoms/us_icon.dart';
 import '../effects/motion.dart';
 import '../notes/note_style.dart';
+import 'vintage_parchment.dart';
 
 /// An opened capsule as the reader sees it: the photo first, large and
 /// glowing, its caption, a quiet heart divider, then the letter on blush
@@ -127,7 +131,7 @@ class _OpenedCapsuleState extends State<OpenedCapsule>
               child: IconButton.filledTonal(
                 tooltip: 'Close',
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
+                icon: const UsIcon(UsIcons.close, size: 20),
               ),
             ),
           ],
@@ -168,11 +172,10 @@ class _OpenedCapsuleState extends State<OpenedCapsule>
           content = ColoredBox(
             color: NotePalette.card,
             child: Center(
-              child: TextButton.icon(
+              child: TextButton(
                 onPressed: widget.onRetryPhoto,
                 style: TextButton.styleFrom(foregroundColor: NotePalette.pink),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text("Couldn't load the photo. Try again"),
+                child: const Text("Couldn't load the photo. Try again"),
               ),
             ),
           );
@@ -193,7 +196,7 @@ class _OpenedCapsuleState extends State<OpenedCapsule>
             width: width + frame * 2,
             padding: const EdgeInsets.all(frame),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF1EC),
+              color: UsPalette.cream,
               borderRadius: BorderRadius.circular(radius + frame),
               boxShadow: [
                 BoxShadow(
@@ -326,12 +329,10 @@ class _HeartRule extends StatelessWidget {
               line(true),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Icon(
-                  filled
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
+                child: UsIcon(
+                  UsIcons.heart,
                   size: 16,
-                  color: color.withValues(alpha: 0.9),
+                  color: color.withValues(alpha: filled ? 1 : 0.9),
                 ),
               ),
               line(false),
@@ -343,8 +344,8 @@ class _HeartRule extends StatelessWidget {
   }
 }
 
-/// The letter on blush paper: a second sheet peeking out behind, a thin
-/// inner border, a small heart at the top and a faint flower in the corner.
+/// The letter on aged parchment, in pen script: the title in Playfair,
+/// then the letter and a "With love" sign-off in La Belle Aurore.
 class _Paper extends StatelessWidget {
   const _Paper({
     required this.title,
@@ -356,159 +357,71 @@ class _Paper extends StatelessWidget {
   final String letter;
   final ({String name, DateTime written})? signature;
 
-  static const _paperTop = Color(0xFFFCF1EC);
-  static const _paperBottom = Color(0xFFF6E2DD);
-  static const _sheetBehind = Color(0xFFE3C3BC);
   static const _months = [
-    'January', 'February', 'March', 'April', 'May', 'June', 'July', //
-    'August', 'September', 'October', 'November', 'December',
+    'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', //
+    'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
   ];
 
   @override
   Widget build(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < 360;
-    final pad = narrow ? 22.0 : 30.0;
+    final pad = narrow ? 24.0 : 32.0;
     final heading = title?.trim() ?? '';
     final sign = signature;
-    const radius = 22.0;
+    final theme = Theme.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Stack(
-        clipBehavior: Clip.none,
+    return VintageParchment(
+      seed: letter.length,
+      padding: EdgeInsets.fromLTRB(pad, pad + 4, pad, pad + 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // The sheet behind, peeking out by a fixed few pixels (a turn
-          // would grow into a wedge on long letters).
-          Positioned(
-            left: -6,
-            right: 4,
-            top: 7,
-            bottom: -7,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: _sheetBehind,
-                borderRadius: BorderRadius.circular(radius),
+          if (heading.isNotEmpty) ...[
+            Semantics(
+              header: true,
+              child: Text(
+                heading,
+                style: NotePalette.display(
+                  narrow ? 24 : 27,
+                  color: UsPalette.sepia,
+                ),
               ),
             ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          SelectableText(
+            letter,
+            style: AppTypography.capsuleHand(
+              color: UsPalette.sepia,
+              size: narrow ? 20 : 22,
+            ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [_paperTop, _paperBottom],
+          if (sign != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'With love, ${sign.name}',
+                    style: AppTypography.capsuleHand(
+                      color: UsPalette.sepia,
+                      size: narrow ? 20 : 22,
+                    ),
+                  ),
+                  Text(
+                    '${sign.written.day} ${_months[sign.written.month - 1]} '
+                    '${sign.written.year}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: UsPalette.sepiaSoft,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
               ),
-              borderRadius: BorderRadius.circular(radius),
-              border: Border.all(color: NotePalette.paperEdge),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.40),
-                  blurRadius: 28,
-                  offset: const Offset(0, 14),
-                ),
-              ],
             ),
-            child: Stack(
-              children: [
-                // A thin inner border, like printed stationery.
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Container(
-                      margin: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(radius - 8),
-                        border: Border.all(
-                          color: NotePalette.rose.withValues(alpha: 0.22),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // A faint flower in the lower corner.
-                Positioned(
-                  right: 18,
-                  bottom: 16,
-                  child: ExcludeSemantics(
-                    child: Icon(
-                      Icons.local_florist_outlined,
-                      size: 44,
-                      color: NotePalette.rose.withValues(alpha: 0.16),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(pad, pad, pad, pad + 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const _HeartRule(
-                        color: NotePalette.rose,
-                        lineAlpha: 0.4,
-                        filled: true,
-                        maxWidth: 220,
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      if (heading.isNotEmpty) ...[
-                        Text(
-                          heading,
-                          style: NotePalette.display(
-                            narrow ? 25 : 28,
-                            color: NotePalette.ink,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                      ],
-                      SelectableText(
-                        letter,
-                        style: NotePalette.letter().copyWith(
-                          fontSize: 17.5,
-                          height: 1.75,
-                        ),
-                      ),
-                      if (sign != null) ...[
-                        const SizedBox(height: AppSpacing.xxl),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 40),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  'With love,',
-                                  style:
-                                      NotePalette.letter(
-                                        color: NotePalette.inkSoft,
-                                      ).copyWith(
-                                        fontStyle: FontStyle.italic,
-                                        fontSize: 15,
-                                      ),
-                                ),
-                                Text(
-                                  sign.name,
-                                  style: NotePalette.letter(
-                                    color: NotePalette.ink,
-                                  ).copyWith(fontSize: 16),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${_months[sign.written.month - 1]} '
-                                  '${sign.written.day}, ${sign.written.year}',
-                                  style: NotePalette.letter(
-                                    color: NotePalette.inkSoft,
-                                  ).copyWith(fontSize: 13),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ],
       ),
     );

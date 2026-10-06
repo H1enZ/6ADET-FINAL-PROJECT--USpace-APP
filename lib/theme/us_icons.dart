@@ -58,6 +58,7 @@ abstract final class UsIcons {
   static const note = UsIconData('note');
   static const check = UsIconData('check');
   static const chevronUp = UsIconData('chevron-up');
+  static const chevronDown = UsIconData('chevron-down');
   static const copy = UsIconData('copy');
   static const minusCircle = UsIconData('minus-circle');
 

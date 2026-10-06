@@ -7,10 +7,13 @@ import 'package:image_picker/image_picker.dart';
 import '../../services/auth_service.dart';
 import '../../services/time_capsule_service.dart';
 import '../../theme/app_spacing.dart';
+import '../../widgets/atoms/section_label.dart';
+import '../../widgets/atoms/us_icon.dart';
 import '../../utils/anniversary.dart';
 import '../../utils/capsule_time.dart';
 import '../../widgets/capsule/capsule_letter.dart';
-import '../../widgets/capsule/envelope.dart';
+import '../../widgets/capsule/candle_ceremony.dart';
+import '../../widgets/capsule/monogram_seal.dart';
 
 /// How the composer was left.
 enum ComposerOutcome { sealed, deleteDraft }
@@ -23,6 +26,7 @@ class CapsuleComposerScreen extends StatefulWidget {
     super.key,
     required this.coupleId,
     required this.partnerName,
+    this.myName = '',
     this.draftId,
     this.editingId,
     this.title,
@@ -35,6 +39,9 @@ class CapsuleComposerScreen extends StatefulWidget {
 
   final String coupleId;
   final String partnerName;
+
+  /// Your name: its first letter is pressed into the wax seal.
+  final String myName;
 
   /// Your existing draft, if any.
   final String? draftId;
@@ -325,6 +332,7 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
       MaterialPageRoute(
         builder: (_) => CapsulePreviewScreen(
           partnerName: widget.partnerName,
+          senderName: widget.myName,
           title: _title.text.trim().isEmpty ? null : _title.text.trim(),
           letter: _letter.text,
           caption: _photoPath == null || _caption.text.trim().isEmpty
@@ -425,7 +433,7 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
         _Save.saved => Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check, size: 16, color: theme.colorScheme.tertiary),
+            UsIcon(UsIcons.check, size: 16, color: theme.colorScheme.tertiary),
             const SizedBox(width: 4),
             Text('Saved', style: muted),
           ],
@@ -474,7 +482,7 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
               IconButton(
                 tooltip: 'Delete draft',
                 onPressed: _deleteDraft,
-                icon: const Icon(Icons.delete_outline),
+                icon: const UsIcon(UsIcons.trash, size: 22),
               ),
           ],
         ),
@@ -502,56 +510,20 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    TextField(
-                      controller: _title,
-                      maxLength: TimeCapsuleService.titleMax,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        labelText: 'Title (optional)',
-                        helperText: 'Hidden until it is opened',
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextField(
-                      controller: _letter,
-                      maxLength: TimeCapsuleService.letterMax,
-                      minLines: 8,
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        labelText: 'Your letter',
-                        hintText: 'Dear ${widget.partnerName},',
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text('Photo (optional)', style: theme.textTheme.titleSmall),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.xl),
+                    // Photo first: a capsule is opened photo first, so it
+                    // is written that way too.
+                    const SectionLabel(text: 'Photo (optional)'),
                     if (_photoPath == null)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: OutlinedButton.icon(
-                          onPressed: _photoBusy ? null : _pickPhoto,
-                          icon: _photoBusy
-                              ? const SizedBox.square(
-                                  dimension: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.add_photo_alternate_outlined),
-                          label: Text(
-                            _photoBusy ? 'Uploading...' : 'Add one photo',
-                          ),
-                        ),
+                      _PhotoDrop(
+                        busy: _photoBusy,
+                        onPick: _photoBusy ? null : _pickPhoto,
                       )
                     else ...[
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.input),
-                        child: SizedBox(
-                          height: 200,
+                        borderRadius: BorderRadius.circular(AppRadius.card),
+                        child: AspectRatio(
+                          aspectRatio: 4 / 3,
                           child: _photo != null
                               ? Image.memory(
                                   _photo!,
@@ -578,14 +550,14 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
                         children: [
                           TextButton.icon(
                             onPressed: _photoBusy ? null : _pickPhoto,
-                            icon: const Icon(Icons.swap_horiz),
+                            icon: const UsIcon(UsIcons.image, size: 18),
                             label: Text(
                               _photoBusy ? 'Uploading...' : 'Replace photo',
                             ),
                           ),
                           TextButton.icon(
                             onPressed: _photoBusy ? null : _removePhoto,
-                            icon: const Icon(Icons.close),
+                            icon: const UsIcon(UsIcons.close, size: 18),
                             label: const Text('Remove photo'),
                           ),
                         ],
@@ -594,14 +566,40 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
                         controller: _caption,
                         maxLength: TimeCapsuleService.captionMax,
                         textCapitalization: TextCapitalization.sentences,
+                        buildCounter: _nearLimitCounter,
                         decoration: const InputDecoration(
-                          labelText: 'Caption (optional)',
+                          hintText: 'A caption for the photo (optional)',
                         ),
                       ),
                     ],
+                    const SizedBox(height: AppSpacing.xl),
+                    const SectionLabel(text: 'Title (optional)'),
+                    TextField(
+                      controller: _title,
+                      maxLength: TimeCapsuleService.titleMax,
+                      textCapitalization: TextCapitalization.sentences,
+                      buildCounter: _nearLimitCounter,
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. Our first trip',
+                        helperText: 'Hidden until it is opened',
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.lg),
-                    Text('When it opens', style: theme.textTheme.titleSmall),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SectionLabel(text: 'Your letter'),
+                    TextField(
+                      controller: _letter,
+                      maxLength: TimeCapsuleService.letterMax,
+                      minLines: 8,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      textCapitalization: TextCapitalization.sentences,
+                      buildCounter: _nearLimitCounter,
+                      decoration: InputDecoration(
+                        hintText: 'Dear ${widget.partnerName},',
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    const SectionLabel(text: 'When it opens'),
                     Wrap(
                       spacing: AppSpacing.sm,
                       runSpacing: AppSpacing.sm,
@@ -624,14 +622,14 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
                       children: [
                         OutlinedButton.icon(
                           onPressed: _pickDate,
-                          icon: const Icon(Icons.calendar_today_outlined),
+                          icon: const UsIcon(UsIcons.calendar, size: 18),
                           label: Text(
                             unlock == null ? 'Choose a date' : longDate(unlock),
                           ),
                         ),
                         OutlinedButton.icon(
                           onPressed: _pickTime,
-                          icon: const Icon(Icons.schedule),
+                          icon: const UsIcon(UsIcons.history, size: 18),
                           label: Text(
                             unlock == null
                                 ? 'Choose a time'
@@ -673,10 +671,9 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
                               : () => _save(),
                           child: Text(_editing ? 'Save changes' : 'Save draft'),
                         ),
-                        FilledButton.icon(
+                        FilledButton(
                           onPressed: _preview,
-                          icon: const Icon(Icons.visibility_outlined),
-                          label: Text(
+                          child: Text(
                             _editing ? 'Preview and seal again' : 'Preview',
                           ),
                         ),
@@ -693,6 +690,121 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
   }
 }
 
+/// A field's count, shown only once you are near its limit (80%). The limit
+/// itself is always enforced by maxLength.
+Widget? _nearLimitCounter(
+  BuildContext context, {
+  required int currentLength,
+  required bool isFocused,
+  int? maxLength,
+}) {
+  final max = maxLength;
+  if (max == null || currentLength < max * 0.8) return null;
+  final theme = Theme.of(context);
+  return Semantics(
+    liveRegion: true,
+    label: '${max - currentLength} characters left',
+    child: ExcludeSemantics(
+      child: Text(
+        '$currentLength / $max',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: currentLength >= max
+              ? theme.colorScheme.error
+              : theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ),
+  );
+}
+
+/// The empty photo area: a large dashed tile to tap, like Add Memory.
+class _PhotoDrop extends StatelessWidget {
+  const _PhotoDrop({required this.busy, required this.onPick});
+
+  final bool busy;
+  final VoidCallback? onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      label: busy ? 'Uploading the photo' : 'Add a photo',
+      excludeSemantics: true,
+      child: CustomPaint(
+        foregroundPainter: _Dashes(color: scheme.primary.withValues(alpha: 0.6)),
+        child: Material(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            onTap: onPick,
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  busy
+                      ? const SizedBox.square(
+                          dimension: 28,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        )
+                      : UsIcon(UsIcons.image, size: 32, color: scheme.primary),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    busy ? 'Uploading...' : 'Add a photo',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: scheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'It is the first thing they see when it opens',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Dashes extends CustomPainter {
+  _Dashes({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(0.75),
+          const Radius.circular(AppRadius.card),
+        ),
+      );
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = color;
+    for (final metric in path.computeMetrics()) {
+      for (var d = 0.0; d < metric.length; d += 13) {
+        canvas.drawPath(metric.extractPath(d, d + 7), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Dashes old) => old.color != color;
+}
+
 /// The full capsule as it will be read, before sealing. "Preview opening"
 /// plays the envelope here only: nothing is saved, shown to your partner,
 /// marked opened or announced.
@@ -700,6 +812,7 @@ class CapsulePreviewScreen extends StatelessWidget {
   const CapsulePreviewScreen({
     super.key,
     required this.partnerName,
+    this.senderName = '',
     required this.letter,
     required this.unlockAt,
     required this.onSeal,
@@ -711,6 +824,9 @@ class CapsulePreviewScreen extends StatelessWidget {
   });
 
   final String partnerName;
+
+  /// Who is sealing it: their initial goes into the wax.
+  final String senderName;
   final String? title;
   final String letter;
   final String? caption;
@@ -725,6 +841,7 @@ class CapsulePreviewScreen extends StatelessWidget {
       MaterialPageRoute<void>(
         fullscreenDialog: true,
         builder: (_) => _LocalOpening(
+          senderName: senderName,
           title: title,
           letter: letter,
           caption: caption,
@@ -775,19 +892,27 @@ class CapsulePreviewScreen extends StatelessWidget {
       context: context,
       barrierDismissible: false,
       barrierLabel: 'Sealing',
-      barrierColor: Colors.black.withValues(alpha: 0.88),
+      barrierColor: Colors.black.withValues(alpha: 0.96),
       pageBuilder: (context, _, _) => Center(
-        child: Material(
-          color: Colors.transparent,
-          child: Semantics(
-            liveRegion: true,
-            label: 'Your time capsule is sealed',
-            child: EnvelopeSealing(
-              width: (MediaQuery.sizeOf(context).width - 64).clamp(
-                200.0,
-                320.0,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Material(
+            color: Colors.transparent,
+            child: Semantics(
+              liveRegion: true,
+              label: 'Your time capsule is sealed',
+              child: CapsuleSealingCeremony(
+                width: (MediaQuery.sizeOf(context).width - 64).clamp(
+                  200.0,
+                  320.0,
+                ),
+                initial: sealInitial(senderName),
+                title: title,
+                letter: letter,
+                caption:
+                    'Opens ${longDate(unlockAt)} at ${clockTime(unlockAt)}',
+                onDone: () => Navigator.of(context).pop(),
               ),
-              onDone: () => Navigator.of(context).pop(),
             ),
           ),
         ),
@@ -857,7 +982,7 @@ class CapsulePreviewScreen extends StatelessWidget {
             children: [
               OutlinedButton.icon(
                 onPressed: () => _previewOpening(context),
-                icon: const Icon(Icons.drafts_outlined),
+                icon: const UsIcon(UsIcons.loveNotes, size: 20),
                 label: const Text('Preview opening'),
               ),
               OutlinedButton(
@@ -866,7 +991,7 @@ class CapsulePreviewScreen extends StatelessWidget {
               ),
               FilledButton.icon(
                 onPressed: () => _seal(context),
-                icon: const Icon(Icons.lock_outline),
+                icon: const UsIcon(UsIcons.lock, size: 20),
                 label: Text(resealing ? 'Seal again' : 'Seal capsule'),
               ),
             ],
@@ -880,6 +1005,7 @@ class CapsulePreviewScreen extends StatelessWidget {
 /// "Preview opening": the envelope and reveal, entirely on this device.
 class _LocalOpening extends StatefulWidget {
   const _LocalOpening({
+    required this.senderName,
     required this.letter,
     required this.hasPhoto,
     this.title,
@@ -888,6 +1014,7 @@ class _LocalOpening extends StatefulWidget {
   });
 
   final String? title;
+  final String senderName;
   final String letter;
   final String? caption;
   final bool hasPhoto;
@@ -929,8 +1056,11 @@ class _LocalOpeningState extends State<_LocalOpening> {
                       hasPhoto: widget.hasPhoto,
                       photo: widget.photo,
                     )
-                  : EnvelopeOpening(
+                  : CapsuleOpeningCeremony(
                       width: width,
+                      initial: sealInitial(widget.senderName),
+                      title: widget.title,
+                      letter: widget.letter,
                       photo: widget.photo,
                       onReveal: () => setState(() => _revealed = true),
                     ),

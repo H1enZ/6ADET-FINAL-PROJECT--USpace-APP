@@ -11,12 +11,14 @@ import '../../services/couple_service.dart';
 import '../../services/note_service.dart';
 import '../../services/time_capsule_service.dart';
 import '../../theme/app_spacing.dart';
+import '../../theme/us_palette.dart';
 import '../../utils/anniversary.dart';
 import '../../utils/capsule_time.dart';
 import '../../widgets/atoms/filter_pill.dart';
 import '../../widgets/capsule/capsule_summary_card.dart';
 import '../../widgets/capsule/envelope.dart';
 import '../../widgets/effects/motion.dart';
+import '../../widgets/atoms/us_icon.dart';
 import '../../widgets/notes/note_style.dart';
 import '../love_note_detail_screen.dart';
 import 'capsule_composer_screen.dart';
@@ -277,6 +279,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
       CapsuleComposerScreen(
         coupleId: _coupleId,
         partnerName: _partnerName,
+        myName: widget.profile.displayName,
         anniversary: _anniversary,
         draftId: editing ? null : capsule?.id,
         editingId: editing ? capsule?.id : null,
@@ -416,7 +419,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
 
   /// A previous capsule: sealed (envelope only) or opened (a readable note).
   Widget _oldCard(Object item, DateTime now) {
-    String at(DateTime d) => '${longDate(d)}, ${clockTime(d)}';
+    String at(DateTime d) => _when(d, now);
     if (item is SealedNote) {
       final mine = item.authorId == _myId;
       final person = mine ? 'To $_partnerName' : 'From $_partnerName';
@@ -437,7 +440,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
             ? IconButton(
                 tooltip: 'Cancel capsule',
                 onPressed: () => _cancelOld(item),
-                icon: const Icon(Icons.close_rounded, color: NotePalette.cream),
+                icon: const UsIcon(UsIcons.close, color: NotePalette.cream),
               )
             : null,
         semanticLabel:
@@ -600,7 +603,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
               onPressed: () => _compose(),
               backgroundColor: scheme.primary,
               foregroundColor: scheme.onPrimary,
-              icon: const Icon(Icons.edit_outlined),
+              icon: const UsIcon(UsIcons.edit, size: 22),
               label: const Text('Write a capsule'),
             ),
       body: _loading
@@ -613,7 +616,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
                   AppSpacing.screenMargin,
                   AppSpacing.sm,
                   AppSpacing.screenMargin,
-                  96,
+                  112,
                 ),
                 children: [
                   Center(
@@ -783,7 +786,10 @@ class _DraftCard extends StatelessWidget {
                 if (onCancel != null)
                   TextButton(onPressed: onCancel, child: const Text('Cancel'))
                 else
-                  Icon(Icons.chevron_right, color: scheme.onPrimaryContainer),
+                  UsIcon(
+                    UsIcons.chevronRight,
+                    color: scheme.onPrimaryContainer,
+                  ),
               ],
             ),
           ),
@@ -836,7 +842,7 @@ class _CapsuleCard extends StatelessWidget {
     final grace = c.inGrace(now);
     final ready = c.isReady(now);
     final person = mine ? 'To $partnerName' : 'From $partnerName';
-    String at(DateTime d) => '${longDate(d)}, ${clockTime(d)}';
+    String at(DateTime d) => _when(d, now);
     // A sealed capsule's title stays hidden: only its sender, during the
     // ten editable minutes, and anyone once it's opened may see it.
     final safeLine = mine
@@ -896,7 +902,7 @@ class _CapsuleCard extends StatelessWidget {
           CapsuleCardButton(label: 'Cancel', onPressed: onCancel),
           CapsuleCardButton(
             label: 'Edit',
-            icon: Icons.edit_outlined,
+            icon: UsIcons.edit,
             primary: true,
             onPressed: onEdit,
           ),
@@ -914,7 +920,7 @@ class _CapsuleCard extends StatelessWidget {
         headlineAccent: mine ? 'when they are' : 'to open',
         subtitle: safeLine,
         person: person,
-        when: 'Ready since ${at(c.readySince)}',
+        when: 'since ${c.readySince.year == now.year ? shortDate(c.readySince) : longDate(c.readySince)}',
         unread: unread,
         highlighted: highlighted,
         onTap: mine ? null : onOpen,
@@ -922,7 +928,7 @@ class _CapsuleCard extends StatelessWidget {
           if (!mine)
             CapsuleCardButton(
               label: 'Open now',
-              icon: Icons.drafts_outlined,
+              icon: UsIcons.loveNotes,
               primary: true,
               onPressed: onOpen,
             ),
@@ -945,7 +951,7 @@ class _CapsuleCard extends StatelessWidget {
       note: mine && pressKey != null
           ? 'Your Time Capsule is now sealed.'
           : null,
-      noteColor: const Color(0xFF7FBFA0),
+      noteColor: UsPalette.sage,
       unread: unread,
       highlighted: highlighted,
       semanticLabel:
@@ -953,6 +959,10 @@ class _CapsuleCard extends StatelessWidget {
     );
   }
 }
+
+/// "4 Nov, 8:00 AM", with the year only when it isn't [now]'s year.
+String _when(DateTime d, DateTime now) =>
+    '${d.year == now.year ? shortDate(d) : longDate(d)}, ${clockTime(d)}';
 
 class _Empty extends StatelessWidget {
   const _Empty({required this.text});

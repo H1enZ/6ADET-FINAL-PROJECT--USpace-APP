@@ -1,11 +1,14 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../theme/app_spacing.dart';
+import '../../theme/app_typography.dart';
+import '../../theme/us_palette.dart';
+import '../atoms/us_icon.dart';
 import '../effects/motion.dart';
-import 'envelope.dart';
+import '../notes/note_style.dart';
+import 'vintage_parchment.dart';
 
 /// A capsule's contents as the reader sees them: the photo first, its
 /// caption right with it, then the letter on cream paper. With [reveal] it
@@ -89,7 +92,7 @@ class _CapsuleLetterState extends State<CapsuleLetter>
               child: IconButton.filledTonal(
                 tooltip: 'Close',
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
+                icon: const UsIcon(UsIcons.close, size: 20),
               ),
             ),
           ],
@@ -125,10 +128,9 @@ class _CapsuleLetterState extends State<CapsuleLetter>
         );
       } else if (widget.photoFailed) {
         inner = Center(
-          child: TextButton.icon(
+          child: TextButton(
             onPressed: widget.onRetryPhoto,
-            icon: const Icon(Icons.refresh),
-            label: const Text("Couldn't load the photo. Try again"),
+            child: const Text("Couldn't load the photo. Try again"),
           ),
         );
       } else {
@@ -137,7 +139,7 @@ class _CapsuleLetterState extends State<CapsuleLetter>
       return Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: UsPalette.cream,
           borderRadius: BorderRadius.circular(4),
           boxShadow: [
             BoxShadow(
@@ -190,43 +192,27 @@ class _CapsuleLetterState extends State<CapsuleLetter>
           child: SizeTransition(
             sizeFactor: letterAnim,
             alignment: Alignment.topCenter,
-            child: Container(
+            child: SizedBox(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(28, 28, 28, 32),
-              decoration: BoxDecoration(
-                color: PaperColors.letter,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: PaperColors.rule),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 14,
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.title != null) ...[
-                    Text(
-                      widget.title!,
-                      style: GoogleFonts.lora(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                        color: PaperColors.ink,
+              // The same aged parchment and pen script as the opened letter.
+              child: VintageParchment(
+                seed: widget.letter.length,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.title != null) ...[
+                      Text(
+                        widget.title!,
+                        style: NotePalette.display(24, color: UsPalette.sepia),
                       ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                    SelectableText(
+                      widget.letter,
+                      style: AppTypography.capsuleHand(color: UsPalette.sepia),
                     ),
-                    const SizedBox(height: AppSpacing.lg),
                   ],
-                  SelectableText(
-                    widget.letter,
-                    style: GoogleFonts.lora(
-                      fontSize: 17,
-                      height: 1.65,
-                      color: PaperColors.ink,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

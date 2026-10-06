@@ -3,18 +3,19 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../theme/app_spacing.dart';
-import '../effects/motion.dart';
+import '../../theme/us_palette.dart';
+import '../atoms/us_icon.dart';
 import '../effects/soft_hearts_background.dart' show heartPath;
 import '../notes/note_style.dart';
 
 /// Where a Time Capsule is in its life, as shown on its card.
 enum CapsuleCardState { sealed, grace, ready, opened }
 
-/// One Time Capsule as a plum card: a glossy wax seal on the left, then a
-/// status chip, a big headline (the countdown, or "Ready to open"), a
-/// subtitle, and who / when lines, with a chevron on the right. The same
-/// card in every state, so a capsule in its ten editable minutes looks like
-/// itself with buttons added.
+/// One Time Capsule as a calm plum card: a small still wax seal on the
+/// left, then a quiet status label, one headline line (the countdown, or
+/// "Ready to open"), a subtitle and one "From Ana · 4 Nov, 8:00 AM" line.
+/// The same card in every state, so a capsule in its ten editable minutes
+/// looks like itself with buttons added. Nothing on it moves by itself.
 ///
 /// The card only shows what the caller passes in: callers must never pass a
 /// sealed capsule's hidden title (see [subtitle]).
@@ -42,7 +43,7 @@ class CapsuleSummaryCard extends StatelessWidget {
   /// "Opens", in cream...
   final String headlineLead;
 
-  /// ...then "in 30 days", in a rose gradient. Either may be empty.
+  /// ...then "in 30 days", in rose. Either may be empty.
   final String headlineAccent;
 
   /// The capsule's title when the viewer may see it, or a safe line such
@@ -52,7 +53,7 @@ class CapsuleSummaryCard extends StatelessWidget {
   /// "From therabot-d" / "To therabot-e".
   final String person;
 
-  /// "4 Nov 2026, 8:00 AM".
+  /// "4 Nov, 8:00 AM".
   final String when;
 
   /// An extra small line: "Editable for 09:43", "You both replied".
@@ -68,12 +69,12 @@ class CapsuleSummaryCard extends StatelessWidget {
   /// Buttons under the text: Edit / Cancel, Open now.
   final List<Widget> actions;
 
-  /// Replaces the chevron, e.g. a cancel button.
+  /// A small control on the right, e.g. a cancel button.
   final Widget? trailing;
   final bool unread;
   final bool highlighted;
 
-  static const _radius = 28.0;
+  static const _radius = AppRadius.card + 4;
 
   void _explain(BuildContext context) {
     final text = switch (state) {
@@ -89,47 +90,26 @@ class CapsuleSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final glow = state == CapsuleCardState.ready;
-    // Narrow phones: a smaller seal and headline leave the text room.
     final narrow = MediaQuery.sizeOf(context).width < 360;
     final tap = onTap ?? () => _explain(context);
-    final headlineSize = narrow ? 22.0 : 26.0;
+    final ready = state == CapsuleCardState.ready;
 
     final body = Padding(
-      padding: EdgeInsets.fromLTRB(
-        narrow ? AppSpacing.sm : AppSpacing.md,
-        AppSpacing.xl,
-        AppSpacing.md,
-        AppSpacing.xl,
-      ),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SealArea(state: state, size: narrow ? 84 : 104),
-              SizedBox(width: narrow ? AppSpacing.sm : AppSpacing.md),
+              _SealArea(state: state, size: narrow ? 52 : 60),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        _StatusChip(state: state),
-                        if (unread) ...[
-                          const SizedBox(width: AppSpacing.sm),
-                          Container(
-                            width: 9,
-                            height: 9,
-                            decoration: const BoxDecoration(
-                              color: NotePalette.rose,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
+                    _StatusLabel(state: state, unread: unread),
+                    const SizedBox(height: 4),
                     Text.rich(
                       TextSpan(
                         children: [
@@ -139,67 +119,54 @@ class CapsuleSummaryCard extends StatelessWidget {
                             const TextSpan(text: ' '),
                           TextSpan(
                             text: headlineAccent,
-                            style: TextStyle(
-                              foreground: Paint()
-                                ..shader =
-                                    const LinearGradient(
-                                      colors: [
-                                        Color(0xFFFFC2D3),
-                                        NotePalette.pink,
-                                        Color(0xFFF07FA2),
-                                      ],
-                                    ).createShader(
-                                      Rect.fromLTWH(
-                                        0,
-                                        0,
-                                        headlineSize * 7,
-                                        headlineSize,
-                                      ),
-                                    ),
-                            ),
+                            style: const TextStyle(color: UsPalette.roseLight),
                           ),
                         ],
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: NotePalette.display(
-                        headlineSize,
-                        color: const Color(0xFFFFF6F1),
-                      ).copyWith(height: 1.1, fontWeight: FontWeight.w700),
+                      style: NotePalette.display(narrow ? 18 : 20),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: NotePalette.cream,
-                        fontSize: narrow ? 15 : 16,
-                        height: 1.3,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    _Meta(icon: Icons.person_outline_rounded, text: person),
-                    const SizedBox(height: AppSpacing.xs),
-                    _Meta(icon: Icons.calendar_month_outlined, text: when),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$person · $when',
+                      // Narrow phones may wrap it rather than cut the date.
+                      maxLines: narrow ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: NotePalette.muted,
+                      ),
+                    ),
                     if (note != null) ...[
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                         note!,
-                        style: theme.textTheme.labelLarge?.copyWith(
+                        style: theme.textTheme.labelMedium?.copyWith(
                           color: noteColor ?? NotePalette.pink,
+                          letterSpacing: 0.2,
                         ),
                       ),
                     ],
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              trailing ?? _Chevron(size: narrow ? 36 : 42),
+              if (trailing != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                trailing!,
+              ],
             ],
           ),
           if (actions.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
             Wrap(
               alignment: WrapAlignment.end,
               spacing: AppSpacing.sm,
@@ -219,45 +186,24 @@ class CapsuleSummaryCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF3D1A33), Color(0xFF2A1226), Color(0xFF1C0D19)],
+            colors: [UsPalette.cardRaised, UsPalette.card],
           ),
           border: Border.all(
-            color: highlighted || glow
-                ? NotePalette.borderBright
-                : NotePalette.pink.withValues(alpha: 0.32),
-            width: highlighted ? 1.6 : 1.2,
+            color: highlighted || ready ? UsPalette.lineStrong : UsPalette.line,
+            width: highlighted ? 1.6 : 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.45),
-              blurRadius: 22,
-              offset: const Offset(0, 10),
-            ),
-            BoxShadow(
-              color: NotePalette.rose.withValues(
-                alpha: glow || highlighted ? 0.28 : 0.10,
-              ),
-              blurRadius: 24,
-            ),
-          ],
         ),
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
             borderRadius: BorderRadius.circular(_radius),
             onTap: tap,
-            splashColor: NotePalette.rose.withValues(alpha: 0.15),
-            child: Stack(
-              children: [
-                const Positioned.fill(child: _CardLights(radius: _radius)),
-                Semantics(
-                  container: true,
-                  button: true,
-                  label: semanticLabel + (unread ? '. New' : ''),
-                  excludeSemantics: actions.isEmpty && trailing == null,
-                  child: body,
-                ),
-              ],
+            child: Semantics(
+              container: true,
+              button: true,
+              label: semanticLabel + (unread ? '. New' : ''),
+              excludeSemantics: actions.isEmpty && trailing == null,
+              child: body,
             ),
           ),
         ),
@@ -266,128 +212,20 @@ class CapsuleSummaryCard extends StatelessWidget {
   }
 }
 
-/// Inner light: a soft top-edge highlight, a rose glow in the lower right,
-/// and a few faint hearts in the top-right corner.
-class _CardLights extends StatelessWidget {
-  const _CardLights({required this.radius});
-
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) => IgnorePointer(
-    child: ExcludeSemantics(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: CustomPaint(painter: _CardLightsPainter()),
-      ),
-    ),
-  );
-}
-
-class _CardLightsPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(1.05, 1.1),
-          radius: 0.9,
-          colors: [
-            NotePalette.rose.withValues(alpha: 0.20),
-            NotePalette.rose.withValues(alpha: 0),
-          ],
-        ).createShader(rect),
-    );
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white.withValues(alpha: 0.05),
-            Colors.white.withValues(alpha: 0),
-          ],
-          stops: const [0, 0.35],
-        ).createShader(rect),
-    );
-    final heart = Paint()..color = NotePalette.pink.withValues(alpha: 0.07);
-    for (final (dx, dy, w) in const [
-      (0.90, 0.10, 26.0),
-      (0.84, 0.30, 38.0),
-      (0.95, 0.42, 16.0),
-    ]) {
-      final c = Offset(size.width * dx, size.height * dy);
-      canvas.drawPath(
-        heartPath(Rect.fromCenter(center: c, width: w, height: w)),
-        heart,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_CardLightsPainter old) => false;
-}
-
-/// The glossy wax seal, its glow, an orbit ribbon, sparkles and hearts.
-/// Ready capsules breathe gently (still with reduced motion on).
-class _SealArea extends StatefulWidget {
+/// The wax seal, still: cracked once the capsule is opened.
+class _SealArea extends StatelessWidget {
   const _SealArea({required this.state, required this.size});
 
   final CapsuleCardState state;
   final double size;
 
   @override
-  State<_SealArea> createState() => _SealAreaState();
-}
-
-class _SealAreaState extends State<_SealArea>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _sync();
-  }
-
-  @override
-  void didUpdateWidget(_SealArea old) {
-    super.didUpdateWidget(old);
-    _sync();
-  }
-
-  void _sync() {
-    final on = widget.state == CapsuleCardState.ready && !motionOff(context);
-    if (on && !_pulse.isAnimating) {
-      _pulse.repeat(reverse: true);
-    } else if (!on && _pulse.isAnimating) {
-      _pulse.stop();
-      _pulse.value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) => ExcludeSemantics(
     child: SizedBox.square(
-      dimension: widget.size,
+      dimension: size,
       child: RepaintBoundary(
         child: CustomPaint(
-          painter: _SealPainter(
-            pulse: _pulse,
-            cracked: widget.state == CapsuleCardState.opened,
-          ),
+          painter: _SealPainter(cracked: state == CapsuleCardState.opened),
         ),
       ),
     ),
@@ -395,10 +233,8 @@ class _SealAreaState extends State<_SealArea>
 }
 
 class _SealPainter extends CustomPainter {
-  _SealPainter({required this.pulse, required this.cracked})
-    : super(repaint: pulse);
+  _SealPainter({required this.cracked});
 
-  final Animation<double> pulse;
   final bool cracked;
 
   // Fixed wobble for the wax rim, so it looks hand-pressed but never jumps.
@@ -423,60 +259,7 @@ class _SealPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final s = size.width;
     final c = Offset(s / 2, s / 2);
-    final t = Curves.easeInOut.transform(pulse.value);
-    final r = s * 0.30 * (1 + t * 0.04);
-
-    // Glow and a faint halo ring.
-    canvas.drawCircle(
-      c,
-      s / 2,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            NotePalette.rose.withValues(alpha: 0.38 + t * 0.15),
-            NotePalette.rose.withValues(alpha: 0.10),
-            NotePalette.rose.withValues(alpha: 0),
-          ],
-          stops: const [0, 0.55, 1],
-        ).createShader(Rect.fromCircle(center: c, radius: s / 2)),
-    );
-    canvas.drawCircle(
-      c,
-      s * 0.44,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = NotePalette.pink.withValues(alpha: 0.16),
-    );
-
-    // Orbit ribbon: the back half goes behind the seal.
-    final orbit = Rect.fromCenter(center: c, width: s * 0.98, height: s * 0.30);
-    void ribbon(double start, double sweep) {
-      canvas.save();
-      canvas.translate(c.dx, c.dy);
-      canvas.rotate(-0.42);
-      canvas.translate(-c.dx, -c.dy);
-      canvas.drawArc(
-        orbit,
-        start,
-        sweep,
-        false,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = s * 0.022
-          ..strokeCap = StrokeCap.round
-          ..shader = LinearGradient(
-            colors: [
-              NotePalette.pink.withValues(alpha: 0.15),
-              NotePalette.pink.withValues(alpha: 0.85),
-              NotePalette.rose.withValues(alpha: 0.5),
-            ],
-          ).createShader(orbit),
-      );
-      canvas.restore();
-    }
-
-    ribbon(math.pi, math.pi);
+    final r = s * 0.40;
 
     // Wax: a lumpy rim made of overlapping blobs.
     final wax = Path()..addOval(Rect.fromCircle(center: c, radius: r * 0.9));
@@ -598,166 +381,58 @@ class _SealPainter extends CustomPainter {
       );
     }
 
-    // Front half of the ribbon over the seal.
-    ribbon(0, math.pi);
-
-    // Sparkles and hearts around it.
-    void sparkle(Offset p, double k) {
-      final path = Path()
-        ..moveTo(p.dx, p.dy - k)
-        ..quadraticBezierTo(p.dx, p.dy, p.dx + k, p.dy)
-        ..quadraticBezierTo(p.dx, p.dy, p.dx, p.dy + k)
-        ..quadraticBezierTo(p.dx, p.dy, p.dx - k, p.dy)
-        ..quadraticBezierTo(p.dx, p.dy, p.dx, p.dy - k)
-        ..close();
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = const Color(0xFFFFD6E2).withValues(alpha: 0.85)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.6),
-      );
-    }
-
-    sparkle(Offset(s * 0.86, s * 0.17), s * 0.06);
-    sparkle(Offset(s * 0.13, s * 0.80), s * 0.05);
-    final heartPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFFF6A9C1), Color(0xFFD4557F)],
-      ).createShader(Offset.zero & size);
-    canvas.drawPath(
-      heartPath(
-        Rect.fromCenter(
-          center: Offset(s * 0.13, s * 0.18),
-          width: s * 0.17,
-          height: s * 0.16,
-        ),
-      ),
-      heartPaint,
-    );
-    canvas.drawPath(
-      heartPath(
-        Rect.fromCenter(
-          center: Offset(s * 0.88, s * 0.74),
-          width: s * 0.11,
-          height: s * 0.10,
-        ),
-      ),
-      heartPaint,
-    );
   }
 
   @override
   bool shouldRepaint(_SealPainter old) => old.cracked != cracked;
 }
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.state});
+/// "SEALED" / "READY" / "OPENED" as a quiet label, with a dot when new.
+class _StatusLabel extends StatelessWidget {
+  const _StatusLabel({required this.state, required this.unread});
 
   final CapsuleCardState state;
+  final bool unread;
 
   @override
   Widget build(BuildContext context) {
     final (label, icon) = switch (state) {
-      CapsuleCardState.sealed ||
-      CapsuleCardState.grace => ('SEALED', Icons.lock_rounded),
-      CapsuleCardState.ready => ('READY', Icons.lock_open_rounded),
-      CapsuleCardState.opened => ('OPENED', Icons.mark_email_read_rounded),
-    };
-    final ready = state == CapsuleCardState.ready;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 5, 14, 5),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            NotePalette.rose.withValues(alpha: ready ? 0.38 : 0.24),
-            NotePalette.rose.withValues(alpha: ready ? 0.22 : 0.10),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: NotePalette.pink.withValues(alpha: ready ? 0.8 : 0.55),
-        ),
+      CapsuleCardState.sealed || CapsuleCardState.grace => (
+        'SEALED',
+        UsIcons.lock,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: NotePalette.pink),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: NotePalette.pink,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.6,
+      CapsuleCardState.ready => ('READY', UsIcons.timeCapsule),
+      CapsuleCardState.opened => ('OPENED', UsIcons.loveNotes),
+    };
+    return Row(
+      children: [
+        UsIcon(icon, size: 13, color: NotePalette.pink),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: NotePalette.pink,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.4,
+          ),
+        ),
+        if (unread) ...[
+          const SizedBox(width: AppSpacing.sm),
+          Container(
+            width: 7,
+            height: 7,
+            decoration: const BoxDecoration(
+              color: NotePalette.rose,
+              shape: BoxShape.circle,
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _Meta extends StatelessWidget {
-  const _Meta({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.only(top: 1),
-        child: Icon(icon, size: 16, color: NotePalette.muted),
-      ),
-      const SizedBox(width: 7),
-      Expanded(
-        child: Text(
-          text,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: NotePalette.muted,
-            fontSize: 13.5,
-          ),
-        ),
-      ),
-    ],
-  );
-}
-
-class _Chevron extends StatelessWidget {
-  const _Chevron({required this.size});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withValues(alpha: 0.10),
-          Colors.white.withValues(alpha: 0.03),
-        ],
-      ),
-      border: Border.all(color: NotePalette.pink.withValues(alpha: 0.35)),
-    ),
-    child: Icon(
-      Icons.chevron_right_rounded,
-      size: size * 0.6,
-      color: const Color(0xFFFFF6F1),
-    ),
-  );
-}
-
-/// The pink pill buttons used on the card: Edit, Open now.
+/// The small pill buttons used on the card: Cancel, Edit, Open now.
 class CapsuleCardButton extends StatelessWidget {
   const CapsuleCardButton({
     super.key,
@@ -768,46 +443,41 @@ class CapsuleCardButton extends StatelessWidget {
   });
 
   final String label;
-  final IconData? icon;
+  final UsIconData? icon;
   final VoidCallback onPressed;
   final bool primary;
 
   @override
   Widget build(BuildContext context) {
-    final fg = primary ? const Color(0xFF3A0A19) : NotePalette.pink;
+    final fg = primary ? UsPalette.onRose : NotePalette.pink;
     return Material(
-      color: primary ? null : Colors.transparent,
+      color: primary ? UsPalette.rose : Colors.transparent,
       shape: StadiumBorder(
         side: primary
             ? BorderSide.none
             : BorderSide(color: NotePalette.pink.withValues(alpha: 0.5)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Ink(
-        decoration: primary
-            ? const BoxDecoration(gradient: NotePalette.buttonGradient)
-            : null,
-        child: InkWell(
-          onTap: onPressed,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 40),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 18, color: fg),
-                    const SizedBox(width: 6),
-                  ],
-                  Text(
-                    label,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelLarge?.copyWith(color: fg),
-                  ),
+      child: InkWell(
+        onTap: onPressed,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  UsIcon(icon!, size: 18, color: fg),
+                  const SizedBox(width: 6),
                 ],
-              ),
+                Text(
+                  label,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: fg),
+                ),
+              ],
             ),
           ),
         ),
