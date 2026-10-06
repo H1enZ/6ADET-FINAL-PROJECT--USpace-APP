@@ -55,6 +55,7 @@ abstract final class UsIcons {
   static const more = UsIconData('more');
   static const trash = UsIconData('trash');
   static const star = UsIconData('star');
+  static const note = UsIconData('note');
 
   // Care (Therabot and Work it out).
   static const hug = UsIconData('hug');

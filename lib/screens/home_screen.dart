@@ -33,10 +33,8 @@ import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/header_icon_button.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
-import '../widgets/home/mood_grid.dart';
-import '../widgets/home/mood_hero.dart';
-import '../widgets/home/mood_split_hero.dart';
 import '../widgets/home/therabot_card.dart';
+import '../widgets/home/mood_card.dart';
 import '../widgets/home/quick_actions.dart';
 import '../widgets/molecules/special_event_card.dart';
 import 'add_memory_sheet.dart';
@@ -102,16 +100,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _liveDebounce;
   int _loadGeneration = 0;
 
-  /// A mood tapped in the grid but not saved yet. Shown on the hero.
-  Mood? _preview;
+  /// A mood you just tapped, shown straight away while it saves. Cleared
+  /// when the save finishes (it is then today's saved mood) or fails (the
+  /// card falls back to the previous mood).
+  Mood? _pending;
   bool _savingMood = false;
-
-  /// Which mood view the hero shows: both of you split down the middle,
-  /// just you, or just your partner. The arrow flips through them.
-  _MoodView _moodView = _MoodView.both;
-
-  /// On the hero's Share / Add a note row, to scroll it into view.
-  final _heroActionsKey = GlobalKey();
 
   /// On the anniversary countdown, so a notification can scroll to it.
   final _countdownKey = GlobalKey();
@@ -142,18 +135,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// The newest note someone shared today, even if they changed their
   /// mood after writing it.
   String? _noteToday(String userId) {
-    final today = _today;
-    MoodEntry? latest;
-    for (final e in _moods) {
-      final note = e.note?.trim() ?? '';
-      final sameDay =
-          e.createdAt.year == today.year &&
-          e.createdAt.month == today.month &&
-          e.createdAt.day == today.day;
-      if (e.userId != userId || !sameDay || note.isEmpty) continue;
-      if (latest == null || e.createdAt.isAfter(latest.createdAt)) latest = e;
-    }
-    return latest?.note?.trim();
+    final note = latestMoodOn(_moods, userId, _today)?.note?.trim() ?? '';
+    return note.isEmpty ? null : note;
   }
 
   @override
@@ -286,91 +269,95 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---------------------------------------------------------------- mood
 
-  /// Tapping a mood only previews it. Tapping today's saved mood again
-  /// clears the preview.
-  void _previewMood(Mood mood) {
-    if (_savingMood) return;
+  /// Tapping a mood shares it at once: the card shows it immediately, the
+  /// save runs, and if it fails the previous mood comes back with the usual
+  /// short error. While a save is in flight further taps are ignored, so a
+  /// double tap can never write twice.
+  Future<bool> _pickMood(Mood mood) async {
+    if (_savingMood) return false;
+    // The note belongs with how you feel today, so it carries over to the
+    // new mood instead of vanishing (moods are new rows; rows can't change).
+    final note = _noteToday(_myId);
     HapticFeedback.selectionClick();
-    final preview = mood == _savedMood ? null : mood;
     setState(() {
-      _preview = preview;
-      // Your own view, so the Share button is right there.
-      if (preview != null) _moodView = _MoodView.mine;
+      _pending = mood;
+      _savingMood = true;
     });
-
-    // Make it clear nothing is shared yet: say so to screen readers, and
-    // bring the Share button into view if the grid has scrolled it away.
-    SemanticsService.sendAnnouncement(
-      View.of(context),
-      preview == null
-          ? '${mood.label}, already shared today'
-          : '${mood.label}, not shared yet. Share mood button is above.',
-      Directionality.of(context),
-    );
-    if (preview != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final target = _heroActionsKey.currentContext;
-        if (target == null || !target.mounted) return;
-        Scrollable.ensureVisible(
-          target,
-          duration: motionOff(target) ? Duration.zero : AppMotion.medium,
-          curve: AppMotion.enter,
-          // Scroll only if it is not already on screen.
-          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
-        );
-      });
-    }
-  }
-
-  /// Saves the previewed mood (shared with your partner).
-  Future<void> _shareMood() async {
-    final mood = _preview;
-    if (mood == null || _savingMood) return;
-    setState(() => _savingMood = true);
     try {
-      await MoodService.checkIn(coupleId: _coupleId, mood: mood);
-      if (!mounted) return;
-      // Saved: show it as today's mood straight away, even if the reload
-      // below fails, so a successful share never looks unsaved.
+      await MoodService.checkIn(coupleId: _coupleId, mood: mood, note: note);
+      if (!mounted) return true;
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        _partner == null
+            ? '${mood.label}, saved as your mood today'
+            : '${mood.label}, shared with $_partnerName',
+        Directionality.of(context),
+      );
+      // Saved: keep it as today's mood even if the reload below fails.
       setState(() {
         _moods = [
           MoodEntry(
             id: 'just-shared',
             userId: _myId,
             mood: mood,
+            note: note,
             createdAt: DateTime.now(),
           ),
           ..._moods,
         ];
-        _preview = null;
+        _pending = null;
       });
       await _load();
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
+      setState(() => _pending = null); // back to the previous mood
       _showMessage(friendlyError(e));
+      return false;
     } finally {
       if (mounted) setState(() => _savingMood = false);
     }
   }
 
-  /// The existing check-in sheet: a note, and a private option.
+  /// Add, edit or remove today's note. Moods tapped in the sheet share at
+  /// once (same as the card); the button saves only the note: one new
+  /// check-in with your current mood and the text (or no text, to remove
+  /// it). Shared like every check-in now.
   Future<void> _checkMood() async {
-    final current = _preview ?? _savedMood;
+    final current = _pending ?? _savedMood;
     final saved = await _sheet(
       MoodSheet(
-        coupleId: _coupleId,
-        partnerName: _partnerName,
         // A history-only mood is never preselected: it cannot be picked again.
         current: current != null && current.selectable ? current : null,
+        currentNote: _noteToday(_myId),
+        onPick: _pickMood,
+        onSaveNote: (mood, note) =>
+            MoodService.checkIn(coupleId: _coupleId, mood: mood, note: note),
       ),
     );
     if (saved != true) return;
     await _load();
-    if (!mounted) return;
-    setState(() {
-      _preview = null;
-      _moodView = _MoodView.both;
-    });
+  }
+
+  /// Both of today's notes, opened from the small note marker on the card.
+  Future<void> _showNotes() async {
+    final partner = _partner;
+    final mine = _noteToday(_myId);
+    final theirs = partner == null ? null : _noteToday(partner.userId);
+    final edit = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (context) => MoodNotesSheet(
+        notes: [
+          (name: 'You', note: mine),
+          if (partner != null)
+            (name: _first(partner.displayName), note: theirs),
+        ],
+        hasMine: mine != null,
+      ),
+    );
+    if (edit == true && mounted) await _checkMood();
   }
 
   // ---------------------------------------------------------------- actions
@@ -416,8 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Therabot is no longer a tab: it opens as its own page from Home.
-  Future<void> _openTherabot() =>
-      _push(TherabotTab(profile: widget.profile));
+  Future<void> _openTherabot() => _push(TherabotTab(profile: widget.profile));
 
   /// Builds the notifications. Home passes what it already loaded; the
   /// Notifications screen calls it without, so it fetches fresh data.
@@ -675,9 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final partnerFirst = partner == null ? null : _first(partner.displayName);
     final today = _today;
     final saved = _savedMood;
-    final shown = _preview ?? saved;
-    final pending = _preview != null && _preview != saved;
-    final view = partner == null ? _MoodView.mine : _moodView;
+    final shown = _pending ?? saved;
     final myAnswered = _answers.any((a) => a.userId == _myId);
     const gap = AppSpacing.xl;
 
@@ -748,66 +732,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 actionLabel: 'History',
                 onAction: _openMoodHistory,
               ),
-              AnimatedSwitcher(
-                duration: motionOff(context) ? Duration.zero : AppMotion.quick,
-                child: view == _MoodView.both
-                    ? MoodSplitHero(
-                        key: const ValueKey('both'),
-                        myName: _first(_me.displayName),
-                        myMood: shown,
-                        myNote: pending ? null : _noteToday(_myId),
-                        myPending: pending,
-                        partnerName: partnerFirst!,
-                        partnerMood:
-                            latestMoodOn(_moods, partner!.userId, today)?.mood,
-                        partnerNote: _noteToday(partner.userId),
-                        onOpenMine: () =>
-                            setState(() => _moodView = _MoodView.mine),
-                        onOpenPartner: () =>
-                            setState(() => _moodView = _MoodView.partner),
-                        onAddNote: _checkMood,
-                        flipLabel: 'See your mood',
-                        onFlip: () =>
-                            setState(() => _moodView = _MoodView.mine),
-                      )
-                    : MoodHero(
-                        key: ValueKey(view),
-                        name: view == _MoodView.partner
-                            ? partnerFirst!
-                            : _first(_me.displayName),
-                        mood: view == _MoodView.partner
-                            ? latestMoodOn(_moods, partner!.userId, today)?.mood
-                            : shown,
-                        // A preview shows the mood's own quote until shared.
-                        note: view == _MoodView.partner
-                            ? _noteToday(partner!.userId)
-                            : pending
-                            ? null
-                            : _noteToday(_myId),
-                        pending: view == _MoodView.mine && pending,
-                        saving: _savingMood,
-                        hasPartner: partner != null,
-                        showingPartner: view == _MoodView.partner,
-                        viewIndex: partner == null ? null : view.index,
-                        switchLabel: partner == null
-                            ? null
-                            : view == _MoodView.mine
-                            ? "See $partnerFirst's mood"
-                            : 'See both moods',
-                        onSwitch: partner == null
-                            ? null
-                            : () => setState(
-                                () => _moodView = view == _MoodView.mine
-                                    ? _MoodView.partner
-                                    : _MoodView.both,
-                              ),
-                        onShare: _shareMood,
-                        onAddNote: _checkMood,
-                        actionsKey: _heroActionsKey,
+              MoodCard(
+                me: MoodPerson(
+                  name: _first(_me.displayName),
+                  avatarUrl: _me.avatarUrl,
+                  mood: shown,
+                  note: _noteToday(_myId),
+                ),
+                partner: partner == null
+                    ? null
+                    : MoodPerson(
+                        name: partnerFirst!,
+                        avatarUrl: partner.avatarUrl,
+                        mood: latestMoodOn(_moods, partner.userId, today)?.mood,
+                        note: _noteToday(partner.userId),
                       ),
+                busy: _savingMood,
+                onPick: _pickMood,
+                onAddNote: _checkMood,
+                onShowNotes: _showNotes,
               ),
-              const SizedBox(height: AppSpacing.md),
-              MoodGrid(selected: shown, saved: saved, onSelect: _previewMood),
             ],
           ),
         ),
@@ -967,12 +911,14 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 }
 
-/// The three ways the Home mood hero can be shown. The order is the order
-/// of the dots under it.
-enum _MoodView { both, mine, partner }
-
 const _weekdays = [
-  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', //
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday', //
 ];
 const _months = [
   'January', 'February', 'March', 'April', 'May', 'June', //
@@ -1042,9 +988,7 @@ class _InviteBanner extends StatelessWidget {
   Future<void> _copy(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: code));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    );
+    ScaffoldMessenger.of(context);
   }
 
   @override
