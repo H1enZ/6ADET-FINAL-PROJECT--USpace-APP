@@ -4,6 +4,10 @@
 //   1. Read the Supabase settings passed in at build time (lib/config.dart).
 //   2. Connect to Supabase, which also restores a saved session.
 //   3. Show Splash, which decides: Sign in, Pair, or Home.
+//   4. While the app runs, a session that ends on its own (expired or
+//      revoked) sends you back to Splash, with this account's data cleared.
+
+import 'dart:async';
 
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/gestures.dart';
@@ -13,6 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'screens/config_missing_screen.dart';
 import 'screens/splash_screen.dart';
+import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/organisms/phone_frame.dart';
 
@@ -40,12 +45,43 @@ Future<void> main() async {
   );
 }
 
-class USpaceApp extends StatelessWidget {
+class USpaceApp extends StatefulWidget {
   const USpaceApp({super.key});
+
+  @override
+  State<USpaceApp> createState() => _USpaceAppState();
+}
+
+class _USpaceAppState extends State<USpaceApp> {
+  final _navigator = GlobalKey<NavigatorState>();
+  StreamSubscription<AuthState>? _auth;
+
+  @override
+  void initState() {
+    super.initState();
+    if (AppConfig.isConfigured) _auth = AuthService.changes.listen(_onAuth);
+  }
+
+  /// Signing out from a button already restarts the flow itself; this only
+  /// handles a session that ended without you asking.
+  void _onAuth(AuthState state) {
+    if (state.event != AuthChangeEvent.signedOut) return;
+    if (AuthService.takeExpectedSignOut()) return;
+    AuthService.forgetAccountData();
+    final context = _navigator.currentContext;
+    if (context != null) restartFlow(context);
+  }
+
+  @override
+  void dispose() {
+    _auth?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigator,
       title: 'USpace',
       debugShowCheckedModeBanner: false,
 

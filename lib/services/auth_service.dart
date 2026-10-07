@@ -1,5 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'couple_service.dart';
+import 'storage_links.dart';
+
 /// Signing up, in and out. Supabase stores the session for us, so a
 /// returning user stays signed in after closing the app.
 class AuthService {
@@ -17,6 +20,8 @@ class AuthService {
     required String password,
     required String displayName,
   }) async {
+    _expectSignOut = false;
+    forgetAccountData();
     final response = await _auth.signUp(
       email: email.trim(),
       password: password,
@@ -29,11 +34,44 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    _expectSignOut = false;
+    forgetAccountData();
     await _auth.signInWithPassword(email: email.trim(), password: password);
   }
 
+  // Set by [signOut] and used up by the sign-out event it causes, however
+  // late that event arrives, so the app's listener can tell a sign-out you
+  // asked for from one that just happened (an expired session).
+  static bool _expectSignOut = false;
+
+  /// True once for the sign-out event caused by [signOut].
+  static bool takeExpectedSignOut() {
+    final expected = _expectSignOut;
+    _expectSignOut = false;
+    return expected;
+  }
+
   static Future<void> signOut() async {
-    await _auth.signOut();
+    _expectSignOut = true;
+    try {
+      await _auth.signOut();
+    } catch (_) {
+      _expectSignOut = false;
+      rethrow;
+    } finally {
+      forgetAccountData();
+    }
+  }
+
+  /// Signed-in or signed-out changes (see USpaceApp, which sends you back
+  /// to the start when your session ends on its own).
+  static Stream<AuthState> get changes => _auth.onAuthStateChange;
+
+  /// Clears everything kept in memory for the signed-in account, so none
+  /// of it can show for the next person who signs in on this device.
+  static void forgetAccountData() {
+    CoupleService.forget();
+    StorageLinks.clear();
   }
 }
 

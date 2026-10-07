@@ -6,6 +6,7 @@ import '../models/profile.dart';
 import '../utils/anniversary.dart';
 import 'auth_service.dart';
 import 'storage_links.dart';
+import 'couple_service.dart';
 
 /// Your own profile: name, birthday and photo. The database only lets you
 /// change your own row and your own photo folder.
@@ -51,6 +52,7 @@ class ProfileService {
     await _db
         .from('profiles')
         .update({'display_name': trimmed}).eq('user_id', _userId);
+    CoupleService.forget();
   }
 
   /// Null removes it.
@@ -58,6 +60,7 @@ class ProfileService {
     await _db.from('profiles').update({
       'birthday': birthday == null ? null : isoDate(birthday),
     }).eq('user_id', _userId);
+    CoupleService.forget();
   }
 
   /// Uploads a new photo into your own folder, points your profile at it,
@@ -83,6 +86,7 @@ class ProfileService {
     await _db
         .from('profiles')
         .update({'avatar_path': path}).eq('user_id', _userId);
+    CoupleService.forget();
 
     if (oldPath != null) {
       try {
@@ -95,6 +99,7 @@ class ProfileService {
     await _db
         .from('profiles')
         .update({'avatar_path': null}).eq('user_id', _userId);
+    CoupleService.forget();
     try {
       await _db.storage.from(_bucket).remove([path]);
     } catch (_) {}
