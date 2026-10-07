@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'couple_service.dart';
+import 'couple_sync.dart';
 import 'storage_links.dart';
 
 /// Signing up, in and out. Supabase stores the session for us, so a
@@ -70,6 +71,7 @@ class AuthService {
   /// Clears everything kept in memory for the signed-in account, so none
   /// of it can show for the next person who signs in on this device.
   static void forgetAccountData() {
+    CoupleSync.reset();
     CoupleService.forget();
     StorageLinks.clear();
   }

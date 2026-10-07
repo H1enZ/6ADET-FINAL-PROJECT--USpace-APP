@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/scrap_decoration.dart';
 import '../models/scrapbook.dart';
+import 'couple_sync.dart';
 
 /// The Timeline scrapbook's layout and connections (migration 018). Both
 /// partners share one scrapbook. Writes are batched by the caller: nothing
@@ -50,11 +51,13 @@ class ScrapbookService {
         .delete()
         .eq('couple_id', coupleId)
         .inFilter('memory_id', list);
+    CoupleSync.announce('timeline_layout_items');
   }
 
   /// Back to the fully automatic scrapbook. Memories and connections stay.
   static Future<void> removeAllItems(String coupleId) async {
     await _db.from('timeline_layout_items').delete().eq('couple_id', coupleId);
+    CoupleSync.announce('timeline_layout_items');
   }
 
   static Future<ScrapConnection> connect(
@@ -85,6 +88,7 @@ class ScrapbookService {
 
   static Future<void> disconnect(String id) async {
     await _db.from('timeline_connections').delete().eq('id', id);
+    CoupleSync.announce('timeline_connections');
   }
 
   /// The couple's decorations. Throws when the database has no decorations
@@ -111,40 +115,6 @@ class ScrapbookService {
     final list = ids.toList();
     if (list.isEmpty) return;
     await _db.from('timeline_decorations').delete().inFilter('id', list);
-  }
-
-  /// Calls [onChange] when either partner saves layout or connections.
-  /// (Inserts and updates only: removals are picked up on the next load,
-  /// since delete events cannot be filtered to one couple safely.)
-  static RealtimeChannel listen(String coupleId, void Function() onChange) {
-    final filter = PostgresChangeFilter(
-      type: PostgresChangeFilterType.eq,
-      column: 'couple_id',
-      value: coupleId,
-    );
-    var channel = _db.channel('scrapbook-$coupleId');
-    for (final table in [
-      'timeline_layout_items',
-      'timeline_connections',
-      'timeline_decorations',
-    ]) {
-      for (final event in [
-        PostgresChangeEvent.insert,
-        PostgresChangeEvent.update,
-      ]) {
-        channel = channel.onPostgresChanges(
-          event: event,
-          schema: 'public',
-          table: table,
-          filter: filter,
-          callback: (_) => onChange(),
-        );
-      }
-    }
-    return channel.subscribe();
-  }
-
-  static Future<void> stopListening(RealtimeChannel channel) async {
-    await _db.removeChannel(channel);
+    CoupleSync.announce('timeline_decorations');
   }
 }

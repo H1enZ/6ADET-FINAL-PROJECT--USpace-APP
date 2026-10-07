@@ -16,6 +16,7 @@ import '../widgets/molecules/us_confirm.dart';
 import 'bucket_item_detail_screen.dart';
 import 'bucket_item_sheet.dart';
 import '../widgets/molecules/us_states.dart';
+import '../services/couple_sync.dart';
 
 /// Shared bucket list for the paired couple.
 class BucketListScreen extends StatefulWidget {
@@ -36,10 +37,24 @@ class _BucketListScreenState extends State<BucketListScreen> {
 
   String get _coupleId => widget.profile.coupleId!;
 
+  CoupleSyncHandle? _live;
+
   @override
   void initState() {
     super.initState();
     _load();
+    // Goals and savings your partner adds, edits, completes or removes.
+    try {
+      _live = CoupleSync.listen(_coupleId, const {'bucket_items', 'bucket_contributions'}, () {
+        if (mounted) _load();
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _live?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

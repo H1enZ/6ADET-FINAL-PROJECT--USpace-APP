@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../models/chat_message.dart';
 import '../models/chat_reaction.dart';
 import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
+import '../services/couple_sync.dart';
 import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
 import '../utils/capsule_time.dart';
@@ -49,7 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _sending = false;
   bool _showEmojis = false;
   String? _error;
-  RealtimeChannel? _live;
+  CoupleSyncHandle? _live;
 
   // New-message animation: ids seen so far, and the ones that just arrived.
   final Set<String> _seen = {};
@@ -90,16 +90,21 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _load(scrollToEnd: true);
     try {
-      _live = ChatService.listen(widget.coupleId, () {
-        if (mounted) _load();
-      });
+      // A short settle only: a message should feel instant, but marking a
+      // batch as read updates several rows at once.
+      _live = CoupleSync.listen(
+          widget.coupleId,
+          const {'messages', 'message_reactions'},
+          () {
+            if (mounted) _load();
+          },
+          settle: const Duration(milliseconds: 100));
     } catch (_) {}
   }
 
   @override
   void dispose() {
-    final live = _live;
-    if (live != null) ChatService.stopListening(live);
+    _live?.cancel();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -360,15 +365,8 @@ class _ChatScreenState extends State<ChatScreen> {
     if (before == null) return;
     final label = ReactionView.of(before)?.label;
     _announce(label == null ? 'Reaction removed' : 'Removed your $label reaction');
-    await _write(m.id, null, before, () async {
-      await ChatService.removeReaction(m.id);
-      // The removal itself is saved; if the nudge to your partner fails,
-      // they still see it on their next reload.
-      final live = _live;
-      if (live != null) {
-        ChatService.announceReactionsChanged(live).catchError((_) {});
-      }
-    });
+    // ChatService tells your partner's chat about the removal.
+    await _write(m.id, null, before, () => ChatService.removeReaction(m.id));
   }
 
   /// Shows [value] as your reaction (null = none) while [save] runs. If it

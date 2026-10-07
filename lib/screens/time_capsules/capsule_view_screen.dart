@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../../models/time_capsule.dart';
 import '../../services/auth_service.dart';
 import '../../services/time_capsule_service.dart';
+import '../../services/couple_sync.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/anniversary.dart';
 import '../../utils/capsule_time.dart';
@@ -56,7 +56,7 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
   bool _busy = false;
   late _Stage _stage = widget.capsule.isOpened ? _Stage.reading : _Stage.closed;
   bool _revealAnimation = false;
-  RealtimeChannel? _live;
+  CoupleSyncHandle? _live;
 
   bool get _iAmSender => _capsule.senderId == widget.myId;
   String get _senderName => _iAmSender ? 'you' : widget.partnerName;
@@ -66,16 +66,19 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
     super.initState();
     if (_capsule.isOpened) _load();
     try {
-      _live = TimeCapsuleService.listen(widget.coupleId, () {
-        if (mounted && _stage == _Stage.reading) _load();
-      });
+      _live = CoupleSync.listen(
+        widget.coupleId,
+        const {'time_capsules', 'activities'},
+        () {
+          if (mounted && _stage == _Stage.reading) _load();
+        },
+      );
     } catch (_) {}
   }
 
   @override
   void dispose() {
-    final live = _live;
-    if (live != null) TimeCapsuleService.stopListening(live);
+    _live?.cancel();
     super.dispose();
   }
 

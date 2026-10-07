@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/love_note.dart';
 import 'memory_service.dart';
+import 'couple_sync.dart';
 
 /// Love notes and Time Capsules. The database hides a sealed capsule's text
 /// from both partners until it opens; only its envelope (who, when, teaser)
@@ -106,33 +107,12 @@ class NoteService {
   /// Only the author can delete a note (the database enforces it).
   static Future<void> delete(String id, {String? photoPath}) async {
     await _db.from('notes').delete().eq('id', id);
+    CoupleSync.announce('notes');
     if (photoPath != null) await MemoryService.removeFiles([photoPath]);
   }
 
   /// Only the author, only while still sealed.
   static Future<void> cancelCapsule(String id) async {
     await _db.rpc('cancel_capsule', params: {'note_id': id});
-  }
-
-  /// Calls [onChange] when a new note arrives for this couple.
-  static RealtimeChannel listen(String coupleId, void Function() onChange) {
-    return _db
-        .channel('notes-$coupleId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'notes',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'couple_id',
-            value: coupleId,
-          ),
-          callback: (_) => onChange(),
-        )
-        .subscribe();
-  }
-
-  static Future<void> stopListening(RealtimeChannel channel) async {
-    await _db.removeChannel(channel);
   }
 }

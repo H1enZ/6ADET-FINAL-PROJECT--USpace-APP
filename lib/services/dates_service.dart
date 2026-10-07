@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/important_date.dart';
 import '../utils/anniversary.dart';
+import 'couple_sync.dart';
 
 /// Important dates the couple counts down to. Either partner can add or
 /// remove them.
@@ -38,5 +39,6 @@ class DatesService {
 
   static Future<void> delete(String id) async {
     await _db.from('important_dates').delete().eq('id', id);
+    CoupleSync.announce('important_dates');
   }
 }

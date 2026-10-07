@@ -6,6 +6,7 @@ import '../models/memory.dart';
 import '../utils/anniversary.dart';
 import 'auth_service.dart';
 import 'storage_links.dart';
+import 'couple_sync.dart';
 
 /// A photo picked on this device, not uploaded yet.
 class NewPhoto {
@@ -293,6 +294,7 @@ class MemoryService {
   /// Only the author can delete (enforced by the database). Photos go too.
   static Future<void> delete(Memory memory) async {
     await _db.from('memories').delete().eq('id', memory.id);
+    CoupleSync.announce('memories');
     await _removeFiles([for (final p in memory.photos) p.path]);
   }
 

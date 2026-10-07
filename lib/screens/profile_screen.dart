@@ -16,6 +16,7 @@ import 'splash_screen.dart';
 import '../widgets/effects/smooth_scroll.dart';
 import '../widgets/molecules/us_states.dart';
 import '../widgets/effects/motion.dart';
+import '../services/couple_sync.dart';
 
 /// Your profile: photo, name, birthday, and your partner at a glance.
 /// You can only change your own details (the database enforces it).
@@ -32,22 +33,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Mouse-wheel scrolling glides instead of jumping.
   final _scroll = SmoothScrollController();
 
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
-
   late Profile _me = widget.profile;
   Profile? _partner;
   bool _loading = true;
   bool _busy = false;
   String? _error;
 
+  CoupleSyncHandle? _live;
+
   @override
   void initState() {
     super.initState();
     _load();
+    // Your partner's name, photo and birthday, and the anniversary.
+    try {
+      _live = CoupleSync.listen(widget.profile.coupleId!, const {'profiles', 'couples'}, () {
+        if (mounted) _load();
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _live?.cancel();
+    _scroll.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {

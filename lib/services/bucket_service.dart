@@ -4,6 +4,7 @@ import '../models/bucket_contribution.dart';
 import '../models/bucket_item.dart';
 import '../utils/anniversary.dart';
 import '../utils/money.dart';
+import 'couple_sync.dart';
 
 /// Shared bucket-list items and their savings logs. Both partners can add,
 /// edit, complete and delete items, and log savings. Row-level security in
@@ -134,6 +135,7 @@ class BucketService {
   /// Also deletes its savings log (the database cascades it).
   static Future<void> delete(String id) async {
     await _db.from('bucket_items').delete().eq('id', id);
+    CoupleSync.announce('bucket_items');
   }
 
   // ---------------------------------------------------------------------
@@ -170,5 +172,6 @@ class BucketService {
   /// Only your own entries (the database enforces it).
   static Future<void> deleteContribution(String id) async {
     await _db.from('bucket_contributions').delete().eq('id', id);
+    CoupleSync.announce('bucket_contributions');
   }
 }

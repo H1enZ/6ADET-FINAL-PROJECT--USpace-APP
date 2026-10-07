@@ -8,6 +8,7 @@ import '../utils/anniversary.dart';
 import '../widgets/atoms/us_icon.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/molecules/us_states.dart';
+import '../services/couple_sync.dart';
 
 /// Past daily questions with both answers, newest first. Your partner's
 /// answer only shows for days you answered too (the database enforces it).
@@ -32,10 +33,24 @@ class _QuestionArchiveScreenState extends State<QuestionArchiveScreen> {
   bool _loading = true;
   String? _error;
 
+  CoupleSyncHandle? _live;
+
   @override
   void initState() {
     super.initState();
     _load();
+    // Answers as they come in (your partner's shows once you have answered).
+    try {
+      _live = CoupleSync.listen(widget.coupleId, const {'question_answers'}, () {
+        if (mounted) _load();
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _live?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

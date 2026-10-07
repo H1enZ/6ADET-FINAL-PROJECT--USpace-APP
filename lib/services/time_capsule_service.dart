@@ -265,38 +265,6 @@ class TimeCapsuleService {
 
   // ---------------------------------------------------------------- live
 
-  /// Calls [onChange] when one of your couple's capsules changes, or a
-  /// capsule event (opened, replied) arrives. Filtered by couple: never
-  /// subscribe without the filter (see migration 014).
-  static RealtimeChannel listen(String coupleId, void Function() onChange) {
-    final filter = PostgresChangeFilter(
-      type: PostgresChangeFilterType.eq,
-      column: 'couple_id',
-      value: coupleId,
-    );
-    return _db
-        .channel('capsules-$coupleId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'time_capsules',
-          filter: filter,
-          callback: (_) => onChange(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'activities',
-          filter: filter,
-          callback: (_) => onChange(),
-        )
-        .subscribe();
-  }
-
-  static Future<void> stopListening(RealtimeChannel channel) async {
-    await _db.removeChannel(channel);
-  }
-
   // ---------------------------------------------------------------- unread
 
   // Unread dots are remembered on this device, like Notifications: for each

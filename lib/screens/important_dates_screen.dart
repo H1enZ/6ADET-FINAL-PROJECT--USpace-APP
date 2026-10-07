@@ -11,6 +11,7 @@ import '../widgets/molecules/us_confirm.dart';
 import '../widgets/molecules/us_field_button.dart';
 import '../widgets/molecules/us_states.dart';
 import '../widgets/effects/motion.dart';
+import '../services/couple_sync.dart';
 
 /// All the couple's special dates, soonest first. Either partner can add or
 /// remove them. Returns `true` when something changed.
@@ -29,10 +30,24 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
   bool _changed = false;
   String? _error;
 
+  CoupleSyncHandle? _live;
+
   @override
   void initState() {
     super.initState();
     _load();
+    // Dates your partner adds, edits or removes.
+    try {
+      _live = CoupleSync.listen(widget.coupleId, const {'important_dates'}, () {
+        if (mounted) _load();
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _live?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

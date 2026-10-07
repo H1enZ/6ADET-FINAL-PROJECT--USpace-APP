@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../models/activity.dart';
 import '../models/app_notification.dart';
@@ -18,6 +17,7 @@ import '../services/affection_service.dart';
 import '../services/auth_service.dart';
 import '../services/chat_service.dart';
 import '../services/couple_service.dart';
+import '../services/couple_sync.dart';
 import '../services/dates_service.dart';
 import '../services/memory_service.dart';
 import '../services/mood_service.dart';
@@ -96,8 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _busy = false;
   bool _celebrated = false;
   String? _error;
-  RealtimeChannel? _live;
-  Timer? _liveDebounce;
+  CoupleSyncHandle? _live;
   int _loadGeneration = 0;
 
   /// A mood you just tapped, shown straight away while it saves. Cleared
@@ -145,14 +144,25 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.refresh?.addListener(_load);
     _load();
     try {
-      _live = ActivityService.listen(_coupleId, () {
-        // One action can insert several rows (an activity and an affection):
-        // wait for the burst to settle, then reload once.
-        _liveDebounce?.cancel();
-        _liveDebounce = Timer(const Duration(milliseconds: 300), () {
+      // Every shared action writes an activity row (a memory, mood, note,
+      // answer, goal or date), so that alone covers most of Home. Names,
+      // photos, the anniversary and edited or removed dates don't, so
+      // those tables are listened to directly. One action can write
+      // several rows: CoupleSync waits for the burst, then reloads once.
+      _live = CoupleSync.listen(
+        _coupleId,
+        const {
+          'activities',
+          'affections',
+          'profiles',
+          'couples',
+          'important_dates',
+        },
+        () {
           if (mounted) _load();
-        });
-      });
+        },
+        settle: const Duration(milliseconds: 300),
+      );
     } catch (_) {
       // Live updates are a bonus; pull to refresh still works.
     }
@@ -162,9 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     widget.refresh?.removeListener(_load);
     _scroll.dispose();
-    _liveDebounce?.cancel();
-    final live = _live;
-    if (live != null) ActivityService.stopListening(live);
+    _live?.cancel();
     super.dispose();
   }
 

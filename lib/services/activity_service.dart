@@ -18,36 +18,4 @@ class ActivityService {
         .limit(limit);
     return rows.map(Activity.fromMap).toList();
   }
-
-  /// Calls [onChange] whenever a new activity or affection arrives for this
-  /// couple. Realtime still applies the database's security rules.
-  /// Close it with [stopListening] when the screen goes away.
-  static RealtimeChannel listen(String coupleId, void Function() onChange) {
-    final filter = PostgresChangeFilter(
-      type: PostgresChangeFilterType.eq,
-      column: 'couple_id',
-      value: coupleId,
-    );
-    return _db
-        .channel('home-$coupleId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'activities',
-          filter: filter,
-          callback: (_) => onChange(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'affections',
-          filter: filter,
-          callback: (_) => onChange(),
-        )
-        .subscribe();
-  }
-
-  static Future<void> stopListening(RealtimeChannel channel) async {
-    await _db.removeChannel(channel);
-  }
 }

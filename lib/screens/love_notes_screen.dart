@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../models/love_note.dart';
 import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
 import '../services/note_service.dart';
+import '../services/couple_sync.dart';
 import '../services/profile_service.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -49,7 +49,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
   bool _loading = true;
   String? _error;
   Timer? _tick;
-  RealtimeChannel? _live;
+  CoupleSyncHandle? _live;
 
   String get _coupleId => widget.profile.coupleId!;
   String get _myId => widget.profile.userId;
@@ -75,7 +75,8 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
       }
     });
     try {
-      _live = NoteService.listen(_coupleId, () {
+      // New notes, favourites and (announced) deletes, from either of you.
+      _live = CoupleSync.listen(_coupleId, const {'notes'}, () {
         if (mounted) _load();
       });
     } catch (_) {}
@@ -85,8 +86,7 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
   void dispose() {
     _scroll.dispose();
     _tick?.cancel();
-    final live = _live;
-    if (live != null) NoteService.stopListening(live);
+    _live?.cancel();
     super.dispose();
   }
 

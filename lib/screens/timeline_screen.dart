@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../models/memory.dart';
 import '../models/profile.dart';
@@ -11,6 +10,7 @@ import '../models/scrap_decoration.dart';
 import '../models/scrapbook.dart';
 import '../services/auth_service.dart';
 import '../services/couple_service.dart';
+import '../services/couple_sync.dart';
 import '../services/memory_service.dart';
 import '../services/scrapbook_service.dart';
 import '../theme/app_spacing.dart';
@@ -143,8 +143,10 @@ class _TimelineScreenState extends State<TimelineScreen>
   Timer? _saveTimer;
   bool _saving = false;
 
-  RealtimeChannel? _channel;
+  CoupleSyncHandle? _layoutLive;
+  CoupleSyncHandle? _memoriesLive;
   Timer? _remoteTimer;
+  Timer? _memoriesTimer;
 
   // Organize / reset: everything glides to its new place.
   late final AnimationController _arrange = AnimationController(
@@ -164,7 +166,19 @@ class _TimelineScreenState extends State<TimelineScreen>
     _load();
     _loadDatesChoice();
     try {
-      _channel = ScrapbookService.listen(_coupleId, _remoteChanged);
+      // Your partner arranging the board, and adding, editing or removing
+      // memories. Both merge in without undoing anything you haven't
+      // saved yet.
+      _layoutLive = CoupleSync.listen(_coupleId, const {
+        'timeline_layout_items',
+        'timeline_connections',
+        'timeline_decorations',
+      }, _remoteChanged);
+      _memoriesLive = CoupleSync.listen(_coupleId, const {
+        'memories',
+        'memory_photos',
+        'profiles',
+      }, _remoteMemoriesChanged);
     } catch (_) {
       // Live updates are a bonus.
     }
@@ -184,8 +198,9 @@ class _TimelineScreenState extends State<TimelineScreen>
     _flush(); // anything not saved yet goes now
     _saveTimer?.cancel();
     _remoteTimer?.cancel();
-    final channel = _channel;
-    if (channel != null) ScrapbookService.stopListening(channel);
+    _memoriesTimer?.cancel();
+    _layoutLive?.cancel();
+    _memoriesLive?.cancel();
     _anim.dispose();
     _arrange.dispose();
     _view.dispose();
@@ -351,6 +366,37 @@ class _TimelineScreenState extends State<TimelineScreen>
         setState(() {
           _mergeRemote(scrap.items, scrap.links);
           if (decos != null) _mergeDecos(decos);
+          _relayout();
+        });
+      } catch (_) {}
+    });
+  }
+
+  /// A memory was added, edited or removed elsewhere: re-read the memories
+  /// (and names) quietly. Never shows an error over the board; while you
+  /// are moving something it waits, then tries again.
+  void _remoteMemoriesChanged() {
+    _memoriesTimer?.cancel();
+    _memoriesTimer = Timer(const Duration(milliseconds: 400), () async {
+      if (!mounted || _loading) return;
+      if (_gesture != null || _decoGesture != null || _arrange.isAnimating) {
+        _remoteMemoriesChanged();
+        return;
+      }
+      try {
+        final results = await Future.wait<Object>([
+          CoupleService.members(_coupleId),
+          MemoryService.list(_coupleId),
+        ]);
+        if (!mounted) return;
+        final members = results[0] as List<Profile>;
+        setState(() {
+          _names = {for (final m in members) m.userId: m.displayName};
+          _memories = results[1] as List<Memory>;
+          // A memory your partner removed can't stay selected here.
+          final ids = {for (final m in _memories) m.id};
+          if (!ids.contains(_selected)) _selected = null;
+          if (!ids.contains(_connectFrom)) _connectFrom = null;
           _relayout();
         });
       } catch (_) {}

@@ -9,6 +9,7 @@ import '../widgets/home/mood_art.dart';
 import '../widgets/atoms/us_icon.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/molecules/us_states.dart';
+import '../services/couple_sync.dart';
 
 /// The days either of you checked in, newest first and grouped by month.
 /// Each day shows your mood and your partner's shared mood (the latest
@@ -48,10 +49,24 @@ class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
   /// How far back the history reaches.
   static const _days = 365;
 
+  CoupleSyncHandle? _live;
+
   @override
   void initState() {
     super.initState();
     _load();
+    // Moods your partner shares while this is open.
+    try {
+      _live = CoupleSync.listen(widget.coupleId, const {'moods'}, () {
+        if (mounted) _load();
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _live?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

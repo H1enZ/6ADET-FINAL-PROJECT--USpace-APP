@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show RealtimeChannel;
 
 import '../../models/love_note.dart';
 import '../../models/profile.dart';
@@ -10,6 +9,7 @@ import '../../services/auth_service.dart';
 import '../../services/couple_service.dart';
 import '../../services/note_service.dart';
 import '../../services/time_capsule_service.dart';
+import '../../services/couple_sync.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/us_palette.dart';
 import '../../utils/anniversary.dart';
@@ -81,7 +81,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
 
   Timer? _refresh;
   Timer? _tick;
-  RealtimeChannel? _live;
+  CoupleSyncHandle? _live;
   bool _active = false;
 
   // Your capsules in their ten minutes at the last tick, to notice the
@@ -144,9 +144,14 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     _refresh = Timer.periodic(const Duration(seconds: 30), (_) => _load());
     _tick = Timer.periodic(const Duration(seconds: 1), (_) => _onTick());
     try {
-      _live = TimeCapsuleService.listen(_coupleId, () {
-        if (mounted) _load();
-      });
+      // Capsules, and replies (each reply writes an activity row).
+      _live = CoupleSync.listen(
+        _coupleId,
+        const {'time_capsules', 'activities'},
+        () {
+          if (mounted) _load();
+        },
+      );
     } catch (_) {}
   }
 
@@ -155,9 +160,8 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     _refresh?.cancel();
     _tick?.cancel();
     _refresh = _tick = null;
-    final live = _live;
+    _live?.cancel();
     _live = null;
-    if (live != null) TimeCapsuleService.stopListening(live);
   }
 
   /// Opens another screen with this one paused, and refreshes after.

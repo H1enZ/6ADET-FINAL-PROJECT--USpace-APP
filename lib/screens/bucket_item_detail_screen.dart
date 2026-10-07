@@ -15,6 +15,8 @@ import '../widgets/molecules/us_confirm.dart';
 import '../widgets/molecules/us_field_button.dart';
 import 'bucket_item_sheet.dart';
 import '../widgets/molecules/us_states.dart';
+import '../services/couple_sync.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 /// One bucket-list item: where, when, the budget and the savings log.
 /// Both partners can log savings; each can delete only their own entries.
@@ -44,10 +46,24 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
   bool _changed = false;
   String? _error;
 
+  CoupleSyncHandle? _live;
+
   @override
   void initState() {
     super.initState();
     _load();
+    // The goal itself and its savings, as your partner changes them.
+    try {
+      _live = CoupleSync.listen(_item.coupleId, const {'bucket_items', 'bucket_contributions'}, () {
+        if (mounted) _liveReload();
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _live?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -68,6 +84,24 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
         _loading = false;
       });
     }
+  }
+
+  /// A live change: re-read the goal (title, target, done) and its savings.
+  /// If your partner removed the goal, close it and say so.
+  Future<void> _liveReload() async {
+    try {
+      final fresh = await BucketService.item(_item.id);
+      if (!mounted) return;
+      setState(() => _item = fresh);
+    } on PostgrestException catch (e) {
+      // PGRST116: no row came back, so the goal is gone.
+      if (e.code == 'PGRST116' && mounted) {
+        showUsMessage(context, 'Your partner removed this goal.');
+        Navigator.of(context).pop(true);
+        return;
+      }
+    } catch (_) {}
+    if (mounted) await _load();
   }
 
   String _name(String userId) => userId == widget.myUserId

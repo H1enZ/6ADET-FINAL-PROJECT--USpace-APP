@@ -6,6 +6,7 @@ import '../models/chat_message.dart';
 import '../models/chat_reaction.dart';
 import 'auth_service.dart';
 import 'storage_links.dart';
+import 'couple_sync.dart';
 
 /// The couple's private chat. Row-level security means only the two
 /// partners can read or post, nobody can send as the other, and edits,
@@ -136,6 +137,7 @@ class ChatService {
         .delete()
         .eq('message_id', messageId)
         .eq('user_id', _me);
+    CoupleSync.announce('message_reactions');
   }
 
   /// Messages from your partner you have not read yet (for the badge).
@@ -148,49 +150,5 @@ class ChatService {
         .isFilter('read_at', null)
         .isFilter('deleted_at', null);
     return rows.length;
-  }
-
-  /// Broadcast on the couple's chat channel after a reaction is removed.
-  static const _reactionsChanged = 'reactions_changed';
-
-  /// Calls [onChange] when a message is sent, edited, deleted or read, or
-  /// a reaction is added, changed or removed.
-  static RealtimeChannel listen(String coupleId, void Function() onChange) {
-    final filter = PostgresChangeFilter(
-      type: PostgresChangeFilterType.eq,
-      column: 'couple_id',
-      value: coupleId,
-    );
-    return _db
-        .channel('chat-$coupleId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'messages',
-          filter: filter,
-          callback: (_) => onChange(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'message_reactions',
-          filter: filter,
-          callback: (_) => onChange(),
-        )
-        // Realtime doesn't deliver DELETE events through a filtered
-        // subscription, so a removed reaction is announced here instead.
-        .onBroadcast(event: _reactionsChanged, callback: (_) => onChange())
-        .subscribe();
-  }
-
-  /// Tells your partner's open chat to reload reactions after you removed
-  /// one. The message carries nothing: they re-read reactions themselves,
-  /// through the usual row-level security.
-  static Future<void> announceReactionsChanged(RealtimeChannel channel) async {
-    await channel.sendBroadcastMessage(event: _reactionsChanged, payload: {});
-  }
-
-  static Future<void> stopListening(RealtimeChannel channel) async {
-    await _db.removeChannel(channel);
   }
 }
