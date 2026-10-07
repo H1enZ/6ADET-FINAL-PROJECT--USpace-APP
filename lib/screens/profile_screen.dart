@@ -6,10 +6,11 @@ import '../services/auth_service.dart';
 import '../services/couple_service.dart';
 import '../services/profile_service.dart';
 import '../theme/app_spacing.dart';
+import '../theme/us_palette.dart';
 import '../utils/anniversary.dart';
-import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/avatar_circle.dart';
+import '../widgets/atoms/us_icon.dart';
 import '../widgets/atoms/section_label.dart';
 import 'splash_screen.dart';
 import '../widgets/effects/smooth_scroll.dart';
@@ -96,28 +97,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _photoOptions() async {
     final hasPhoto = _me.avatarPath != null;
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: Text(hasPhoto ? 'Choose a new photo' : 'Add a photo'),
-              onTap: () => Navigator.of(context).pop('pick'),
-            ),
-            if (hasPhoto)
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Remove photo'),
-                onTap: () => Navigator.of(context).pop('remove'),
-              ),
-          ],
-        ),
+    final choice = await _showActions(context, [
+      (
+        'pick',
+        UsIcons.image,
+        hasPhoto ? 'Choose a new photo' : 'Add a photo',
+        false,
       ),
-    );
+      if (hasPhoto) ('remove', UsIcons.trash, 'Remove photo', true),
+    ]);
     if (choice == 'pick') await _pickPhoto();
     if (choice == 'remove') {
       final path = _me.avatarPath!;
@@ -179,6 +167,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _run(() => ProfileService.updateBirthday(null), 'Birthday removed');
   }
 
+  /// No birthday yet: straight to the picker. Otherwise change or remove.
+  Future<void> _birthdayOptions() async {
+    if (_me.birthday == null) return _pickBirthday();
+    final choice = await _showActions(context, [
+      ('change', UsIcons.calendar, 'Change date', false),
+      ('remove', UsIcons.trash, 'Remove birthday', true),
+    ]);
+    if (choice == 'change') await _pickBirthday();
+    if (choice == 'remove') await _removeBirthday();
+  }
+
   Future<void> _unlink() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -207,10 +206,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final muted =
-        theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+    final muted = theme.textTheme.bodyMedium?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
     final birthday = _me.birthday;
     final partner = _partner;
+    final leaving = partner == null ? 'Leave this space' : 'Unlink partner';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -221,176 +222,155 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: ListView(
                 controller: _scroll,
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(AppSpacing.screenMargin),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenMargin,
+                  AppSpacing.sm,
+                  AppSpacing.screenMargin,
+                  AppSpacing.huge,
+                ),
                 children: [
                   Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(
-                          maxWidth: AppSpacing.formMaxWidth),
+                        maxWidth: AppSpacing.formMaxWidth,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (_error != null) ...[
-                            Text(_error!,
-                                style: theme.textTheme.bodyMedium
-                                    ?.copyWith(color: scheme.error)),
+                            Text(
+                              _error!,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.error,
+                              ),
+                            ),
                             const SizedBox(height: AppSpacing.lg),
                           ],
 
-                          // Photo with a camera button
+                          // Photo, name, email.
                           Center(
-                            child: Stack(
-                              children: [
-                                AvatarCircle(
-                                  name: _me.displayName,
-                                  imageUrl: _me.avatarUrl,
-                                  size: 112,
-                                ),
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: IconButton.filled(
-                                    tooltip: 'Change photo',
-                                    onPressed: _busy ? null : _photoOptions,
-                                    icon: const Icon(
-                                        Icons.photo_camera_outlined),
-                                  ),
-                                ),
-                              ],
+                            child: _AvatarButton(
+                              profile: _me,
+                              onTap: _busy ? null : _photoOptions,
                             ),
                           ),
                           const SizedBox(height: AppSpacing.lg),
+                          Text(
+                            _me.displayName,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            AuthService.user?.email ?? '',
+                            textAlign: TextAlign.center,
+                            style: muted,
+                          ),
+                          const SizedBox(height: AppSpacing.xxxl),
 
-                          // Name
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          _Group(
+                            label: 'You',
                             children: [
-                              Flexible(
-                                child: Text(
-                                  _me.displayName,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.titleLarge,
-                                ),
+                              _Row(
+                                icon: UsIcons.profile,
+                                title: 'Name',
+                                value: _me.displayName,
+                                onTap: _busy ? null : _editName,
                               ),
-                              IconButton(
-                                tooltip: 'Edit name',
-                                onPressed: _busy ? null : _editName,
-                                icon: const Icon(Icons.edit_outlined, size: 20),
+                              _Row(
+                                icon: UsIcons.calendar,
+                                title: 'Birthday',
+                                value: birthday == null
+                                    ? 'Add'
+                                    : longDate(birthday),
+                                subtitle: birthday == null
+                                    ? 'Your partner gets a countdown on Home.'
+                                    : birthdayLine(
+                                        birthday: birthday,
+                                        isMe: true,
+                                        name: _me.displayName,
+                                      ),
+                                onTap: _busy ? null : _birthdayOptions,
                               ),
                             ],
                           ),
-                          Text(AuthService.user?.email ?? '',
-                              textAlign: TextAlign.center, style: muted),
-                          const SizedBox(height: AppSpacing.xxxl),
 
-                          // Birthday
-                          SectionLabel(
-                            text: 'Birthday',
-                            actionLabel: birthday == null ? 'Add' : 'Change',
-                            onAction: _busy ? null : _pickBirthday,
-                          ),
-                          if (birthday == null)
-                            Text(
-                              'Add your birthday so your partner gets a '
-                              'countdown on Home. Only the two of you can see it.',
-                              style: muted,
-                            )
-                          else ...[
-                            Text(longDate(birthday),
-                                style: theme.textTheme.titleMedium),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(
-                              birthdayLine(
-                                birthday: birthday,
-                                isMe: true,
-                                name: _me.displayName,
-                              ),
-                              style: muted,
-                            ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton(
-                                onPressed: _busy ? null : _removeBirthday,
-                                child: const Text('Remove birthday'),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: AppSpacing.xxl),
-
-                          // Partner
-                          if (partner != null) ...[
-                            const SectionLabel(text: 'Your partner'),
-                            Row(
+                          if (partner != null)
+                            _Group(
+                              label: 'Your partner',
                               children: [
-                                AvatarCircle(
-                                  name: partner.displayName,
-                                  imageUrl: partner.avatarUrl,
-                                  size: 48,
-                                ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                Padding(
+                                  padding: const EdgeInsets.all(
+                                    AppSpacing.cardPadding,
+                                  ),
+                                  child: Row(
                                     children: [
-                                      Text(partner.displayName,
-                                          style: theme.textTheme.titleMedium),
-                                      Text(
-                                        partner.birthday == null
-                                            ? 'No birthday added yet'
-                                            : birthdayLine(
-                                                birthday: partner.birthday!,
-                                                isMe: false,
-                                                name: partner.displayName,
-                                              ),
-                                        style: muted,
+                                      AvatarCircle(
+                                        name: partner.displayName,
+                                        imageUrl: partner.avatarUrl,
+                                        size: 44,
+                                      ),
+                                      const SizedBox(width: AppSpacing.md),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              partner.displayName,
+                                              style:
+                                                  theme.textTheme.titleMedium,
+                                            ),
+                                            Text(
+                                              partner.birthday == null
+                                                  ? 'No birthday added yet'
+                                                  : birthdayLine(
+                                                      birthday:
+                                                          partner.birthday!,
+                                                      isMe: false,
+                                                      name:
+                                                          partner.displayName,
+                                                    ),
+                                              style: muted,
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: AppSpacing.xxl),
-                          ],
 
-                          // Account
-                          const SectionLabel(text: 'Account'),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: AppButton(
-                              label: 'Sign out',
-                              icon: Icons.logout,
-                              variant: AppButtonVariant.outlined,
-                              onPressed: _busy ? null : _signOut,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xxl),
-
-                          // Danger zone
-                          SectionLabel(
-                              text: partner == null ? 'Leave this space' : 'Unlink partner'),
-                          Text(
-                            partner == null
-                                ? 'Nobody else has joined yet. Leaving deletes this space '
-                                    'and everything in it.'
-                                : 'You will leave the space you share with '
-                                    '${partner.displayName}. They keep your memories, notes '
-                                    'and bucket list, and get a new invite code.',
-                            style: muted,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: OutlinedButton.icon(
-                              onPressed: _busy ? null : _unlink,
-                              icon: const Icon(Icons.link_off),
-                              label: Text(partner == null ? 'Leave this space' : 'Unlink partner'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: scheme.error,
-                                side: BorderSide(color: scheme.error),
-                                minimumSize: const Size(64, AppSpacing.touchTarget),
+                          _Group(
+                            label: 'Account',
+                            children: [
+                              _Row(
+                                icon: UsIcons.logout,
+                                title: 'Sign out',
+                                onTap: _busy ? null : _signOut,
+                                chevron: false,
                               ),
-                            ),
+                            ],
+                          ),
+
+                          _Group(
+                            label: 'Your space',
+                            children: [
+                              _Row(
+                                icon: UsIcons.unlink,
+                                title: leaving,
+                                subtitle: partner == null
+                                    ? 'Nobody else has joined yet. Leaving '
+                                          'deletes this space and everything '
+                                          'in it.'
+                                    : '${partner.displayName} keeps your '
+                                          'memories, notes and bucket list, '
+                                          'and gets a new invite code.',
+                                destructive: true,
+                                onTap: _busy ? null : _unlink,
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -399,6 +379,236 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// A small sheet of actions; returns the chosen key, or null.
+Future<String?> _showActions(
+  BuildContext context,
+  List<(String, UsIconData, String, bool)> actions,
+) {
+  return showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      final scheme = Theme.of(context).colorScheme;
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (key, icon, label, destructive) in actions)
+                ListTile(
+                  minTileHeight: 56,
+                  leading: UsIcon(
+                    icon,
+                    size: 22,
+                    color: destructive ? scheme.error : scheme.onSurfaceVariant,
+                  ),
+                  title: Text(
+                    label,
+                    style: destructive ? TextStyle(color: scheme.error) : null,
+                  ),
+                  onTap: () => Navigator.of(context).pop(key),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// Your photo with a small, quiet camera badge. The whole thing is the button.
+class _AvatarButton extends StatelessWidget {
+  const _AvatarButton({required this.profile, required this.onTap});
+
+  final Profile profile;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: 'Change photo',
+      excludeSemantics: true,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 56,
+        child: Stack(
+          children: [
+            AvatarCircle(
+              name: profile.displayName,
+              imageUrl: profile.avatarUrl,
+              size: 96,
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: UsPalette.cardRaised,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: UsPalette.lineStrong),
+                ),
+                child: UsIcon(
+                  UsIcons.camera,
+                  size: 16,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A labelled card of rows, split by hairlines.
+class _Group extends StatelessWidget {
+  const _Group({required this.label, required this.children});
+
+  final String label;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionLabel(text: label),
+          Material(
+            color: UsPalette.card,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              side: const BorderSide(color: UsPalette.line),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < children.length; i++) ...[
+                  if (i > 0)
+                    const Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: AppSpacing.cardPadding,
+                      color: UsPalette.line,
+                    ),
+                  children[i],
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One settings row: icon, title (and a quiet line under it), the current
+/// value on the right, and a chevron when it opens something.
+class _Row extends StatelessWidget {
+  const _Row({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.value,
+    this.subtitle,
+    this.destructive = false,
+    this.chevron = true,
+  });
+
+  final UsIconData icon;
+  final String title;
+  final String? value;
+  final String? subtitle;
+  final VoidCallback? onTap;
+  final bool destructive;
+  final bool chevron;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      label: [title, value, subtitle].whereType<String>().join(', '),
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.cardPadding,
+              vertical: AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                UsIcon(
+                  icon,
+                  size: 22,
+                  color: destructive ? scheme.error : scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: destructive ? scheme.error : scheme.onSurface,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (value != null) ...[
+                  const SizedBox(width: AppSpacing.sm),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    child: Text(
+                      value!,
+                      textAlign: TextAlign.end,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+                if (chevron) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  UsIcon(
+                    UsIcons.chevronRight,
+                    size: 16,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -444,7 +654,7 @@ class _EditNameDialogState extends State<_EditNameDialog> {
           AppTextField(
             label: 'Name',
             controller: _name,
-            prefixIcon: Icons.person_outline,
+            usIcon: UsIcons.profile,
             maxLength: 40,
             textCapitalization: TextCapitalization.words,
             textInputAction: TextInputAction.done,
@@ -523,7 +733,7 @@ class _UnlinkDialogState extends State<_UnlinkDialog> {
           ];
 
     return AlertDialog(
-      icon: Icon(Icons.link_off, color: scheme.error),
+      icon: UsIcon(UsIcons.unlink, size: 28, color: scheme.error),
       title: Text(name == null ? 'Leave this space?' : 'Unlink from $name?'),
       content: SingleChildScrollView(
         child: Column(
@@ -533,7 +743,15 @@ class _UnlinkDialogState extends State<_UnlinkDialog> {
             for (final p in points)
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Text('\u2022  $p', style: theme.textTheme.bodyMedium),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('\u2022  ', style: theme.textTheme.bodyMedium),
+                    Expanded(
+                      child: Text(p, style: theme.textTheme.bodyMedium),
+                    ),
+                  ],
+                ),
               ),
             const SizedBox(height: AppSpacing.md),
             AppTextField(

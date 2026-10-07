@@ -84,6 +84,14 @@ abstract final class UsIcons {
   static const coins = UsIconData('coins');
   static const globe = UsIconData('globe');
 
+  // Profile and sign in.
+  static const mail = UsIconData('mail');
+  static const logout = UsIconData('logout');
+  static const camera = UsIconData('camera');
+  static const unlink = UsIconData('unlink');
+  static const key = UsIconData('key');
+  static const alertCircle = UsIconData('alert-circle');
+
   // Love note types.
   static const flower = UsIconData('flower');
   static const moon = UsIconData('moon');

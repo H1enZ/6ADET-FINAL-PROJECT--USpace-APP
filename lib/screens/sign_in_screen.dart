@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/atoms/app_text_field.dart';
+import '../widgets/atoms/us_icon.dart';
 import '../widgets/brand/uspace_wordmark.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/effects/soft_hearts_background.dart';
@@ -266,7 +267,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                       focusNode: _nameFocus,
                                       enabled: !_busy,
                                       onChanged: _edited,
-                                      prefixIcon: Icons.person_outline,
+                                      usIcon: UsIcons.profile,
                                       maxLength: 40,
                                       textCapitalization:
                                           TextCapitalization.words,
@@ -283,7 +284,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                     focusNode: _emailFocus,
                                     enabled: !_busy,
                                     onChanged: _edited,
-                                    prefixIcon: Icons.mail_outline,
+                                    usIcon: UsIcons.mail,
                                     keyboardType: TextInputType.emailAddress,
                                     // username too, so password managers
                                     // save the email with the password.
@@ -305,7 +306,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                         : null,
                                     enabled: !_busy,
                                     onChanged: _edited,
-                                    prefixIcon: Icons.lock_outline,
+                                    usIcon: UsIcons.lock,
                                     obscureText: !_showPassword,
                                     autofillHints: [
                                       creating
@@ -318,10 +319,11 @@ class _SignInScreenState extends State<SignInScreen> {
                                       tooltip: _showPassword
                                           ? 'Hide password'
                                           : 'Show password',
-                                      icon: Icon(
+                                      icon: UsIcon(
                                         _showPassword
-                                            ? Icons.visibility_off_outlined
-                                            : Icons.visibility_outlined,
+                                            ? UsIcons.eyeOff
+                                            : UsIcons.eye,
+                                        size: 22,
                                       ),
                                       constraints: const BoxConstraints(
                                         minWidth: AppSpacing.touchTarget,
@@ -337,7 +339,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                     const SizedBox(height: AppSpacing.lg),
                                     _Notice(
                                       text: _error!,
-                                      icon: Icons.error_outline_rounded,
+                                      icon: UsIcons.alertCircle,
                                       color: scheme.error,
                                     ),
                                   ],
@@ -345,7 +347,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                     const SizedBox(height: AppSpacing.lg),
                                     _Notice(
                                       text: _info!,
-                                      icon: Icons.mark_email_unread_outlined,
+                                      icon: UsIcons.mail,
                                       color: scheme.tertiary,
                                     ),
                                   ],
@@ -430,7 +432,7 @@ class _Notice extends StatelessWidget {
   const _Notice({required this.text, required this.icon, required this.color});
 
   final String text;
-  final IconData icon;
+  final UsIconData icon;
   final Color color;
 
   @override
@@ -449,7 +451,7 @@ class _Notice extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ExcludeSemantics(child: Icon(icon, color: color, size: 20)),
+            ExcludeSemantics(child: UsIcon(icon, color: color, size: 20)),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
