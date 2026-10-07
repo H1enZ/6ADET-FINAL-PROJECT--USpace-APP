@@ -25,7 +25,7 @@ class ImportantDate {
     repeatsYearly: (row['repeats_yearly'] as bool?) ?? true,
     createdAt: row['created_at'] == null
         ? null
-        : DateTime.tryParse(row['created_at'] as String),
+        : DateTime.tryParse(row['created_at'] as String)?.toLocal(),
   );
 
   /// When it next happens: this year's (or next year's) date if it repeats,

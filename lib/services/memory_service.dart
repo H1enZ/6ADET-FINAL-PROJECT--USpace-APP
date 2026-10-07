@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/memory.dart';
 import '../utils/anniversary.dart';
 import 'auth_service.dart';
+import 'storage_links.dart';
 
 /// A photo picked on this device, not uploaded yet.
 class NewPhoto {
@@ -103,10 +104,7 @@ class MemoryService {
     }.toList();
     if (paths.isEmpty) return memories;
     try {
-      final signed = await _db.storage
-          .from(_bucket)
-          .createSignedUrls(paths, 60 * 60);
-      final urls = {for (final s in signed) s.path: s.signedUrl};
+      final urls = await StorageLinks.signed(_bucket, paths);
       return [
         for (final m in memories)
           m.copyWith(
@@ -150,13 +148,8 @@ class MemoryService {
       _upload(coupleId, photo, 0, folder: 'notes/');
 
   /// One-hour links for files in the bucket; missing ones are left out.
-  static Future<Map<String, String>> signedUrls(List<String> paths) async {
-    if (paths.isEmpty) return const {};
-    final signed = await _db.storage
-        .from(_bucket)
-        .createSignedUrls(paths, 60 * 60);
-    return {for (final s in signed) s.path: s.signedUrl};
-  }
+  static Future<Map<String, String>> signedUrls(List<String> paths) =>
+      StorageLinks.signed(_bucket, paths);
 
   static Future<void> removeFiles(List<String> paths) => _removeFiles(paths);
 

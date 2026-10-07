@@ -47,7 +47,9 @@ class BucketItem {
       title: row['title'] as String,
       targetDate: targetDate == null ? null : DateTime.parse(targetDate),
       isDone: (row['is_done'] as bool?) ?? false,
-      completedAt: completedAt == null ? null : DateTime.parse(completedAt),
+      completedAt: completedAt == null
+          ? null
+          : DateTime.parse(completedAt).toLocal(),
       locationArea: row['location_area'] as String?,
       locationSpot: row['location_spot'] as String?,
       budget: readAmount(row['budget']),

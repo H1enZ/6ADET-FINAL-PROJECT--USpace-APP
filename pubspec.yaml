@@ -12,17 +12,19 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.9
   # Phone frame around the app in the browser.
   device_preview: ^1.3.1
   # Sign-in, database and photo storage (see docs/01-proposal.md).
   supabase_flutter: ^2.9.0
-  # Poppins and Inter, from docs/03-design-system.md.
+  # Playfair Display, Inter, Lora, Caveat and La Belle Aurore
+  # (docs/03-design-system.md).
   google_fonts: ^6.2.1
   # Choosing a photo for a memory (works on web and phones).
   image_picker: ^1.1.2
-  # Remembers the Light / Dark / System choice on this device.
+  # Small per-device state: which notifications and capsule replies you
+  # have seen, and the last Time Capsules filter.
   shared_preferences: ^2.3.0
+  # USpace's own line icons (assets/icons/).
   flutter_svg: ^2.3.0
 
 dev_dependencies:

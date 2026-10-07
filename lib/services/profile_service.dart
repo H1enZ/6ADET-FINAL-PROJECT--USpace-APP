@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/profile.dart';
 import '../utils/anniversary.dart';
 import 'auth_service.dart';
+import 'storage_links.dart';
 
 /// Your own profile: name, birthday and photo. The database only lets you
 /// change your own row and your own photo folder.
@@ -32,9 +33,7 @@ class ProfileService {
     final paths = people.map((p) => p.avatarPath).whereType<String>().toList();
     if (paths.isEmpty) return people;
     try {
-      final signed =
-          await _db.storage.from(_bucket).createSignedUrls(paths, 60 * 60);
-      final urls = {for (final s in signed) s.path: s.signedUrl};
+      final urls = await StorageLinks.signed(_bucket, paths);
       return [
         for (final p in people)
           p.avatarPath == null ? p : p.withAvatarUrl(urls[p.avatarPath]),

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/chat_message.dart';
 import '../models/chat_reaction.dart';
 import 'auth_service.dart';
+import 'storage_links.dart';
 
 /// The couple's private chat. Row-level security means only the two
 /// partners can read or post, nobody can send as the other, and edits,
@@ -24,12 +25,6 @@ class ChatService {
 
   static String get _me => _db.auth.currentUser!.id;
 
-  // Signed photo links, reused across reloads until they near expiry. A new
-  // link on every reload made each photo download again and briefly lose
-  // its height, which shifted the conversation.
-  static final Map<String, ({String url, DateTime expires})> _signed = {};
-  static const _linkLife = Duration(hours: 1);
-
   /// The latest [limit] messages, oldest first, with photo links signed.
   static Future<List<ChatMessage>> recent(String coupleId, {int limit = 300}) async {
     final rows = await _db
@@ -40,29 +35,15 @@ class ChatService {
         .limit(limit);
     final messages = rows.map(ChatMessage.fromMap).toList().reversed.toList();
 
-    final paths = messages.map((m) => m.photoPath).whereType<String>().toSet();
+    final paths = messages.map((m) => m.photoPath).whereType<String>();
     if (paths.isEmpty) return messages;
-    final now = DateTime.now();
-    final unsigned = [
-      for (final p in paths)
-        if ((_signed[p]?.expires.difference(now) ?? Duration.zero) <
-            const Duration(minutes: 10))
-          p,
-    ];
-    if (unsigned.isNotEmpty) {
-      try {
-        final signed = await _db.storage
-            .from(_bucket)
-            .createSignedUrls(unsigned, _linkLife.inSeconds);
-        final expires = now.add(_linkLife);
-        for (final s in signed) {
-          if (s.signedUrl.isNotEmpty) _signed[s.path] = (url: s.signedUrl, expires: expires);
-        }
-      } catch (_) {}
-    }
+    var urls = const <String, String>{};
+    try {
+      urls = await StorageLinks.signed(_bucket, paths);
+    } catch (_) {}
     return [
       for (final m in messages)
-        m.photoPath == null ? m : m.withPhotoUrl(_signed[m.photoPath]?.url),
+        m.photoPath == null ? m : m.withPhotoUrl(urls[m.photoPath]),
     ];
   }
 
