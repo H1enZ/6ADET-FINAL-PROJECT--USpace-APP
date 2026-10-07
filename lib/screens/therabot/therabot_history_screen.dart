@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/atoms/us_icon.dart';
+import '../../widgets/molecules/us_confirm.dart';
+
 import '../../models/therabot.dart';
 import '../../services/therabot_service.dart';
 import '../../theme/app_spacing.dart';
@@ -77,29 +80,18 @@ class _TherabotHistoryScreenState extends State<TherabotHistoryScreen> {
 
   Future<void> _requestDelete(TherabotHistoryEntry e) async {
     final both = e.partnerRequestedDelete;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(both ? 'Delete for both of you?' : 'Ask to delete this?'),
-        content: Text(
-          both
-              ? '${widget.partnerName} already asked to delete it. It will be gone for good, for both of you.'
-              : "It is deleted for good only when ${widget.partnerName} agrees too. Until then it stays, "
-                    'and you can change your mind.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(both ? 'Delete' : 'Ask to delete'),
-          ),
-        ],
-      ),
+    final ok = await showUsConfirm(
+      context,
+      title: both ? 'Delete for both of you?' : 'Ask to delete this?',
+      message: both
+          ? '${widget.partnerName} already asked to delete it. It will be gone for good, for both of you.'
+          : "It is deleted for good only when ${widget.partnerName} agrees too. Until then it stays, "
+                'and you can change your mind.',
+      confirmLabel: both ? 'Delete' : 'Ask to delete',
+      cancelLabel: 'Keep',
+      destructive: true,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await TherabotService.requestDelete(e.sessionId, true);
       if (!mounted) return;
@@ -125,8 +117,8 @@ class _TherabotHistoryScreenState extends State<TherabotHistoryScreen> {
           tooltip: _showHidden
               ? 'Hide hidden reflections'
               : 'Show hidden reflections',
-          icon: Icon(
-            _showHidden ? Icons.visibility : Icons.visibility_off_outlined,
+          icon: UsIcon(
+            _showHidden ? UsIcons.eye : UsIcons.eyeOff,
           ),
           onPressed: () {
             setState(() => _showHidden = !_showHidden);
@@ -365,23 +357,15 @@ class _TherabotInsightsScreenState extends State<TherabotInsightsScreen> {
   }
 
   Future<void> _delete(String id) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this insight?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final ok = await showUsConfirm(
+      context,
+      title: 'Delete this insight?',
+      message: 'It is removed from your insights for good.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep',
+      destructive: true,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await TherabotService.deleteInsight(id);
     } catch (e) {
@@ -443,7 +427,7 @@ class _TherabotInsightsScreenState extends State<TherabotInsightsScreen> {
                     ),
                     IconButton(
                       tooltip: 'Delete',
-                      icon: const Icon(Icons.delete_outline),
+                      icon: const UsIcon(UsIcons.trash),
                       onPressed: () => _delete(i.id),
                     ),
                   ],

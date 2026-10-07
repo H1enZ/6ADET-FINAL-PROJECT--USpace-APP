@@ -4,14 +4,40 @@ import 'package:flutter/material.dart';
 
 import '../../models/therabot.dart';
 import '../../theme/app_spacing.dart';
+import '../../theme/us_palette.dart';
 import '../atoms/app_button.dart';
-import '../effects/heartbeat.dart';
 import '../effects/motion.dart';
 import '../effects/smooth_scroll.dart';
 import '../atoms/us_icon.dart';
 
 /// The exact Therabot subtitle, shown wherever Therabot introduces itself.
 const therabotSubtitle = 'A private relationship reflection assistant';
+
+/// Therabot's background: the plain dark page, nothing moving. Therabot is
+/// the quietest place in USpace.
+class TherabotBackground extends StatelessWidget {
+  const TherabotBackground({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      ColoredBox(color: Theme.of(context).colorScheme.surface, child: child);
+}
+
+/// A plain Therabot card: flat, one hairline edge, no glow. [selected]
+/// marks your own pick with a rose edge. ([radius] is kept for callers.)
+BoxDecoration therabotCardDecoration({
+  bool selected = false,
+  double radius = AppRadius.card,
+}) => BoxDecoration(
+  color: UsPalette.card,
+  borderRadius: BorderRadius.circular(AppRadius.card),
+  border: Border.all(
+    color: selected ? UsPalette.rose : UsPalette.line,
+    width: selected ? 1.4 : 1,
+  ),
+);
 
 /// A Therabot page: a readable column centred on wide screens, like the
 /// "Let's work it out" pages.
@@ -98,15 +124,6 @@ class TherabotCard extends StatelessWidget {
                     : scheme.outline,
                 width: tentative ? 1.2 : 1,
               ),
-        boxShadow: tinted || tentative
-            ? null
-            : [
-                BoxShadow(
-                  color: scheme.secondary.withValues(alpha: 0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -153,8 +170,7 @@ class TherabotHeader extends StatelessWidget {
                 color: scheme.primaryContainer,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.auto_awesome_outlined,
+              child: UsIcon(UsIcons.therabot,
                 color: scheme.primary,
                 size: 22,
               ),
@@ -203,7 +219,7 @@ class PrivacyNote extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.lock_outline, size: 16, color: scheme.onSurfaceVariant),
+        UsIcon(UsIcons.lock, size: 16, color: scheme.onSurfaceVariant),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
@@ -251,7 +267,7 @@ class _ExpiryNoteState extends State<ExpiryNote> {
     final scheme = theme.colorScheme;
     return Row(
       children: [
-        Icon(Icons.schedule, size: 16, color: scheme.onSurfaceVariant),
+        UsIcon(UsIcons.history, size: 16, color: scheme.onSurfaceVariant),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
@@ -283,7 +299,7 @@ String expiryText(DateTime expiresAt, DateTime now) {
   return 'Open for $span. Private answers are cleared after that.';
 }
 
-/// Shown while Therabot is writing: a slow heartbeat and a few calm lines.
+/// Shown while Therabot is writing: a still leaf and a few calm lines.
 class TherabotThinking extends StatefulWidget {
   const TherabotThinking({super.key, required this.lines});
 
@@ -322,19 +338,19 @@ class _TherabotThinkingState extends State<TherabotThinking> {
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.huge),
         child: Column(
           children: [
-            Heartbeat(
+            ExcludeSemantics(
               child: Container(
                 width: 64,
                 height: 64,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
+                  color: scheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.auto_awesome_outlined,
-                  color: scheme.primary,
-                  size: 30,
+                child: UsIcon(
+                  UsIcons.therabot,
+                  color: scheme.onSurfaceVariant,
+                  size: 28,
                 ),
               ),
             ),
@@ -537,8 +553,7 @@ class NextStepGrid extends StatelessWidget {
                                 UsIcon(c.icon, size: 26, color: scheme.primary),
                                 const Spacer(),
                                 if (c == selected)
-                                  Icon(
-                                    Icons.check_circle,
+                                  UsIcon(UsIcons.check,
                                     size: 18,
                                     color: scheme.primary,
                                   ),
@@ -648,7 +663,7 @@ class TherabotSafetyView extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.spa_outlined, color: scheme.onSurfaceVariant),
+                  UsIcon(UsIcons.breathe, color: scheme.onSurfaceVariant),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(

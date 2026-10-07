@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/atoms/us_icon.dart';
+
 import '../../models/therabot.dart';
 import '../../services/therabot_service.dart';
 import '../../theme/app_spacing.dart';
@@ -519,7 +521,7 @@ class _PrivateReflectionPageState extends State<PrivateReflectionPage> {
                     : _summary != null && !_changed
                     ? 'Nothing changed yet'
                     : 'Reflect with Therabot',
-                icon: last ? Icons.auto_awesome_outlined : null,
+                usIcon: last ? UsIcons.therabot : null,
                 isLoading: _busy,
                 onPressed: last && _summary != null && !_changed ? null : _next,
               ),
@@ -622,7 +624,7 @@ class _PrivateReflectionPageState extends State<PrivateReflectionPage> {
         _errorLine(context),
         AppButton(
           label: "That's accurate",
-          icon: Icons.check,
+          usIcon: UsIcons.check,
           isLoading: _busy,
           onPressed: () => _approve(s.approvalText),
           fullWidth: true,
@@ -630,7 +632,7 @@ class _PrivateReflectionPageState extends State<PrivateReflectionPage> {
         const SizedBox(height: AppSpacing.sm),
         AppButton(
           label: 'Not quite',
-          icon: Icons.edit_outlined,
+          usIcon: UsIcons.edit,
           variant: AppButtonVariant.outlined,
           onPressed: _busy ? null : _notQuite,
           fullWidth: true,
@@ -638,7 +640,7 @@ class _PrivateReflectionPageState extends State<PrivateReflectionPage> {
         const SizedBox(height: AppSpacing.sm),
         AppButton(
           label: 'Let me clarify',
-          icon: Icons.chat_outlined,
+          usIcon: UsIcons.chat,
           variant: AppButtonVariant.outlined,
           onPressed: _busy || _left <= 0 ? null : _clarify,
           fullWidth: true,
@@ -694,7 +696,7 @@ class _PrivateReflectionPageState extends State<PrivateReflectionPage> {
         _errorLine(context),
         AppButton(
           label: 'Approve my version',
-          icon: Icons.check,
+          usIcon: UsIcons.check,
           isLoading: _busy,
           onPressed: () => _approve(_edit.text),
           fullWidth: true,

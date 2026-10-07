@@ -74,6 +74,12 @@ abstract final class UsIcons {
   static const link = UsIconData('link');
   static const palette = UsIconData('palette');
 
+  // Therabot.
+  static const eye = UsIconData('eye');
+  static const eyeOff = UsIconData('eye-off');
+  static const shuffle = UsIconData('shuffle');
+  static const route = UsIconData('route');
+
   // Love note types.
   static const flower = UsIconData('flower');
   static const moon = UsIconData('moon');

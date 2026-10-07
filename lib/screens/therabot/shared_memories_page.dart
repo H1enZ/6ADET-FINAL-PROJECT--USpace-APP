@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../widgets/atoms/us_icon.dart';
+
 import '../../models/love_note.dart';
 import '../../models/memory.dart';
 import '../../services/auth_service.dart';
@@ -209,7 +211,7 @@ class _SharedMemoriesPageState extends State<SharedMemoriesPage> {
         const SizedBox(height: AppSpacing.lg),
         AppButton(
           label: 'Add a memory',
-          icon: Icons.add_photo_alternate_outlined,
+          usIcon: UsIcons.image,
           onPressed: _addMemory,
         ),
       ];
@@ -220,7 +222,7 @@ class _SharedMemoriesPageState extends State<SharedMemoriesPage> {
         const SizedBox(height: AppSpacing.lg),
         AppButton(
           label: 'Send "Remember this?"',
-          icon: Icons.favorite_outline_rounded,
+          usIcon: UsIcons.heart,
           isLoading: _sending,
           onPressed: _sending ? null : () => _remind(memory),
         ),
@@ -228,7 +230,7 @@ class _SharedMemoriesPageState extends State<SharedMemoriesPage> {
           const SizedBox(height: AppSpacing.sm),
           AppButton(
             label: 'Another memory',
-            icon: Icons.shuffle_rounded,
+            usIcon: UsIcons.shuffle,
             variant: AppButtonVariant.outlined,
             onPressed: _sending ? null : _next,
           ),
@@ -302,8 +304,7 @@ class _MemoryCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => ColoredBox(
                       color: scheme.surfaceContainer,
-                      child: Icon(
-                        Icons.image_not_supported_outlined,
+                      child: UsIcon(UsIcons.image,
                         color: scheme.onSurfaceVariant,
                       ),
                     ),

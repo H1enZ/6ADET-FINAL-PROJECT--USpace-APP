@@ -274,7 +274,7 @@ class NotePrimaryButton extends StatelessWidget {
   });
 
   final String label;
-  final IconData icon;
+  final UsIconData icon;
   final VoidCallback? onPressed;
   final bool loading;
 
@@ -293,15 +293,8 @@ class NotePrimaryButton extends StatelessWidget {
         opacity: enabled || loading ? 1 : 0.5,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            gradient: NotePalette.buttonGradient,
+            color: NotePalette.rose,
             borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: NotePalette.rose.withValues(alpha: 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
           ),
           child: Material(
             type: MaterialType.transparency,
@@ -323,9 +316,9 @@ class NotePrimaryButton extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (!iconAfter) ...[
-                              Icon(
+                              UsIcon(
                                 icon,
-                                size: 22,
+                                size: 20,
                                 color: UsPalette.onRose,
                               ),
                               const SizedBox(width: AppSpacing.sm),
@@ -340,9 +333,9 @@ class NotePrimaryButton extends StatelessWidget {
                             ),
                             if (iconAfter) ...[
                               const SizedBox(width: AppSpacing.xs),
-                              Icon(
+                              UsIcon(
                                 icon,
-                                size: 22,
+                                size: 20,
                                 color: UsPalette.onRose,
                               ),
                             ],

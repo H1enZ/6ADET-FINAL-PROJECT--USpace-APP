@@ -2041,7 +2041,7 @@ class _EmptyTimeline extends StatelessWidget {
             const SizedBox(height: AppSpacing.xl),
             NotePrimaryButton(
               label: 'Add a memory',
-              icon: Icons.add_rounded,
+              icon: UsIcons.plus,
               onPressed: onAdd,
             ),
           ],

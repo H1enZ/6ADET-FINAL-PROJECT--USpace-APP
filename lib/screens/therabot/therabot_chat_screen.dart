@@ -1,13 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../widgets/atoms/us_icon.dart';
+import '../../widgets/molecules/us_confirm.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/therabot_chat.dart';
 import '../../services/therabot_service.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/effects/motion.dart';
-import '../../widgets/effects/soft_hearts_background.dart';
 import '../../widgets/notes/note_style.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
 import '../../theme/us_palette.dart';
@@ -61,6 +63,9 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
   /// When the reflection closes; set here too when you start a new one.
   late DateTime? _expiresAt = widget.expiresAt;
   bool _busy = false;
+
+  /// Saving a kept summary: busy, but Therabot isn't writing a reply.
+  bool _saving = false;
   bool _changed = false;
   String? _sending; // your message, shown while Therabot replies
   String? _safety;
@@ -285,7 +290,10 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
   Future<void> _keepSummary(String text) async {
     final id = _view?.talkId;
     if (id == null) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _saving = true;
+    });
     try {
       await TherabotService.talkSaveSummary(id, text);
       if (!mounted) return;
@@ -296,7 +304,12 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
     } catch (e) {
       if (mounted) therabotToast(context, therabotError(e).message);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _saving = false;
+        });
+      }
     }
   }
 
@@ -323,26 +336,16 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
   Future<void> _deleteTalk() async {
     final id = _view?.talkId;
     if (id == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this private talk?'),
-        content: const Text(
-          'Your messages and summary are deleted right away.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    if (_busy) return;
+    final ok = await showUsConfirm(
+      context,
+      title: 'Delete this private talk?',
+      message: 'Your messages and summary are deleted right away.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep',
+      destructive: true,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await TherabotService.talkDelete(id);
       if (mounted) Navigator.of(context).pop(true);
@@ -442,13 +445,7 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
       },
       child: Scaffold(
         backgroundColor: NotePalette.background,
-        body: SoftHeartsBackground(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [NotePalette.backgroundTop, NotePalette.background],
-          ),
-          heartColor: NotePalette.rose.withValues(alpha: 0.04),
+        body: TherabotBackground(
           child: SafeArea(
             child: Column(
               children: [
@@ -518,8 +515,8 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
                                   text: _sending!,
                                 ),
                               ),
-                            if (_busy && view != null ||
-                                _busy && _talk && view == null)
+                            if (_busy && !_saving && view != null ||
+                                _busy && !_saving && _talk && view == null)
                               const _Typing(),
                             if (_needsConsent)
                               _ConsentCard(
@@ -618,8 +615,7 @@ class _Header extends StatelessWidget {
         children: [
           IconButton(
             tooltip: 'Back',
-            icon: const Icon(
-              Icons.arrow_back_rounded,
+            icon: const UsIcon(UsIcons.back,
               color: NotePalette.cream,
             ),
             onPressed: onBack,
@@ -655,8 +651,7 @@ class _Header extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                Icons.lock_outline_rounded,
+                              const UsIcon(UsIcons.lock,
                                 size: 14,
                                 color: NotePalette.pink,
                               ),
@@ -674,8 +669,7 @@ class _Header extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.schedule_rounded,
+                          const UsIcon(UsIcons.history,
                             size: 14,
                             color: NotePalette.muted,
                           ),
@@ -695,7 +689,7 @@ class _Header extends StatelessWidget {
           ),
           PopupMenuButton<String>(
             tooltip: 'More',
-            icon: const Icon(Icons.more_vert_rounded, color: NotePalette.cream),
+            icon: const UsIcon(UsIcons.more, color: NotePalette.cream),
             itemBuilder: (_) => menu,
             onSelected: onMenu,
           ),
@@ -720,15 +714,7 @@ class _Bubble extends StatelessWidget {
         vertical: AppSpacing.md,
       ),
       decoration: BoxDecoration(
-        gradient: mine
-            ? const LinearGradient(
-                colors: [Color(0xFF8A3560), Color(0xFF6A2549)],
-              )
-            : null,
-        color: mine ? null : const Color(0xFF2E1628),
-        border: mine
-            ? null
-            : Border.all(color: NotePalette.pink.withValues(alpha: 0.18)),
+        color: mine ? UsPalette.rose : UsPalette.card,
         borderRadius: BorderRadius.only(
           topLeft: const Radius.circular(18),
           topRight: const Radius.circular(18),
@@ -739,7 +725,7 @@ class _Bubble extends StatelessWidget {
       child: Text(
         message.text,
         style: theme.textTheme.bodyLarge?.copyWith(
-          color: NotePalette.cream,
+          color: mine ? UsPalette.onRose : NotePalette.cream,
           height: 1.45,
         ),
       ),
@@ -756,20 +742,12 @@ class _Bubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             if (!mine) ...[
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: NotePalette.rose.withValues(alpha: 0.18),
-                  border: Border.all(
-                    color: NotePalette.pink.withValues(alpha: 0.35),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 15,
-                  color: NotePalette.pink,
+              const Padding(
+                padding: EdgeInsets.only(bottom: 6),
+                child: UsIcon(
+                  UsIcons.therabot,
+                  size: 16,
+                  color: NotePalette.muted,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -834,7 +812,7 @@ class _TypingState extends State<_Typing> with SingleTickerProviderStateMixin {
               vertical: AppSpacing.md,
             ),
             decoration: BoxDecoration(
-              color: const Color(0xFF2E1628),
+              color: UsPalette.card,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: NotePalette.pink.withValues(alpha: 0.18),
@@ -879,7 +857,7 @@ class _Chips extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.screenMargin,
+        AppSpacing.screenMargin + 24,
         0,
         AppSpacing.screenMargin,
         AppSpacing.sm,
@@ -892,9 +870,9 @@ class _Chips extends StatelessWidget {
         ),
         child: SingleChildScrollView(
           child: Align(
-            alignment: Alignment.centerRight,
+            alignment: Alignment.centerLeft,
             child: Wrap(
-              alignment: WrapAlignment.end,
+              alignment: WrapAlignment.start,
               spacing: 6,
               runSpacing: 6,
               children: [
@@ -905,27 +883,26 @@ class _Chips extends StatelessWidget {
                     excludeSemantics: true,
                     child: Material(
                       color: NotePalette.rose.withValues(alpha: 0.12),
-                      shape: StadiumBorder(
-                        side: BorderSide(
-                          color: NotePalette.pink.withValues(alpha: 0.55),
-                        ),
-                      ),
+                      shape: const StadiumBorder(),
                       child: InkWell(
                         customBorder: const StadiumBorder(),
                         onTap: () => onTap(c),
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 38),
+                          constraints: const BoxConstraints(minHeight: 44),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.md,
                               vertical: 6,
                             ),
-                            child: Text(
-                              c.label,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: NotePalette.cream,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: 1,
+                              child: Text(
+                                c.label,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: NotePalette.cream,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ),
@@ -972,10 +949,8 @@ class _Composer extends StatelessWidget {
         AppSpacing.md,
       ),
       decoration: BoxDecoration(
-        color: NotePalette.background.withValues(alpha: 0.92),
-        border: Border(
-          top: BorderSide(color: NotePalette.pink.withValues(alpha: 0.12)),
-        ),
+        color: UsPalette.ink,
+        border: const Border(top: BorderSide(color: UsPalette.line)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -1056,16 +1031,12 @@ class _Composer extends StatelessWidget {
             child: Material(
               shape: const CircleBorder(),
               clipBehavior: Clip.antiAlias,
-              color: canSend ? null : NotePalette.card,
+              color: canSend ? UsPalette.rose : NotePalette.card,
               child: Ink(
-                decoration: canSend
-                    ? const BoxDecoration(gradient: NotePalette.buttonGradient)
-                    : null,
                 child: IconButton(
                   tooltip: 'Send',
                   onPressed: canSend ? onSend : null,
-                  icon: Icon(
-                    Icons.send_rounded,
+                  icon: UsIcon(UsIcons.send,
                     color: canSend
                         ? UsPalette.onRose
                         : NotePalette.muted.withValues(alpha: 0.5),
@@ -1106,7 +1077,7 @@ class _ConsentCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: noteCardDecoration(radius: AppRadius.panel + 2),
+      decoration: therabotCardDecoration(radius: AppRadius.panel + 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1123,8 +1094,7 @@ class _ConsentCard extends StatelessWidget {
           ],
           Row(
             children: [
-              const Icon(
-                Icons.lock_outline_rounded,
+              const UsIcon(UsIcons.lock,
                 size: 20,
                 color: NotePalette.pink,
               ),
@@ -1148,7 +1118,7 @@ class _ConsentCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
           NotePrimaryButton(
             label: 'Continue privately',
-            icon: Icons.chevron_right_rounded,
+            icon: UsIcons.chevronRight,
             iconAfter: true,
             loading: busy,
             onPressed: onContinue,
@@ -1191,20 +1161,20 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    Widget quiet(String label, IconData icon, VoidCallback onTap) =>
+    Widget quiet(String label, UsIconData icon, VoidCallback onTap) =>
         TextButton.icon(
           onPressed: busy ? null : onTap,
           style: TextButton.styleFrom(
             foregroundColor: NotePalette.pink,
             minimumSize: const Size(0, 44),
           ),
-          icon: Icon(icon, size: 18),
+          icon: UsIcon(icon, size: 18),
           label: Text(label),
         );
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: noteCardDecoration(radius: AppRadius.panel + 2),
+      decoration: therabotCardDecoration(radius: AppRadius.panel + 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1225,8 +1195,7 @@ class _SummaryCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
-              const Icon(
-                Icons.lock_outline_rounded,
+              const UsIcon(UsIcons.lock,
                 size: 14,
                 color: NotePalette.muted,
               ),
@@ -1248,28 +1217,28 @@ class _SummaryCard extends StatelessWidget {
           if (!kept)
             NotePrimaryButton(
               label: 'Keep this summary',
-              icon: Icons.bookmark_add_outlined,
+              icon: UsIcons.star,
               loading: busy,
               onPressed: onKeep,
             ),
           if (kept)
             NotePrimaryButton(
               label: 'Finish for now',
-              icon: Icons.check_rounded,
+              icon: UsIcons.check,
               onPressed: onFinish,
             ),
           const SizedBox(height: AppSpacing.xs),
           Wrap(
             alignment: WrapAlignment.center,
             children: [
-              quiet('Edit it', Icons.edit_outlined, onEdit),
+              quiet('Edit it', UsIcons.edit, onEdit),
               if (onContinue != null)
                 quiet(
                   'Continue talking',
-                  Icons.chat_bubble_outline_rounded,
+                  UsIcons.chat,
                   onContinue!,
                 ),
-              if (!kept) quiet('Finish for now', Icons.check_rounded, onFinish),
+              if (!kept) quiet('Finish for now', UsIcons.check, onFinish),
             ],
           ),
         ],
@@ -1295,7 +1264,7 @@ class _FinishedCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.sm),
       padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: noteCardDecoration(radius: AppRadius.panel + 2),
+      decoration: therabotCardDecoration(radius: AppRadius.panel + 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1309,8 +1278,7 @@ class _FinishedCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const Icon(
-                Icons.check_circle_outline_rounded,
+              const UsIcon(UsIcons.check,
                 color: NotePalette.pink,
               ),
             ],
@@ -1327,7 +1295,7 @@ class _FinishedCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
           NotePrimaryButton(
             label: 'Back to Therabot',
-            icon: Icons.chevron_right_rounded,
+            icon: UsIcons.chevronRight,
             iconAfter: true,
             onPressed: onBack,
           ),

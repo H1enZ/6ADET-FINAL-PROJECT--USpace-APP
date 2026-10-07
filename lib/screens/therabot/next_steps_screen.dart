@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../widgets/atoms/us_icon.dart';
+
 import '../../models/therabot.dart';
 import '../../services/therabot_service.dart';
 import '../../theme/app_spacing.dart';
-import '../../widgets/effects/soft_hearts_background.dart';
+import '../../theme/us_palette.dart';
 import '../../widgets/home/quick_actions.dart';
 import '../../widgets/notes/note_style.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
@@ -129,13 +131,7 @@ class _NextStepsScreenState extends State<NextStepsScreen> {
       },
       child: Scaffold(
         backgroundColor: NotePalette.background,
-        body: SoftHeartsBackground(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [NotePalette.backgroundTop, NotePalette.background],
-          ),
-          heartColor: NotePalette.rose.withValues(alpha: 0.045),
+        body: TherabotBackground(
           child: SafeArea(
             bottom: false,
             child: ListView(
@@ -243,8 +239,7 @@ class _Header extends StatelessWidget {
           child: IconButton(
             tooltip: 'Back',
             onPressed: onBack,
-            icon: const Icon(
-              Icons.arrow_back_rounded,
+            icon: const UsIcon(UsIcons.back,
               color: NotePalette.cream,
             ),
           ),
@@ -372,7 +367,7 @@ class _ChoiceCard extends StatelessWidget {
       excludeSemantics: true,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        decoration: noteCardDecoration(
+        decoration: therabotCardDecoration(
           selected: selected,
           radius: AppRadius.panel + 2,
         ),
@@ -403,13 +398,13 @@ class _ChoiceCard extends StatelessWidget {
                             color: NotePalette.pink.withValues(alpha: 0.35),
                           ),
                         ),
-                        child: Icon(
+                        child: UsIcon(
                           selected
-                              ? Icons.check_rounded
-                              : Icons.chevron_right_rounded,
+                              ? UsIcons.check
+                              : UsIcons.chevronRight,
                           size: 20,
                           color: selected
-                              ? const Color(0xFF3A0A19)
+                              ? UsPalette.onRose
                               : NotePalette.cream,
                         ),
                       ),
@@ -467,11 +462,10 @@ class _Waiting extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: noteCardDecoration(radius: AppRadius.card),
+      decoration: therabotCardDecoration(radius: AppRadius.card),
       child: Row(
         children: [
-          const Icon(
-            Icons.lock_outline_rounded,
+          const UsIcon(UsIcons.lock,
             color: NotePalette.pink,
             size: 20,
           ),
@@ -514,7 +508,7 @@ class _Result extends StatelessWidget {
     final outcome = nextStepOutcome(mine, theirs);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: noteCardDecoration(
+      decoration: therabotCardDecoration(
         selected: true,
         radius: AppRadius.panel + 2,
       ),
@@ -523,8 +517,7 @@ class _Result extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.check_circle_outline_rounded,
+              const UsIcon(UsIcons.check,
                 color: NotePalette.pink,
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -564,7 +557,7 @@ class _Result extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
           NotePrimaryButton(
             label: 'Open ${mine.label.toLowerCase()}',
-            icon: Icons.chevron_right_rounded,
+            icon: UsIcons.chevronRight,
             iconAfter: true,
             onPressed: onOpenMine,
           ),
@@ -612,8 +605,7 @@ class _OkayRow extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.favorite_border_rounded,
+                const UsIcon(UsIcons.heart,
                   color: NotePalette.pink,
                 ),
                 Expanded(
@@ -625,8 +617,7 @@ class _OkayRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
+                const UsIcon(UsIcons.chevronRight,
                   color: NotePalette.pink,
                 ),
               ],
@@ -652,7 +643,7 @@ class _TalkCard extends StatelessWidget {
           'Still have something on your mind? Talk privately with Therabot. Only you can see it.',
       excludeSemantics: true,
       child: DecoratedBox(
-        decoration: noteCardDecoration(radius: AppRadius.panel + 2),
+        decoration: therabotCardDecoration(radius: AppRadius.panel + 2),
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
@@ -671,15 +662,8 @@ class _TalkCard extends StatelessWidget {
                       border: Border.all(
                         color: NotePalette.pink.withValues(alpha: 0.35),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: NotePalette.rose.withValues(alpha: 0.3),
-                          blurRadius: 16,
-                        ),
-                      ],
                     ),
-                    child: const Icon(
-                      Icons.auto_awesome_rounded,
+                    child: const UsIcon(UsIcons.therabot,
                       color: NotePalette.pink,
                       size: 26,
                     ),
@@ -706,8 +690,7 @@ class _TalkCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  const Icon(
-                    Icons.chevron_right_rounded,
+                  const UsIcon(UsIcons.chevronRight,
                     color: NotePalette.cream,
                   ),
                 ],

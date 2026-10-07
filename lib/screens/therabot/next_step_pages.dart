@@ -193,7 +193,7 @@ class _TherabotComfortPageState extends State<TherabotComfortPage> {
                 const SizedBox(height: AppSpacing.md),
                 AppButton(
                   label: 'Send to ${widget.partnerName}',
-                  icon: Icons.send_outlined,
+                  usIcon: UsIcons.send,
                   onPressed: _send,
                   isLoading: _sending,
                   fullWidth: true,
@@ -334,7 +334,7 @@ class _TherabotTalkPageState extends State<TherabotTalkPage> {
             const SizedBox(height: AppSpacing.sm),
             AppButton(
               label: 'Talk in our chat',
-              icon: Icons.chat_bubble_outline,
+              usIcon: UsIcons.chat,
               variant: AppButtonVariant.outlined,
               onPressed: widget.onOpenChat,
               fullWidth: true,
@@ -579,7 +579,7 @@ class _TherabotSpacePageState extends State<TherabotSpacePage> {
               for (final o in options)
                 ActionChip(label: Text(o.$1), onPressed: () => _set(o.$2())),
               ActionChip(
-                avatar: const Icon(Icons.schedule, size: 18),
+                avatar: const UsIcon(UsIcons.history, size: 18),
                 label: const Text('Custom'),
                 onPressed: _custom,
               ),
@@ -664,7 +664,7 @@ class _TherabotSpacePageState extends State<TherabotSpacePage> {
                   alignment: Alignment.centerRight,
                   child: AppButton(
                     label: 'Send',
-                    icon: Icons.send_outlined,
+                    usIcon: UsIcons.send,
                     variant: AppButtonVariant.outlined,
                     isLoading: _sending,
                     onPressed: _tellPartner,
@@ -825,7 +825,7 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
                         visualDensity: VisualDensity.compact,
                       )
                     else
-                      Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+                      UsIcon(UsIcons.chevronRight, color: scheme.onSurfaceVariant),
                   ],
                 ),
               ),
@@ -1198,7 +1198,7 @@ class _TherabotCompletionPageState extends State<TherabotCompletionPage> {
                   ] else ...[
                     AppButton(
                       label: 'Save to my insights',
-                      icon: Icons.bookmark_add_outlined,
+                      usIcon: UsIcons.star,
                       onPressed: _save,
                       isLoading: _saving,
                       fullWidth: true,

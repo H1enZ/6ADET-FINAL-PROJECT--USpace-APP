@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../models/profile.dart';
 import '../../models/therabot.dart';
@@ -9,9 +8,8 @@ import '../../models/therabot_chat.dart';
 import '../../services/auth_service.dart';
 import '../../services/therabot_service.dart';
 import '../../theme/app_spacing.dart';
+import '../../theme/us_palette.dart';
 import '../../widgets/atoms/app_button.dart';
-import '../../widgets/effects/floating_hearts.dart';
-import '../../widgets/effects/soft_hearts_background.dart';
 import '../../widgets/effects/motion.dart';
 import '../../widgets/atoms/avatar_circle.dart';
 import '../../widgets/notes/note_style.dart';
@@ -26,6 +24,7 @@ import 'shared_reflection_view.dart';
 import 'therabot_history_screen.dart';
 import '../../widgets/effects/smooth_scroll.dart';
 import '../../widgets/atoms/us_icon.dart';
+import '../../widgets/molecules/us_confirm.dart';
 
 /// Therabot: "A private relationship reflection assistant".
 ///
@@ -198,7 +197,6 @@ class _TherabotScreenState extends State<TherabotScreen> {
       await _load();
       if (!mounted) return;
       if (status == 'reflection_ready') {
-        showFloatingHearts(context);
       }
     } catch (e) {
       if (!mounted) return;
@@ -233,24 +231,14 @@ class _TherabotScreenState extends State<TherabotScreen> {
   }
 
   Future<bool> _confirm(String title, String body, String yes) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(yes),
-          ),
-        ],
-      ),
+    return showUsConfirm(
+      context,
+      title: title,
+      message: body,
+      confirmLabel: yes,
+      cancelLabel: 'Keep',
+      destructive: true,
     );
-    return ok == true;
   }
 
   Future<void> _end() async {
@@ -330,7 +318,6 @@ class _TherabotScreenState extends State<TherabotScreen> {
     );
     if (!mounted) return;
     if (approved == true) {
-      showFloatingHearts(context);
     }
     await _load();
   }
@@ -479,7 +466,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
 
     final menu = PopupMenuButton<String>(
       tooltip: 'More',
-      icon: const Icon(Icons.more_vert_rounded, color: NotePalette.cream),
+      icon: const UsIcon(UsIcons.more, color: NotePalette.cream),
       onSelected: (v) => switch (v) {
         'history' => _openHistory(),
         'insights' => _push(const TherabotInsightsScreen()),
@@ -509,14 +496,11 @@ class _TherabotScreenState extends State<TherabotScreen> {
               Text(
                 'A quiet space to reflect before you come back together.',
                 // Therabot is the quiet screen: Inter, not a display face.
-                style: GoogleFonts.inter(
-                  fontSize: MediaQuery.sizeOf(context).width < 360 ? 20 : 22,
-                  fontWeight: FontWeight.w400,
-                  height: 1.3,
-                  color: NotePalette.cream,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: NotePalette.muted,
                 ),
               ),
-              const SizedBox(height: AppSpacing.xxl),
+              const SizedBox(height: AppSpacing.xl),
             ],
             if (_error != null)
               TherabotErrorView(message: _error!, onRetry: _load)
@@ -531,14 +515,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
 
     return Scaffold(
       backgroundColor: NotePalette.background,
-      body: SoftHeartsBackground(
-        // Calmer than Home: the same slow hearts, fainter.
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [NotePalette.backgroundTop, NotePalette.background],
-        ),
-        heartColor: NotePalette.rose.withValues(alpha: 0.045),
+      body: TherabotBackground(
         child: SafeArea(
           bottom: false,
           child: RefreshIndicator(
@@ -595,7 +572,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _ActionCard(
-              icon: Icons.favorite_rounded,
+              icon: UsIcons.heart,
               title: 'Your shared reflection is ready',
               body: 'You both finished reflecting.',
               button: 'View shared reflection',
@@ -676,16 +653,16 @@ class _TherabotScreenState extends State<TherabotScreen> {
       children: [
         Text(
           'What do you need today?',
-          style: theme.textTheme.titleLarge?.copyWith(color: NotePalette.cream),
+          style: theme.textTheme.titleMedium?.copyWith(color: NotePalette.cream),
         ),
         const SizedBox(height: AppSpacing.md),
         if (coupleAvailable)
           _ActionCard(
-            icon: Icons.favorite_rounded,
-            title: 'Reflect on something together',
+            icon: UsIcons.hug,
+            title: 'Reflect together',
             body:
-                'Each of you talks privately with Therabot about the same thing. Then you both see one '
-                'neutral, shared reflection, made only from short summaries of your two perspectives.',
+                'Each of you talks it through privately, then you both see one '
+                'calm, shared reflection.',
             button: 'Reflect together',
             onPressed: _busy ? null : _openCouple,
           ),
@@ -699,14 +676,13 @@ class _TherabotScreenState extends State<TherabotScreen> {
   Widget _talkCard(BuildContext context) {
     final resume = _talk != null;
     return _ActionCard(
-      icon: Icons.lock_outline_rounded,
+      icon: UsIcons.lock,
       title: resume
           ? 'Continue your private talk'
           : 'Talk privately with Therabot',
       body: resume
           ? 'Pick up where you left off. Only you can see it.'
-          : 'Just you and Therabot: vent, think something through, or get advice. Nothing goes to '
-                '$_partner, and it never becomes a couple reflection.',
+          : 'Think something through, vent or get advice. Nothing goes to $_partner.',
       button: resume ? 'Continue talking' : 'Talk privately',
       onPressed: _busy ? null : _openTalk,
       quiet: true,
@@ -723,7 +699,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _ActionCard(
-          icon: Icons.check_circle_outline_rounded,
+          icon: UsIcons.check,
           title: 'Reflection complete',
           body:
               '${s.title == null ? 'Your reflection is' : '"${s.title}" is'} '
@@ -732,7 +708,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
           secondary: TextButton.icon(
             onPressed: _openHistory,
             style: TextButton.styleFrom(foregroundColor: NotePalette.pink),
-            icon: const Icon(Icons.history_rounded, size: 18),
+            icon: const UsIcon(UsIcons.history, size: 18),
             label: const Text('See Past reflections'),
           ),
         ),
@@ -783,7 +759,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       action = _waiting(context, partnerDone);
     } else if (legacy && mine == TherabotProgress.submitted) {
       action = _ActionCard(
-        icon: Icons.fact_check_outlined,
+        icon: UsIcons.check,
         title: 'Your private summary is ready',
         body:
             'Read it, correct anything that is not quite right, and approve it when it feels true.',
@@ -792,7 +768,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       );
     } else if (legacy) {
       action = _ActionCard(
-        icon: Icons.edit_note_rounded,
+        icon: UsIcons.note,
         title: 'Continue your reflection',
         body: 'Pick up where you left off.',
         button: 'Continue reflection',
@@ -800,7 +776,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       );
     } else if (chat != null) {
       action = _ActionCard(
-        icon: Icons.chat_bubble_outline_rounded,
+        icon: UsIcons.chat,
         title: 'Continue your reflection',
         body: 'Pick up your private conversation with Therabot.',
         button: 'Continue reflection',
@@ -809,7 +785,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
     } else if (!s.iStarted) {
       // Neutral: never how your partner described it, not even the topic.
       action = _ActionCard(
-        icon: Icons.favorite_border_rounded,
+        icon: UsIcons.heart,
         title: 'Your partner started a reflection for the two of you.',
         body: 'Take your time and share your side privately.',
         button: 'Share my side',
@@ -817,7 +793,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       );
     } else {
       action = _ActionCard(
-        icon: Icons.auto_awesome_rounded,
+        icon: UsIcons.therabot,
         title: 'Start your reflection',
         body: 'Take a little time for yourself before you come back together.',
         button: 'Start reflection',
@@ -845,7 +821,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
 
   Widget _waiting(BuildContext context, bool partnerDone) {
     final theme = Theme.of(context);
-    Widget note(String label, IconData icon, bool draft) => OutlinedButton.icon(
+    Widget note(String label, UsIconData icon, bool draft) => OutlinedButton.icon(
       onPressed: () => _push(
         TherabotPrivateNotePage(
           coupleId: widget.coupleId,
@@ -858,14 +834,14 @@ class _TherabotScreenState extends State<TherabotScreen> {
         side: BorderSide(color: NotePalette.pink.withValues(alpha: 0.4)),
         minimumSize: const Size(0, 44),
       ),
-      icon: Icon(icon, size: 18),
+      icon: UsIcon(icon, size: 18),
       label: Text(label),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _ActionCard(
-          icon: Icons.check_circle_outline_rounded,
+          icon: UsIcons.check,
           title: 'Your reflection is complete',
           body: partnerDone
               ? 'You have both finished. Your shared reflection is on its way.'
@@ -882,8 +858,8 @@ class _TherabotScreenState extends State<TherabotScreen> {
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
           children: [
-            note('Clarify my thoughts', Icons.edit_note_rounded, false),
-            note('Draft something for later', Icons.drafts_outlined, true),
+            note('Clarify my thoughts', UsIcons.note, false),
+            note('Draft something for later', UsIcons.loveNotes, true),
           ],
         ),
       ],
@@ -979,7 +955,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
             if (s.status == TherabotStatus.reflectionReady)
               TextButton.icon(
                 onPressed: _busy ? null : _nameIt,
-                icon: const Icon(Icons.edit_outlined, size: 18),
+                icon: const UsIcon(UsIcons.edit, size: 18),
                 label: Text(s.title == null ? 'Name it' : 'Rename'),
               ),
           ],
@@ -995,7 +971,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
         ),
         const SizedBox(height: AppSpacing.xxl),
         _ActionCard(
-          icon: Icons.route_rounded,
+          icon: UsIcons.route,
           title: 'What would help you now?',
           body: theirs != null ? 'You have both chosen.' : status,
           button: mine == null
@@ -1101,27 +1077,6 @@ class _HubHeader extends StatelessWidget {
               icon: const UsIcon(UsIcons.back, size: 22),
             ),
           ),
-        Container(
-          width: 40,
-          height: 40,
-          margin: const EdgeInsets.only(top: 2, right: AppSpacing.md),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: NotePalette.rose.withValues(alpha: 0.16),
-            border: Border.all(color: NotePalette.pink.withValues(alpha: 0.35)),
-            boxShadow: [
-              BoxShadow(
-                color: NotePalette.rose.withValues(alpha: 0.35),
-                blurRadius: 16,
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.auto_awesome_rounded,
-            size: 20,
-            color: NotePalette.pink,
-          ),
-        ),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1131,7 +1086,6 @@ class _HubHeader extends StatelessWidget {
                 child: Text(
                   'Therabot',
                   style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 26,
                     color: NotePalette.cream,
                   ),
                 ),
@@ -1190,7 +1144,7 @@ class _SessionCard extends StatelessWidget {
         AppSpacing.lg,
         AppSpacing.md,
       ),
-      decoration: noteCardDecoration(radius: AppRadius.panel + 2),
+      decoration: therabotCardDecoration(radius: AppRadius.panel + 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1287,20 +1241,12 @@ class _Person extends StatelessWidget {
                     ),
                     width: 1.5,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: NotePalette.rose.withValues(
-                        alpha: done || active ? 0.35 : 0.1,
-                      ),
-                      blurRadius: 16,
-                    ),
-                  ],
                 ),
                 child: AvatarCircle(
                   name: realName,
                   imageUrl: imageUrl,
                   size: size,
-                  background: const Color(0xFF4A1D42),
+                  background: UsPalette.cardRaised,
                 ),
               ),
               if (done)
@@ -1313,8 +1259,7 @@ class _Person extends StatelessWidget {
                       color: NotePalette.background,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.check_circle_rounded,
+                    child: const UsIcon(UsIcons.check,
                       size: 18,
                       color: NotePalette.pink,
                     ),
@@ -1346,7 +1291,7 @@ class _Person extends StatelessWidget {
   }
 }
 
-/// Two thin lines with a small glowing heart between them.
+/// Two thin lines with a quiet dot between them (steps of the flow).
 class _HeartLink extends StatelessWidget {
   const _HeartLink();
 
@@ -1364,16 +1309,13 @@ class _HeartLink extends StatelessWidget {
           line(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Icon(
-              Icons.favorite_rounded,
-              size: 16,
-              color: NotePalette.rose,
-              shadows: [
-                Shadow(
-                  color: NotePalette.rose.withValues(alpha: 0.8),
-                  blurRadius: 10,
-                ),
-              ],
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: NotePalette.muted,
+                shape: BoxShape.circle,
+              ),
             ),
           ),
           line(),
@@ -1396,7 +1338,7 @@ class _ActionCard extends StatelessWidget {
     this.quiet = false,
   });
 
-  final IconData icon;
+  final UsIconData icon;
   final String title;
   final String body;
   final String? button;
@@ -1411,81 +1353,54 @@ class _ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      decoration: quiet
-          ? noteCardDecoration(radius: AppRadius.panel + 2)
-          : BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.panel + 2),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF4A1C3A), Color(0xFF2E1226)],
-              ),
-              border: Border.all(
-                color: NotePalette.pink.withValues(alpha: 0.35),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: NotePalette.rose.withValues(alpha: 0.18),
-                  blurRadius: 24,
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: UsPalette.card,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: UsPalette.line),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1, right: AppSpacing.md),
+                child: UsIcon(icon, size: 20, color: NotePalette.pink),
+              ),
               Expanded(
-                child: Text(
-                  title,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: NotePalette.cream,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: NotePalette.cream,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      body,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: NotePalette.muted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(icon, size: 22, color: NotePalette.pink),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            body,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: NotePalette.muted,
-            ),
-          ),
           if (button != null) ...[
-            const SizedBox(height: AppSpacing.xl),
-            if (quiet)
-              OutlinedButton.icon(
-                onPressed: onPressed,
-                iconAlignment: IconAlignment.end,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: NotePalette.pink,
-                  side: BorderSide(
-                    color: NotePalette.pink.withValues(alpha: 0.55),
-                  ),
-                  minimumSize: const Size.fromHeight(50),
-                  shape: const StadiumBorder(),
-                ),
-                icon: const Icon(Icons.chevron_right_rounded),
-                label: Text(button!),
-              )
-            else
-              NotePrimaryButton(
-                label: button!,
-                icon: Icons.chevron_right_rounded,
-                iconAfter: true,
-                onPressed: onPressed,
-              ),
+            const SizedBox(height: AppSpacing.lg),
+            AppButton(
+              label: button!,
+              variant: quiet
+                  ? AppButtonVariant.outlined
+                  : AppButtonVariant.filled,
+              fullWidth: true,
+              onPressed: onPressed,
+            ),
           ],
           if (secondary != null) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -1511,33 +1426,16 @@ class _PrivacyBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.only(top: 2, right: AppSpacing.md),
-          child: Icon(
-            Icons.lock_outline_rounded,
-            size: 22,
-            color: NotePalette.muted,
-          ),
+          padding: EdgeInsets.only(top: 1, right: AppSpacing.sm),
+          child: UsIcon(UsIcons.lock, size: 16, color: NotePalette.muted),
         ),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Your answers stay private.',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: NotePalette.cream,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '$partnerName never sees your answers or your private summary, '
-                'and you never see theirs. A shared reflection is written only '
-                'from short summaries of your two perspectives, and Private Talk is never shared.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: NotePalette.muted,
-                ),
-              ),
-            ],
+          child: Text(
+            'Only you see your answers. A shared reflection uses short '
+            'summaries, never your words.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: NotePalette.muted,
+            ),
           ),
         ),
       ],
