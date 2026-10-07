@@ -185,7 +185,20 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
         ? Image.memory(p.bytes!, fit: BoxFit.cover)
         : (p.saved!.url == null
               ? ColoredBox(color: scheme.surfaceContainerLow)
-              : Image.network(p.saved!.url!, fit: BoxFit.cover));
+              : Image.network(
+                  p.saved!.url!,
+                  fit: BoxFit.cover,
+                  // A photo that can't load keeps its tile, quietly.
+                  errorBuilder: (_, _, _) => ColoredBox(
+                    color: scheme.surfaceContainerLow,
+                    child: Center(
+                      child: UsIcon(
+                        UsIcons.image,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ));
   }
 
   /// A small round button laid over a photo.

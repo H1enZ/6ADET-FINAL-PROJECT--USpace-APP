@@ -421,6 +421,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         dimension: 240,
                         child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
                       ),
+                errorBuilder: (context, _, _) => const SizedBox.square(
+                  dimension: 240,
+                  child: Center(child: Text("This photo couldn't load.")),
+                ),
               ),
             ),
             Positioned(
@@ -850,6 +854,14 @@ class _Bubble extends StatelessWidget {
                                         color: scheme.primaryContainer,
                                       )
                                     : child,
+                            // A photo that can't load keeps the same box.
+                            errorBuilder: (context, _, _) => Container(
+                              width: 200,
+                              height: 140,
+                              color: scheme.primaryContainer,
+                              alignment: Alignment.center,
+                              child: UsIcon(UsIcons.image, color: scheme.primary),
+                            ),
                           ),
                   ),
                 ),

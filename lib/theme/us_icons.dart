@@ -23,7 +23,6 @@ abstract final class UsIcons {
 
   // Home and actions.
   static const bell = UsIconData('bell');
-  static const flip = UsIconData('flip');
   static const history = UsIconData('history');
   static const therabot = UsIconData('therabot');
   static const question = UsIconData('question');
@@ -105,7 +104,6 @@ abstract final class UsIcons {
 
   // Care (Therabot and Work it out).
   static const hug = UsIconData('hug');
-  static const idea = UsIconData('idea');
   static const listen = UsIconData('listen');
   static const edit = UsIconData('edit');
   static const breathe = UsIconData('breathe');

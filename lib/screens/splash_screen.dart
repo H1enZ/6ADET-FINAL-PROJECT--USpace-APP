@@ -13,6 +13,7 @@ import '../widgets/effects/soft_hearts_background.dart';
 import 'main_shell.dart';
 import 'pair_screen.dart';
 import 'sign_in_screen.dart';
+import '../utils/preload.dart';
 
 /// Sends the user back to Splash, which works out where they belong.
 /// Called after signing in, pairing and signing out.
@@ -109,6 +110,8 @@ class _SplashScreenState extends State<SplashScreen>
     _slowTimer = Timer(const Duration(milliseconds: 1500), () {
       if (mounted && _error == null) setState(() => _slow = true);
     });
+    // Fonts and icons load alongside the account (capped, never fails).
+    final preload = preloadCritical();
     try {
       final Widget next;
       if (AuthService.session == null) {
@@ -120,6 +123,8 @@ class _SplashScreenState extends State<SplashScreen>
             ? MainShell(profile: profile)
             : PairScreen(profile: profile);
       }
+
+      await preload;
 
       // Hold just long enough for the wordmark to land, so it doesn't flash.
       final minimum = still
