@@ -353,11 +353,23 @@ void main() {
     expect(find.text('Excited together'), findsNothing);
   });
 
-  testWidgets('your side without a note offers "Add a note"', (tester) async {
+  testWidgets('"Add a note" shows only after tapping your mood', (tester) async {
     await tester.pumpWidget(
       _app(const _Host(start: Mood.excited, partnerMood: Mood.happy)),
     );
     await tester.pump();
-    expect(find.bySemanticsLabel('Add a note'), findsWidgets);
+    expect(find.text('Add a note'), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('You are feeling Excited'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add a note'), findsOneWidget);
+  });
+
+  testWidgets('a matched card has no "Add a note" either', (tester) async {
+    await tester.pumpWidget(
+      _app(const _Host(start: Mood.calm, partnerMood: Mood.calm)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Add a note'), findsNothing);
   });
 }

@@ -868,7 +868,6 @@ class _MoodCardState extends State<MoodCard> with TickerProviderStateMixin {
                         me: me,
                         partner: partner,
                         onTap: _openPicker,
-                        onAddNote: widget.onAddNote,
                         onShowNotes: widget.onShowNotes,
                       ),
                     ),
@@ -891,7 +890,6 @@ class _Shared extends StatelessWidget {
     required this.me,
     required this.partner,
     required this.onTap,
-    required this.onAddNote,
     required this.onShowNotes,
   });
 
@@ -899,7 +897,6 @@ class _Shared extends StatelessWidget {
   final MoodPerson me;
   final MoodPerson partner;
   final VoidCallback onTap;
-  final VoidCallback onAddNote;
   final VoidCallback onShowNotes;
 
   static const double artSize = 100;
@@ -1006,16 +1003,17 @@ class _Shared extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        // Either a quiet "2 notes" marker, or a way to add yours.
-        _QuietAction(
-          icon: notes > 0 ? UsIcons.note : UsIcons.plus,
-          label: notes > 0
-              ? (notes == 1 ? '1 note' : '$notes notes')
-              : 'Add a note',
-          semantics: notes > 0 ? 'Read today’s notes' : 'Add a note',
-          onTap: notes > 0 ? onShowNotes : onAddNote,
-        ),
+        // A quiet "2 notes" marker when either of you left one. Adding a
+        // note starts from tapping the mood.
+        if (notes > 0) ...[
+          const SizedBox(height: AppSpacing.xs),
+          _QuietAction(
+            icon: UsIcons.note,
+            label: notes == 1 ? '1 note' : '$notes notes',
+            semantics: 'Read today’s notes',
+            onTap: onShowNotes,
+          ),
+        ],
       ],
     );
   }
@@ -1072,7 +1070,8 @@ class _QuietAction extends StatelessWidget {
 }
 
 /// Under a mood on the split card: the note as a single quiet line (tap to
-/// read or edit), or, on your side with no note, "Add a note".
+/// read or edit). Nothing when there is no note: "Add a note" only appears
+/// after you tap your mood, so the card itself stays clean.
 class _NoteLine extends StatelessWidget {
   const _NoteLine({required this.note, required this.isMe, this.onTap});
 
@@ -1085,18 +1084,7 @@ class _NoteLine extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final text = note?.trim() ?? '';
-    if (text.isEmpty) {
-      if (!isMe) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: _QuietAction(
-          icon: UsIcons.plus,
-          label: 'Add a note',
-          semantics: 'Add a note',
-          onTap: onTap,
-        ),
-      );
-    }
+    if (text.isEmpty) return const SizedBox.shrink();
     return Semantics(
       button: onTap != null,
       label: isMe ? 'Your note: $text. Edit' : 'Note: $text. Read',
