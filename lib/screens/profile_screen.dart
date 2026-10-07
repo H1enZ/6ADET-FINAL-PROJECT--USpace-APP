@@ -14,6 +14,8 @@ import '../widgets/atoms/us_icon.dart';
 import '../widgets/atoms/section_label.dart';
 import 'splash_screen.dart';
 import '../widgets/effects/smooth_scroll.dart';
+import '../widgets/molecules/us_states.dart';
+import '../widgets/effects/motion.dart';
 
 /// Your profile: photo, name, birthday, and your partner at a glance.
 /// You can only change your own details (the database enforces it).
@@ -74,9 +76,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   /// Runs a change, shows a message, and reloads. Blocks double taps.
   Future<void> _run(Future<void> Function() change, String done) async {
@@ -87,7 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -122,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         imageQuality: 85,
       );
     } catch (_) {
-      _showMessage('That photo could not be opened. Try another one.');
+      _showMessage('That photo could not be opened. Try another one.', error: true);
       return;
     }
     if (file == null) return;
@@ -192,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -216,7 +217,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList(count: 4, height: 72)
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -238,12 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (_error != null) ...[
-                            Text(
-                              _error!,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: scheme.error,
-                              ),
-                            ),
+                            UsErrorNotice(message: _error!, onRetry: _load),
                             const SizedBox(height: AppSpacing.lg),
                           ],
 

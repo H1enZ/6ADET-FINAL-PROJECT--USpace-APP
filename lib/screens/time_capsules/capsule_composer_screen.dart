@@ -14,6 +14,7 @@ import '../../utils/capsule_time.dart';
 import '../../widgets/capsule/capsule_letter.dart';
 import '../../widgets/capsule/candle_ceremony.dart';
 import '../../widgets/capsule/monogram_seal.dart';
+import '../../widgets/molecules/us_states.dart';
 
 /// How the composer was left.
 enum ComposerOutcome { sealed, deleteDraft }
@@ -192,8 +193,8 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
     }
   }
 
-  void _showMessage(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   Future<void> _pickPhoto() async {
     final XFile? file;
@@ -204,7 +205,7 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
         imageQuality: 85,
       );
     } catch (e) {
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
       return;
     }
     if (file == null || !mounted) return;
@@ -240,7 +241,7 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
         unawaited(TimeCapsuleService.prunePhotos(_id!).catchError((_) {}));
       }
     } catch (e) {
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     } finally {
       if (mounted) setState(() => _photoBusy = false);
     }
@@ -324,7 +325,10 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
       return;
     }
     if (!await _save()) {
-      _showMessage("Couldn't save your capsule. ${_saveError ?? ''}".trim());
+      _showMessage(
+        "Couldn't save your capsule. ${_saveError ?? ''}".trim(),
+        error: true,
+      );
       return;
     }
     if (!mounted) return;
@@ -418,7 +422,7 @@ class _CapsuleComposerScreenState extends State<CapsuleComposerScreen> {
       await TimeCapsuleService.cancel(_id!);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -733,7 +737,9 @@ class _PhotoDrop extends StatelessWidget {
       label: busy ? 'Uploading the photo' : 'Add a photo',
       excludeSemantics: true,
       child: CustomPaint(
-        foregroundPainter: _Dashes(color: scheme.primary.withValues(alpha: 0.6)),
+        foregroundPainter: _Dashes(
+          color: scheme.primary.withValues(alpha: 0.6),
+        ),
         child: Material(
           color: scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(AppRadius.card),
@@ -880,10 +886,10 @@ class CapsulePreviewScreen extends StatelessWidget {
       await onSeal();
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Not sealed: ${friendlyError(e)} Your draft is safe.'),
-        ),
+      showUsMessage(
+        context,
+        'Not sealed: ${friendlyError(e)} Your draft is safe.',
+        error: true,
       );
       return;
     }

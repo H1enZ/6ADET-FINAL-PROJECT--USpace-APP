@@ -9,6 +9,8 @@ import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/us_icon.dart';
 import '../widgets/molecules/us_confirm.dart';
 import '../widgets/molecules/us_field_button.dart';
+import '../widgets/molecules/us_states.dart';
+import '../widgets/effects/motion.dart';
 
 /// All the couple's special dates, soonest first. Either partner can add or
 /// remove them. Returns `true` when something changed.
@@ -51,8 +53,8 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
     }
   }
 
-  void _showMessage(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   Future<void> _add() async {
     final result = await showDialog<({String title, DateTime date, bool yearly})>(
@@ -72,7 +74,7 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -91,7 +93,7 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -99,8 +101,6 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final muted =
-        theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
 
     return PopScope<Object?>(
       canPop: false,
@@ -118,7 +118,7 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
           label: const Text('Add a date'),
         ),
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const SkeletonList(count: 5, height: 72)
             : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
@@ -126,19 +126,17 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
                   padding: const EdgeInsets.fromLTRB(AppSpacing.screenMargin,
                       AppSpacing.sm, AppSpacing.screenMargin, 96),
                   children: [
-                    if (_error != null)
-                      Text(_error!,
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(color: scheme.error)),
+                    if (_error != null) ...[
+                      UsErrorNotice(message: _error!, onRetry: _load),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
                     if (_dates.isEmpty && _error == null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: AppSpacing.huge),
-                        child: Text(
-                          'Save the dates that matter to you both: your first '
-                          'date, a trip, a monthsary. They will count down on Home.',
-                          textAlign: TextAlign.center,
-                          style: muted,
-                        ),
+                      const UsEmptyState(
+                        icon: UsIcons.calendar,
+                        title: 'No special dates yet',
+                        message:
+                            'Save the dates that matter to you both: your first '
+                            'date, a trip, a monthsary. They will count down on Home.',
                       ),
                     for (final d in _dates)
                       _DateCard(date: d, onRemove: () => _delete(d)),

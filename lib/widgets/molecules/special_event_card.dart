@@ -10,6 +10,7 @@ import '../../utils/special_events.dart';
 import '../atoms/avatar_circle.dart';
 import '../effects/motion.dart';
 import '../home/mood_particles.dart';
+import '../atoms/us_icon.dart';
 
 /// The plum card on Home that counts down to the nearest special day:
 /// a monthsary, an anniversary, either birthday, Valentine's Day or one of
@@ -53,13 +54,13 @@ class SpecialEventCard extends StatelessWidget {
   static const _pink = Color(0xFFF6A9C1);
   static const _rose = Color(0xFFEF6F98);
 
-  IconData get _icon => switch (event.kind) {
-    SpecialEventKind.anniversary => Icons.favorite_rounded,
-    SpecialEventKind.monthsary => Icons.favorite_border_rounded,
+  UsIconData get _icon => switch (event.kind) {
+    SpecialEventKind.anniversary => UsIcons.heartFilled,
+    SpecialEventKind.monthsary => UsIcons.heart,
     SpecialEventKind.partnerBirthday ||
-    SpecialEventKind.myBirthday => Icons.cake_rounded,
-    SpecialEventKind.valentines => Icons.local_florist_rounded,
-    SpecialEventKind.custom => Icons.event_rounded,
+    SpecialEventKind.myBirthday => UsIcons.tagCelebration,
+    SpecialEventKind.valentines => UsIcons.flower,
+    SpecialEventKind.custom => UsIcons.calendar,
   };
 
   String get _partner => partnerName ?? 'your partner';
@@ -79,8 +80,7 @@ class SpecialEventCard extends StatelessWidget {
 
   /// "Happy 1st Anniversary"
   String get _celebration => switch (event.kind) {
-    SpecialEventKind.anniversary =>
-      'Happy ${ordinal(event.count)} Anniversary',
+    SpecialEventKind.anniversary => 'Happy ${ordinal(event.count)} Anniversary',
     SpecialEventKind.monthsary => 'Happy ${ordinal(event.count)} Monthsary',
     SpecialEventKind.partnerBirthday =>
       partnerName == null
@@ -212,7 +212,7 @@ class SpecialEventCard extends StatelessWidget {
 
     final dateLine = Row(
       children: [
-        const Icon(Icons.calendar_month_rounded, size: 15, color: _pink),
+        const UsIcon(UsIcons.calendar, size: 15, color: _pink),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
@@ -246,8 +246,9 @@ class SpecialEventCard extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: _pink.withValues(alpha: 0.16),
                 ),
-                child: Icon(
-                  event.isToday ? Icons.celebration_rounded : _icon,
+                alignment: Alignment.center,
+                child: UsIcon(
+                  event.isToday ? UsIcons.tagCelebration : _icon,
                   color: _pink,
                   size: narrow ? 18 : 20,
                 ),
@@ -278,8 +279,8 @@ class SpecialEventCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            event.isToday ? Icons.auto_awesome_rounded : Icons.favorite_rounded,
+          UsIcon(
+            event.isToday ? UsIcons.sparkle : UsIcons.heartFilled,
             size: 11,
             color: _pink,
           ),
@@ -320,7 +321,8 @@ class SpecialEventCard extends StatelessWidget {
                 colors: [Color(0xFFFFC4D6), _rose],
               ),
             ),
-            child: Icon(_icon, size: 18, color: _plumBottom),
+            alignment: Alignment.center,
+            child: UsIcon(_icon, size: 18, color: _plumBottom),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -349,10 +351,7 @@ class SpecialEventCard extends StatelessWidget {
             ),
           ),
           if (onTap != null)
-            Icon(
-              Icons.chevron_right_rounded,
-              color: _cream.withValues(alpha: 0.6),
-            ),
+            UsIcon(UsIcons.chevronRight, color: _cream.withValues(alpha: 0.6)),
         ],
       ),
     );
@@ -615,8 +614,9 @@ class _Partners extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: SpecialEventCard._plumMid,
                     ),
-                    child: const Icon(
-                      Icons.favorite_rounded,
+                    alignment: Alignment.center,
+                    child: const UsIcon(
+                      UsIcons.heartFilled,
                       size: 10,
                       color: SpecialEventCard._rose,
                     ),

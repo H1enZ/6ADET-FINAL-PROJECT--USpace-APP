@@ -15,7 +15,7 @@ import '../../widgets/atoms/avatar_circle.dart';
 import '../../widgets/notes/note_style.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
 import '../chat_screen.dart';
-import '../work_it_out_screen.dart' show ResolutionNotesPage;
+import 'resolution_notes_page.dart' show ResolutionNotesPage;
 import 'next_step_pages.dart';
 import 'next_steps_screen.dart';
 import 'private_reflection_page.dart';
@@ -223,7 +223,7 @@ class _TherabotScreenState extends State<TherabotScreen> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
       await _load();
     } finally {
       if (mounted) setState(() => _busy = false);

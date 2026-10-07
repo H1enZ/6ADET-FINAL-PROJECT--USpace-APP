@@ -7,7 +7,6 @@ import '../services/bucket_service.dart';
 import '../services/couple_service.dart';
 import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
-import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/filter_pill.dart';
 import '../utils/anniversary.dart';
 import '../utils/money.dart';
@@ -16,6 +15,7 @@ import '../widgets/effects/motion.dart';
 import '../widgets/molecules/us_confirm.dart';
 import 'bucket_item_detail_screen.dart';
 import 'bucket_item_sheet.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// Shared bucket list for the paired couple.
 class BucketListScreen extends StatefulWidget {
@@ -76,11 +76,8 @@ class _BucketListScreenState extends State<BucketListScreen> {
   int get _todoCount => _items.where((item) => !item.isDone).length;
   int get _doneCount => _items.where((item) => item.isDone).length;
 
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
-    );
-  }
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   Future<void> _add() async {
     final saved = await showModalBottomSheet<bool>(
@@ -131,7 +128,7 @@ class _BucketListScreenState extends State<BucketListScreen> {
             current.id == item.id ? item : current,
         ];
       });
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -155,7 +152,7 @@ class _BucketListScreenState extends State<BucketListScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -205,23 +202,7 @@ class _BucketListScreenState extends State<BucketListScreen> {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.screenMargin),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _error!,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            AppButton(
-              label: 'Try again',
-              variant: AppButtonVariant.outlined,
-              onPressed: _load,
-            ),
-          ],
-        ),
+        child: UsErrorNotice(message: _error!, onRetry: _load),
       ),
     );
   }
@@ -333,32 +314,13 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.huge),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          UsIcon(UsIcons.star, size: 40, color: theme.colorScheme.primary),
-          const SizedBox(height: AppSpacing.lg),
-          Text('Nothing on your list yet', style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Add something you both want to experience together.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          AppButton(
-            label: 'Add your first goal',
-            usIcon: UsIcons.plus,
-            onPressed: onAdd,
-          ),
-        ],
-      ),
+    return UsEmptyState(
+      icon: UsIcons.star,
+      title: 'Nothing on your list yet',
+      message: 'Add something you both want to experience together.',
+      actionLabel: 'Add your first goal',
+      actionIcon: UsIcons.plus,
+      onAction: onAdd,
     );
   }
 }
@@ -370,17 +332,13 @@ class _FilteredEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.huge),
-        child: Text(
-          filter == 'Done'
-              ? 'Nothing has been completed yet.'
-              : 'You have no unfinished items.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-      ),
+    final done = filter == 'Done';
+    return UsEmptyState(
+      icon: done ? UsIcons.check : UsIcons.star,
+      title: done ? 'Nothing completed yet' : 'Everything is done',
+      message: done
+          ? 'Goals you finish together will show up here.'
+          : 'You have no unfinished goals right now.',
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:final_project/models/memory.dart';
+import 'package:final_project/widgets/atoms/us_icon.dart';
 import 'package:final_project/widgets/atoms/filter_pill.dart';
 import 'package:final_project/widgets/molecules/memory_card.dart';
 
@@ -32,7 +33,7 @@ void main() {
 
       expect(find.text('Beach day in Zambales'), findsOneWidget);
       expect(find.text('1 Jul 2026 \u00B7 added by Ana'), findsOneWidget);
-      expect(find.byIcon(Icons.photo_outlined), findsOneWidget); // no photo
+      expect(_usIcon(UsIcons.image), findsOneWidget); // no photo
     });
 
     testWidgets('heart reflects favourite and calls onFavourite',
@@ -44,8 +45,8 @@ void main() {
         onFavourite: () => taps++,
       )));
 
-      expect(find.byIcon(Icons.favorite), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.favorite));
+      expect(_usIcon(UsIcons.heartFilled), findsOneWidget);
+      await tester.tap(_usIcon(UsIcons.heartFilled));
       expect(taps, 1);
     });
 
@@ -79,3 +80,6 @@ void main() {
     });
   });
 }
+
+Finder _usIcon(UsIconData icon) =>
+    find.byWidgetPredicate((w) => w is UsIcon && w.icon == icon);

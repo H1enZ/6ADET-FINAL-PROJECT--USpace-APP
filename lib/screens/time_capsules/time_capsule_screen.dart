@@ -23,6 +23,7 @@ import '../../widgets/notes/note_style.dart';
 import '../love_note_detail_screen.dart';
 import 'capsule_composer_screen.dart';
 import 'capsule_view_screen.dart';
+import '../../widgets/molecules/us_states.dart';
 
 enum _Filter { sealed, ready, opened }
 
@@ -252,10 +253,11 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     }
   }
 
-  void _showMessage(String text, {SnackBarAction? action}) =>
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(text), action: action));
+  void _showMessage(
+    String text, {
+    bool error = false,
+    SnackBarAction? action,
+  }) => showUsMessage(context, text, error: error, action: action);
 
   void _choose(_Filter f) {
     setState(() => _filter = f);
@@ -303,14 +305,13 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
 
   void _deleteWithUndo(TimeCapsule draft) {
     setState(() => _hiddenDraft = draft.id);
-    final controller = ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Draft deleted'),
-        duration: const Duration(seconds: 5),
-        action: SnackBarAction(label: 'Undo', onPressed: () {}),
-      ),
+    final controller = showUsMessage(
+      context,
+      'Draft deleted',
+      duration: const Duration(seconds: 5),
+      action: SnackBarAction(label: 'Undo', onPressed: () {}),
     );
-    controller.closed.then((reason) async {
+    controller?.closed.then((reason) async {
       if (reason == SnackBarClosedReason.action) {
         if (mounted) setState(() => _hiddenDraft = null);
         return;
@@ -318,7 +319,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
       try {
         await TimeCapsuleService.deleteDraft(draft.id);
       } catch (e) {
-        if (mounted) _showMessage(friendlyError(e));
+        if (mounted) _showMessage(friendlyError(e), error: true);
       }
       if (mounted) {
         setState(() => _hiddenDraft = null);
@@ -342,7 +343,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
         editing: true,
       );
     } catch (e) {
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
       await _load();
     }
   }
@@ -374,7 +375,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
         sealed: c.status == CapsuleStatus.sealed,
       );
     } catch (e) {
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
     await _load();
   }
@@ -403,7 +404,7 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
     try {
       await NoteService.cancelCapsule(n.id);
     } catch (e) {
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
     await _load();
   }
@@ -626,17 +627,8 @@ class _TimeCapsuleScreenState extends State<TimeCapsuleScreen>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (_error != null) ...[
-                            Text(
-                              _error!,
-                              style: TextStyle(color: scheme.error),
-                            ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton(
-                                onPressed: _load,
-                                child: const Text('Try again'),
-                              ),
-                            ),
+                            UsErrorNotice(message: _error!, onRetry: _load),
+                            const SizedBox(height: AppSpacing.lg),
                           ],
                           if (draft != null)
                             _DraftCard(
@@ -920,7 +912,8 @@ class _CapsuleCard extends StatelessWidget {
         headlineAccent: mine ? 'when they are' : 'to open',
         subtitle: safeLine,
         person: person,
-        when: 'since ${c.readySince.year == now.year ? shortDate(c.readySince) : longDate(c.readySince)}',
+        when:
+            'since ${c.readySince.year == now.year ? shortDate(c.readySince) : longDate(c.readySince)}',
         unread: unread,
         highlighted: highlighted,
         onTap: mine ? null : onOpen,

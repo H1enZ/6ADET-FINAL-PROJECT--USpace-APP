@@ -98,7 +98,7 @@ class _NextStepsScreenState extends State<NextStepsScreen> {
       _changed = true;
       await _refresh();
     } catch (e) {
-      if (mounted) therabotToast(context, therabotError(e).message);
+      if (mounted) therabotToast(context, therabotError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

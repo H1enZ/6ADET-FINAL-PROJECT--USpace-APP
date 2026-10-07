@@ -8,6 +8,7 @@ import '../../services/profile_service.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/atoms/app_button.dart';
 import 'therabot_screen.dart';
+import '../../widgets/effects/motion.dart';
 
 /// Therabot as a bottom-navigation tab. Loads the couple once, then shows
 /// the existing TherabotScreen unchanged. Therabot needs both partners, so
@@ -75,7 +76,7 @@ class _TherabotTabState extends State<TherabotTab> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: SafeArea(child: SkeletonList(count: 3)));
     }
     final couple = _couple;
     final partner = _partner;

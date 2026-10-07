@@ -47,6 +47,7 @@ abstract final class UsIcons {
   static const close = UsIconData('close');
   static const plus = UsIconData('plus');
   static const heart = UsIconData('heart');
+  static const heartFilled = UsIconData('heart-filled');
   static const lock = UsIconData('lock');
   static const mood = UsIconData('mood');
   static const sparkle = UsIconData('sparkle');

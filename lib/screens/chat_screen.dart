@@ -20,6 +20,7 @@ import '../widgets/chat/reaction_chips.dart';
 import '../widgets/chat/reaction_tray.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/molecules/us_confirm.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// The couple's private chat. Messages arrive in real time; your partner's
 /// messages are marked read while this screen is open.
@@ -200,8 +201,8 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _showMessage(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   Future<void> _send([String? preset]) async {
     final text = (preset ?? _input.text).trim();
@@ -214,7 +215,7 @@ class _ChatScreenState extends State<ChatScreen> {
       await _load(scrollToEnd: true);
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -238,7 +239,7 @@ class _ChatScreenState extends State<ChatScreen> {
       await _load(scrollToEnd: true);
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -326,7 +327,7 @@ class _ChatScreenState extends State<ChatScreen> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -388,7 +389,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       _showMine(messageId, before);
       _announce("Couldn't save your reaction");
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -533,19 +534,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _loading
                 ? const SkeletonList(count: 6, height: 52)
                 : _error != null && _messages.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.xl),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(_error!, textAlign: TextAlign.center,
-                                  style: TextStyle(color: scheme.error)),
-                              TextButton(onPressed: _load, child: const Text('Try again')),
-                            ],
-                          ),
-                        ),
-                      )
+                    ? UsErrorNotice(message: _error!, onRetry: _load, centered: true)
                     : _messages.isEmpty
                         ? _EmptyChat(
                             partnerName: p.displayName,

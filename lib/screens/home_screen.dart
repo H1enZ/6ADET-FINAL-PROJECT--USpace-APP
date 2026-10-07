@@ -29,7 +29,6 @@ import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
 import '../utils/daily_content.dart';
 import '../utils/special_events.dart';
-import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/header_icon_button.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
@@ -50,6 +49,7 @@ import 'question_sheet.dart';
 import 'time_capsules/time_capsule_screen.dart';
 import '../widgets/effects/smooth_scroll.dart';
 import '../widgets/atoms/us_icon.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// Home: how you are feeling today, front and centre, then shortcuts and
 /// the next special day. Recent activity lives behind the bell.
@@ -264,8 +264,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _showMessage(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   // ---------------------------------------------------------------- mood
 
@@ -312,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       if (!mounted) return false;
       setState(() => _pending = null); // back to the previous mood
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
       return false;
     } finally {
       if (mounted) setState(() => _savingMood = false);
@@ -531,11 +531,10 @@ class _HomeScreenState extends State<HomeScreen> {
       case NotificationTarget.sendHugBack:
         // Never sends on its own: offer it, so a stray tap can't send a hug.
         if (_partner == null) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Send $_partnerName a hug back?'),
-            action: SnackBarAction(label: 'Send a hug', onPressed: _sendHug),
-          ),
+        showUsMessage(
+          context,
+          'Send $_partnerName a hug back?',
+          action: SnackBarAction(label: 'Send a hug', onPressed: _sendHug),
         );
       case NotificationTarget.countdown:
         final target = _countdownKey.currentContext;
@@ -562,7 +561,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return true;
     } catch (e) {
       if (!mounted) return false;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
       return false;
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -594,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -648,10 +647,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final muted = theme.textTheme.bodyMedium?.copyWith(
-      color: scheme.onSurfaceVariant,
-    );
-
     if (_loading) {
       return const Scaffold(body: SafeArea(child: SkeletonList(count: 5)));
     }
@@ -675,35 +670,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final sections = <Widget>[
       if (_error != null)
-        section(
-          'error',
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                _error!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.error,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: AppButton(
-                  label: 'Try again',
-                  variant: AppButtonVariant.outlined,
-                  onPressed: _load,
-                ),
-              ),
-            ],
-          ),
-        ),
+        section('error', UsErrorNotice(message: _error!, onRetry: _load)),
+      // Loaded without an error but no space came back (for example the
+      // pairing changed elsewhere): say so plainly and offer a reload.
       if (couple == null && _error == null)
         section(
           'no-couple',
-          Text(
-            "We couldn't load your space just now. Pull down to try again.",
-            style: muted,
+          UsErrorNotice(
+            message: "Your space isn't showing right now.",
+            onRetry: _load,
           ),
         ),
       if (couple != null) ...[
@@ -1032,7 +1007,7 @@ class _InviteBanner extends StatelessWidget {
               ),
               IconButton(
                 tooltip: 'Copy code',
-                icon: const Icon(Icons.copy_rounded),
+                icon: const UsIcon(UsIcons.copy),
                 color: scheme.onPrimaryContainer,
                 onPressed: () => _copy(context),
               ),

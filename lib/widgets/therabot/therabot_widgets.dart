@@ -9,6 +9,7 @@ import '../atoms/app_button.dart';
 import '../effects/motion.dart';
 import '../effects/smooth_scroll.dart';
 import '../atoms/us_icon.dart';
+import '../molecules/us_states.dart';
 
 /// The exact Therabot subtitle, shown wherever Therabot introduces itself.
 const therabotSubtitle = 'A private relationship reflection assistant';
@@ -170,10 +171,7 @@ class TherabotHeader extends StatelessWidget {
                 color: scheme.primaryContainer,
                 shape: BoxShape.circle,
               ),
-              child: UsIcon(UsIcons.therabot,
-                color: scheme.primary,
-                size: 22,
-              ),
+              child: UsIcon(UsIcons.therabot, color: scheme.primary, size: 22),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -553,7 +551,8 @@ class NextStepGrid extends StatelessWidget {
                                 UsIcon(c.icon, size: 26, color: scheme.primary),
                                 const Spacer(),
                                 if (c == selected)
-                                  UsIcon(UsIcons.check,
+                                  UsIcon(
+                                    UsIcons.check,
                                     size: 18,
                                     color: scheme.primary,
                                   ),
@@ -689,5 +688,5 @@ class TherabotSafetyView extends StatelessWidget {
   }
 }
 
-void therabotToast(BuildContext context, String text) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+void therabotToast(BuildContext context, String text, {bool error = false}) =>
+    showUsMessage(context, text, error: error);

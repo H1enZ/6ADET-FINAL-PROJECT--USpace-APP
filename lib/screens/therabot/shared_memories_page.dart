@@ -17,6 +17,7 @@ import '../../widgets/effects/motion.dart';
 import '../../widgets/therabot/therabot_widgets.dart';
 import '../add_memory_sheet.dart';
 import '../memory_detail_screen.dart';
+import '../../widgets/molecules/us_states.dart';
 
 /// The order to revisit memories in: ones from this day in an earlier year
 /// first, then favourites, then the rest in a shuffled order. Only real
@@ -166,7 +167,7 @@ class _SharedMemoriesPageState extends State<SharedMemoriesPage> {
       showEnvelopeFly(context);
     } catch (e) {
       if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -183,22 +184,9 @@ class _SharedMemoriesPageState extends State<SharedMemoriesPage> {
 
     final List<Widget> body;
     if (_error != null) {
-      body = [
-        Text(_error!, style: muted),
-        const SizedBox(height: AppSpacing.md),
-        AppButton(
-          label: 'Try again',
-          variant: AppButtonVariant.outlined,
-          onPressed: _load,
-        ),
-      ];
+      body = [TherabotErrorView(message: _error!, onRetry: _load)];
     } else if (memories == null) {
-      body = const [
-        Padding(
-          padding: EdgeInsets.all(AppSpacing.xxl),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      ];
+      body = const [UsInlineLoader(padding: AppSpacing.xxl)];
     } else if (memories.isEmpty) {
       body = [
         Text('No memories yet', style: theme.textTheme.titleMedium),
@@ -304,7 +292,8 @@ class _MemoryCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => ColoredBox(
                       color: scheme.surfaceContainer,
-                      child: UsIcon(UsIcons.image,
+                      child: UsIcon(
+                        UsIcons.image,
                         color: scheme.onSurfaceVariant,
                       ),
                     ),

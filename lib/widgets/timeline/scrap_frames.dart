@@ -8,6 +8,7 @@ import '../../models/scrapbook.dart';
 import '../../utils/anniversary.dart';
 import '../notes/note_style.dart';
 import 'scrapbook_layout.dart';
+import '../atoms/us_icon.dart';
 
 const _shortMonths = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
@@ -146,7 +147,7 @@ class _NoPhoto extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     color: const Color(0xFF4A1D42),
     alignment: Alignment.center,
-    child: const Icon(Icons.image_outlined, color: NotePalette.pink),
+    child: const UsIcon(UsIcons.image, color: NotePalette.pink),
   );
 }
 

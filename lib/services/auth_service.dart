@@ -46,11 +46,35 @@ class AppException implements Exception {
   String toString() => message;
 }
 
-/// Turns any error into a sentence the user can act on.
+const _connectionError =
+    'Something went wrong. Check your connection and try again.';
+
+/// Turns any error into a sentence the user can act on. Only messages that
+/// were written for people are shown as they are: ours, Supabase Auth's,
+/// and the database's own `raise exception` lines (code P0001). Anything
+/// else (policy, constraint or token errors) never reaches the screen raw.
 String friendlyError(Object error) {
   if (error is AppException) return error.message;
+  if (error is AuthRetryableFetchException) return _connectionError;
   if (error is AuthException) return error.message;
-  if (error is StorageException) return error.message;
-  if (error is PostgrestException) return error.message;
-  return 'Something went wrong. Check your connection and try again.';
+  if (error is StorageException) {
+    if (error.statusCode == '413') {
+      return 'That photo is too large. Try a smaller one.';
+    }
+    return "Couldn't load or save the photo just now. Try again.";
+  }
+  if (error is PostgrestException) {
+    final code = error.code ?? '';
+    if (code == 'P0001' && error.message.length <= 200) return error.message;
+    if (code == 'PGRST301' || code == 'PGRST303') {
+      return 'Your session has ended. Sign in again to continue.';
+    }
+    if (code == '42501') return "You don't have access to that.";
+    if (code == '23505') return 'That has already been saved.';
+    if (code.startsWith('22') || code.startsWith('23')) {
+      return "That didn't fit. Check what you entered and try again.";
+    }
+    return "Couldn't reach USpace just now. Try again in a moment.";
+  }
+  return _connectionError;
 }

@@ -17,6 +17,7 @@ import '../../widgets/capsule/monogram_seal.dart';
 import '../../widgets/capsule/opened_capsule.dart';
 import '../../widgets/effects/motion.dart';
 import '../../widgets/notes/note_style.dart';
+import '../../widgets/molecules/us_states.dart';
 
 /// One capsule, for reading. The receiver of a ready capsule opens it here
 /// (the full envelope opening, once); an opened capsule goes straight to
@@ -284,11 +285,7 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
         ),
         if (_error != null) ...[
           const SizedBox(height: AppSpacing.md),
-          Text(
-            _error!,
-            style: TextStyle(color: scheme.error),
-            textAlign: TextAlign.center,
-          ),
+          UsErrorNotice(message: _error!),
         ],
         const SizedBox(height: AppSpacing.xl),
         if (ready)
@@ -314,24 +311,13 @@ class _CapsuleViewScreenState extends State<CapsuleViewScreen> {
   }
 
   Widget _reading(ThemeData theme) {
-    final scheme = theme.colorScheme;
     final contents = _contents;
     if (contents == null) {
       return Padding(
         padding: const EdgeInsets.only(top: AppSpacing.huge),
-        child: Center(
-          child: _error != null
-              ? Column(
-                  children: [
-                    Text(_error!, style: TextStyle(color: scheme.error)),
-                    TextButton(
-                      onPressed: _load,
-                      child: const Text('Try again'),
-                    ),
-                  ],
-                )
-              : const CircularProgressIndicator(),
-        ),
+        child: _error != null
+            ? UsErrorNotice(message: _error!, onRetry: _load, centered: true)
+            : const UsInlineLoader(),
       );
     }
     return Column(

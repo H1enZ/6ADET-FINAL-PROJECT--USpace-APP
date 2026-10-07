@@ -7,6 +7,7 @@ import '../../theme/us_palette.dart';
 import '../atoms/us_icon.dart';
 import '../effects/soft_hearts_background.dart' show heartPath;
 import '../notes/note_style.dart';
+import '../molecules/us_states.dart';
 
 /// Where a Time Capsule is in its life, as shown on its card.
 enum CapsuleCardState { sealed, grace, ready, opened }
@@ -82,9 +83,7 @@ class CapsuleSummaryCard extends StatelessWidget {
       CapsuleCardState.opened => 'Opened.',
       _ => 'Sealed until $when. It opens by itself, not a moment sooner.',
     };
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(text)));
+    showUsMessage(context, text);
   }
 
   @override
@@ -380,7 +379,6 @@ class _SealPainter extends CustomPainter {
           ..color = const Color(0xFF3E0C22),
       );
     }
-
   }
 
   @override
@@ -397,10 +395,8 @@ class _StatusLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, icon) = switch (state) {
-      CapsuleCardState.sealed || CapsuleCardState.grace => (
-        'SEALED',
-        UsIcons.lock,
-      ),
+      CapsuleCardState.sealed ||
+      CapsuleCardState.grace => ('SEALED', UsIcons.lock),
       CapsuleCardState.ready => ('READY', UsIcons.timeCapsule),
       CapsuleCardState.opened => ('OPENED', UsIcons.loveNotes),
     };

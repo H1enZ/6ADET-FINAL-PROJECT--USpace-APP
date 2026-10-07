@@ -6,6 +6,9 @@ import '../services/auth_service.dart';
 import '../services/mood_service.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/home/mood_art.dart';
+import '../widgets/atoms/us_icon.dart';
+import '../widgets/effects/motion.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// The days either of you checked in, newest first and grouped by month.
 /// Each day shows your mood and your partner's shared mood (the latest
@@ -113,10 +116,7 @@ class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
       if (_error != null)
         Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-          child: Text(
-            _error!,
-            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error),
-          ),
+          child: UsErrorNotice(message: _error!, onRetry: _load),
         ),
     ];
 
@@ -164,7 +164,7 @@ class _MoodHistoryScreenState extends State<MoodHistoryScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Mood history')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList(count: 5, height: 72)
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -368,9 +368,10 @@ class _MoodSide extends StatelessWidget {
                 color: scheme.outlineVariant.withValues(alpha: 0.6),
               ),
             ),
-            child: Icon(
-              Icons.remove_rounded,
-              size: 14,
+            alignment: Alignment.center,
+            child: Container(
+              width: 10,
+              height: 1.5,
               color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
           );
@@ -443,34 +444,10 @@ class _EmptyHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 96),
-      child: Column(
-        children: [
-          Icon(
-            Icons.favorite_border_rounded,
-            size: 44,
-            color: scheme.primary.withValues(alpha: 0.8),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'No moods shared yet.',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Your shared mood journey will appear here.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
+    return const UsEmptyState(
+      icon: UsIcons.mood,
+      title: 'No moods shared yet',
+      message: 'Your shared mood journey will appear here.',
     );
   }
 }

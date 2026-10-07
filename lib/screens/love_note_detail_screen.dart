@@ -14,6 +14,7 @@ import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
 import '../widgets/molecules/us_confirm.dart';
 import '../widgets/notes/note_style.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// One love note, opened: its photo, then the letter on paper. Closes with
 /// `true` when something changed (favourite or deleted), so the list reloads.
@@ -47,8 +48,8 @@ class _LoveNoteDetailScreenState extends State<LoveNoteDetailScreen> {
   /// can't overlap or roll back to an old state.
   bool _savingFavorite = false;
 
-  void _showMessage(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   Future<void> _toggleFavorite() async {
     if (_savingFavorite || _busy) return;
@@ -65,7 +66,7 @@ class _LoveNoteDetailScreenState extends State<LoveNoteDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _note = before);
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     } finally {
       if (mounted) setState(() => _savingFavorite = false);
     }
@@ -91,7 +92,7 @@ class _LoveNoteDetailScreenState extends State<LoveNoteDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 

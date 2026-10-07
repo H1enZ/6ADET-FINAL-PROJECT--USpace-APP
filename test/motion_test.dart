@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:final_project/widgets/atoms/us_icon.dart';
 import 'package:final_project/widgets/effects/motion.dart';
 
 Widget app(Widget child, {bool reduceMotion = false}) => MaterialApp(
@@ -37,10 +38,10 @@ void main() {
 
   testWidgets('the heart fills in and pops back to normal size', (tester) async {
     await tester.pumpWidget(app(const AnimatedHeartIcon(filled: false)));
-    expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+    expect(usIcon(UsIcons.heart), findsOneWidget);
     await tester.pumpWidget(app(const AnimatedHeartIcon(filled: true)));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.favorite), findsOneWidget);
+    expect(usIcon(UsIcons.heartFilled), findsOneWidget);
   });
 
   testWidgets('the loading skeleton says it is loading', (tester) async {
@@ -58,3 +59,6 @@ void main() {
     expect(bar.value, closeTo(0.25, 0.001));
   });
 }
+
+Finder usIcon(UsIconData icon) =>
+    find.byWidgetPredicate((w) => w is UsIcon && w.icon == icon);

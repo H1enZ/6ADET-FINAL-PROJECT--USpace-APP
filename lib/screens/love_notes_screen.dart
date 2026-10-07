@@ -24,6 +24,7 @@ import 'time_capsules/time_capsule_screen.dart';
 import 'write_love_note_screen.dart';
 import '../widgets/effects/smooth_scroll.dart';
 import '../widgets/atoms/us_icon.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// Love Notes: every note you can read, filtered by type, plus Previous
 /// Capsules (the older notes-based Time Capsules, which still open by
@@ -170,8 +171,6 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     final notes = _notes;
     const side = EdgeInsets.symmetric(horizontal: AppSpacing.screenMargin);
 
@@ -228,22 +227,11 @@ class _LoveNotesScreenState extends State<LoveNotesScreen> {
                                       CrossAxisAlignment.stretch,
                                   children: [
                                     if (_error != null) ...[
-                                      Text(
-                                        _error!,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              color: theme.colorScheme.error,
-                                            ),
+                                      UsErrorNotice(
+                                        message: _error!,
+                                        onRetry: _load,
                                       ),
-                                      const SizedBox(height: AppSpacing.md),
-                                      Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: AppButton(
-                                          label: 'Try again',
-                                          variant: AppButtonVariant.outlined,
-                                          onPressed: _load,
-                                        ),
-                                      ),
+                                      const SizedBox(height: AppSpacing.lg),
                                     ],
                                     if (notes.isEmpty && _error == null)
                                       const _EmptyNotes()
@@ -383,7 +371,8 @@ class _NoteCard extends StatelessWidget {
     final firstLine = note.body.trim().split('\n').first;
     final when = note.unlockAt ?? note.sentAt;
     final type =
-        note.category?.label ?? (note.wasCapsule ? 'Time capsule' : 'Love note');
+        note.category?.label ??
+        (note.wasCapsule ? 'Time capsule' : 'Love note');
     const radius = BorderRadius.all(Radius.circular(6));
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -526,28 +515,12 @@ class _EmptyNotes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-      child: Column(
-        children: [
-          const QuickActionArtView(QuickActionArt.loveNote, size: 96),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Say it in writing',
-            textAlign: TextAlign.center,
-            style: NotePalette.display(22),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Leave a love note for today. It stays here for both of you.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: NotePalette.muted,
-            ),
-          ),
-        ],
-      ),
+    return UsEmptyState(
+      art: const QuickActionArtView(QuickActionArt.loveNote, size: 96),
+      title: 'Say it in writing',
+      titleStyle: NotePalette.display(22),
+      message: 'Leave a love note for today. It stays here for both of you.',
+      mutedColor: NotePalette.muted,
     );
   }
 }

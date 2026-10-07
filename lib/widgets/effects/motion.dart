@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 
+import '../../theme/app_spacing.dart';
 import '../../theme/app_effects.dart';
 import 'floating_hearts.dart';
 import '../../theme/us_palette.dart';
@@ -234,8 +235,8 @@ class AnimatedHeartIcon extends StatelessWidget {
     return PopOnChange(
       trigger: filled,
       scale: filled ? 1.45 : 1,
-      child: Icon(
-        filled ? Icons.favorite : Icons.favorite_border,
+      child: UsIcon(
+        filled ? UsIcons.heartFilled : UsIcons.heart,
         size: size,
         color: filled ? (color ?? scheme.primary) : emptyColor,
       ),
@@ -357,7 +358,7 @@ class _SkeletonListState extends State<SkeletonList> with SingleTickerProviderSt
                   return Container(
                     height: i == 0 ? widget.height * 1.4 : widget.height,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(AppRadius.card),
                       gradient: LinearGradient(
                         begin: Alignment(x - 1, 0),
                         end: Alignment(x + 1, 0),

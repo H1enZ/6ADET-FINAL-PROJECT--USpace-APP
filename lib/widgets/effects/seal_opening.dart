@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../capsule/wax_seal.dart';
 import 'motion.dart';
+import '../atoms/us_icon.dart';
 
 /// The moment a Time Capsule opens: the envelope appears, the wax seal
 /// shakes and cracks, the flap opens and the note slides out. Tap "Read it"
@@ -165,7 +166,7 @@ class _SealOpeningState extends State<_SealOpening> with SingleTickerProviderSta
                       opacity: button,
                       child: FilledButton.icon(
                         onPressed: button < 0.5 ? null : () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.mail_outline),
+                        icon: const UsIcon(UsIcons.mail, size: 20),
                         label: const Text('Read it'),
                       ),
                     ),

@@ -7,7 +7,6 @@ import '../services/bucket_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
 import '../utils/money.dart';
-import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/section_label.dart';
 import '../widgets/atoms/us_icon.dart';
@@ -15,6 +14,7 @@ import '../widgets/effects/motion.dart';
 import '../widgets/molecules/us_confirm.dart';
 import '../widgets/molecules/us_field_button.dart';
 import 'bucket_item_sheet.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// One bucket-list item: where, when, the budget and the savings log.
 /// Both partners can log savings; each can delete only their own entries.
@@ -74,9 +74,8 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
       ? 'you'
       : (widget.names[userId] ?? 'your partner');
 
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   Future<void> _edit() async {
     final saved = await showModalBottomSheet<bool>(
@@ -96,7 +95,7 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -119,7 +118,7 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -139,7 +138,7 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -220,24 +219,10 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
                     actionLabel: 'Add',
                     onAction: _loading ? null : _addSavings,
                   ),
-                  if (_error != null) ...[
-                    Text(_error!,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: scheme.error)),
-                    const SizedBox(height: AppSpacing.md),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: AppButton(
-                        label: 'Try again',
-                        variant: AppButtonVariant.outlined,
-                        onPressed: _load,
-                      ),
-                    ),
-                  ] else if (_loading)
-                    const Padding(
-                      padding: EdgeInsets.all(AppSpacing.xxl),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
+                  if (_error != null)
+                    UsErrorNotice(message: _error!, onRetry: _load)
+                  else if (_loading)
+                    const UsInlineLoader(padding: AppSpacing.xxl)
                   else if (_entries.isEmpty)
                     Text(
                       'Nothing saved yet. Each time one of you puts money '

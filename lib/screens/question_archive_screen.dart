@@ -5,6 +5,9 @@ import '../services/auth_service.dart';
 import '../services/question_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
+import '../widgets/atoms/us_icon.dart';
+import '../widgets/effects/motion.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// Past daily questions with both answers, newest first. Your partner's
 /// answer only shows for days you answered too (the database enforces it).
@@ -69,25 +72,23 @@ class _QuestionArchiveScreenState extends State<QuestionArchiveScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Our questions')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonList(count: 5, height: 72)
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppSpacing.screenMargin),
                 children: [
-                  if (_error != null)
-                    Text(_error!,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: scheme.error)),
+                  if (_error != null) ...[
+                    UsErrorNotice(message: _error!, onRetry: _load),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
                   if (days.isEmpty && _error == null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.huge),
-                      child: Text(
-                        'Your answers will collect here, one question a day.',
-                        textAlign: TextAlign.center,
-                        style: muted,
-                      ),
+                    const UsEmptyState(
+                      icon: UsIcons.question,
+                      title: 'No answers yet',
+                      message:
+                          'Your answers will collect here, one question a day.',
                     ),
                   for (final entry in days.entries) ...[
                     Text(longDate(entry.key),

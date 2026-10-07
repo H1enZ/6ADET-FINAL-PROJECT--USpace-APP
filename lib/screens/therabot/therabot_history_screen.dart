@@ -73,7 +73,7 @@ class _TherabotHistoryScreenState extends State<TherabotHistoryScreen> {
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
     }
     await _load();
   }
@@ -97,7 +97,7 @@ class _TherabotHistoryScreenState extends State<TherabotHistoryScreen> {
       if (!mounted) return;
     } catch (err) {
       if (!mounted) return;
-      therabotToast(context, therabotError(err).message);
+      therabotToast(context, therabotError(err).message, error: true);
     }
     await _load();
   }
@@ -117,9 +117,7 @@ class _TherabotHistoryScreenState extends State<TherabotHistoryScreen> {
           tooltip: _showHidden
               ? 'Hide hidden reflections'
               : 'Show hidden reflections',
-          icon: UsIcon(
-            _showHidden ? UsIcons.eye : UsIcons.eyeOff,
-          ),
+          icon: UsIcon(_showHidden ? UsIcons.eye : UsIcons.eyeOff),
           onPressed: () {
             setState(() => _showHidden = !_showHidden);
             _load();
@@ -370,7 +368,7 @@ class _TherabotInsightsScreenState extends State<TherabotInsightsScreen> {
       await TherabotService.deleteInsight(id);
     } catch (e) {
       if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
     }
     await _load();
   }

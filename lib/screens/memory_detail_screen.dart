@@ -13,6 +13,7 @@ import '../widgets/molecules/us_confirm.dart';
 import 'add_memory_sheet.dart';
 import 'memory_tags_sheet.dart';
 import '../widgets/atoms/us_icon.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// One memory, full size: swipe through its photos, read the story.
 /// Either partner can favourite, tag or edit it; only the author can delete it.
@@ -50,8 +51,8 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     super.dispose();
   }
 
-  void _showMessage(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   Future<void> _toggleFavourite() async {
     setState(() => _busy = true);
@@ -65,7 +66,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
       if (value) showFloatingHearts(context);
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -95,7 +96,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
       if (_pages.hasClients) _pages.jumpToPage(0);
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -117,7 +118,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -140,7 +141,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      _showMessage(friendlyError(e));
+      _showMessage(friendlyError(e), error: true);
     }
   }
 

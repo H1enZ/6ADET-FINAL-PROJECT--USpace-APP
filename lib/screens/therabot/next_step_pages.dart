@@ -116,7 +116,7 @@ class _TherabotComfortPageState extends State<TherabotComfortPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -522,7 +522,7 @@ class _TherabotSpacePageState extends State<TherabotSpacePage> {
       if (!mounted) return;
     } catch (e) {
       if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -825,7 +825,10 @@ class _TherabotReconnectPageState extends State<TherabotReconnectPage> {
                         visualDensity: VisualDensity.compact,
                       )
                     else
-                      UsIcon(UsIcons.chevronRight, color: scheme.onSurfaceVariant),
+                      UsIcon(
+                        UsIcons.chevronRight,
+                        color: scheme.onSurfaceVariant,
+                      ),
                   ],
                 ),
               ),
@@ -930,7 +933,7 @@ class _TherabotPrivateNotePageState extends State<TherabotPrivateNotePage> {
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -1068,7 +1071,7 @@ class _TherabotCompletionPageState extends State<TherabotCompletionPage> {
       setState(() => _saved = true);
     } catch (e) {
       if (!mounted) return;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

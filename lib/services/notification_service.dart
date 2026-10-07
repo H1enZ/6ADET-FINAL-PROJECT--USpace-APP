@@ -51,11 +51,19 @@ class NotificationService {
     List<ImportantDate>? dates,
   }) async {
     final now = DateTime.now();
-    // Each source is optional: if one fails, the rest still show.
+    // Each source is optional: if one fails, the rest still show. But if
+    // every source it fetched failed (say, the connection is down), that
+    // is an error, not "all caught up".
+    var fetched = 0;
+    var failed = 0;
+    Object? lastError;
     Future<T?> safe<T>(Future<T> Function() f) async {
+      fetched++;
       try {
         return await f();
-      } catch (_) {
+      } catch (e) {
+        failed++;
+        lastError = e;
         return null;
       }
     }
@@ -82,6 +90,7 @@ class NotificationService {
         return TimeCapsuleService.list(coupleId);
       }),
     ]);
+    if (fetched > 0 && failed == fetched) throw lastError!;
     final acts = (results[0] as List<Activity>?) ?? const <Activity>[];
     final done =
         (results[1]

@@ -153,7 +153,7 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
       if (!mounted) return;
       setState(() => _sending = null);
       if (said != null && _input.text.isEmpty) _input.text = said;
-      therabotToast(context, therabotError(e).message);
+      therabotToast(context, therabotError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -263,7 +263,7 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
       } catch (e) {
         if (!mounted) return;
         setState(() => _busy = false);
-        therabotToast(context, therabotError(e).message);
+        therabotToast(context, therabotError(e).message, error: true);
         // Often: your partner just started one. Back to the hub to see it.
         Navigator.of(context).pop(true);
         return;
@@ -302,7 +302,7 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
         () => _view = _view?.copyWith(stage: 'done', summary: text.trim()),
       );
     } catch (e) {
-      if (mounted) therabotToast(context, therabotError(e).message);
+      if (mounted) therabotToast(context, therabotError(e).message, error: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -350,7 +350,7 @@ class _TherabotChatScreenState extends State<TherabotChatScreen> {
       await TherabotService.talkDelete(id);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
-      if (mounted) therabotToast(context, therabotError(e).message);
+      if (mounted) therabotToast(context, therabotError(e).message, error: true);
     }
   }
 

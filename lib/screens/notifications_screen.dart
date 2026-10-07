@@ -8,7 +8,8 @@ import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
 import '../utils/daily_content.dart';
 import '../widgets/effects/motion.dart';
-import '../widgets/home/mood_art.dart';
+import '../widgets/atoms/us_icon.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// What has happened between you two, and what is coming up. Opened from
 /// the bell on Home. Tapping an item closes this screen and returns the item,
@@ -76,7 +77,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = "Couldn't load notifications.");
+      setState(
+        () => _error =
+            "Couldn't load notifications. Check your connection and try again.",
+      );
     }
   }
 
@@ -107,7 +111,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     final children = <Widget>[
       if (_error != null)
-        _ErrorNotice(_error!, onRetry: _refresh, key: const ValueKey('error')),
+        Padding(
+          key: const ValueKey('error'),
+          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+          child: UsErrorNotice(message: _error!, onRetry: _refresh),
+        ),
       if (items != null && items.isEmpty)
         const _AllCaughtUp(key: ValueKey('empty')),
       for (final (title, group) in [
@@ -187,39 +195,6 @@ class _GroupTitle extends StatelessWidget {
   }
 }
 
-/// Announced as soon as it appears, with a button to retry (pull to refresh
-/// is hard to do with a screen reader or switch access).
-class _ErrorNotice extends StatelessWidget {
-  const _ErrorNotice(this.message, {super.key, required this.onRetry});
-
-  final String message;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-      child: Semantics(
-        liveRegion: true,
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                message,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              ),
-            ),
-            TextButton(onPressed: onRetry, child: const Text('Try again')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// One notification: a soft card with a category icon, title, a short line,
 /// when it happened, and a "New" label.
 class _NotificationCard extends StatelessWidget {
@@ -280,7 +255,8 @@ class _NotificationCard extends StatelessWidget {
                       color: accent.withValues(alpha: 0.14),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    alignment: Alignment.center,
+                    child: UsIcon(
                       _icon(item.kind),
                       color: accent,
                       size: _iconSize,
@@ -382,17 +358,17 @@ class _NotificationCard extends StatelessWidget {
     NotificationKind.therabot => Mood.emotional,
   });
 
-  static IconData _icon(NotificationKind k) => switch (k) {
-    NotificationKind.memory => Icons.photo_library_outlined,
-    NotificationKind.mood => Icons.mood_rounded,
-    NotificationKind.loveNote => Icons.mail_outline_rounded,
-    NotificationKind.capsule => Icons.lock_clock_outlined,
-    NotificationKind.hug => Icons.volunteer_activism_outlined,
-    NotificationKind.date => Icons.event_outlined,
-    NotificationKind.anniversary => Icons.favorite_rounded,
-    NotificationKind.bucket => Icons.checklist_rounded,
-    NotificationKind.question => Icons.forum_outlined,
-    NotificationKind.therabot => Icons.auto_awesome_outlined,
+  static UsIconData _icon(NotificationKind k) => switch (k) {
+    NotificationKind.memory => UsIcons.image,
+    NotificationKind.mood => UsIcons.mood,
+    NotificationKind.loveNote => UsIcons.loveNotes,
+    NotificationKind.capsule => UsIcons.timeCapsule,
+    NotificationKind.hug => UsIcons.hug,
+    NotificationKind.date => UsIcons.calendar,
+    NotificationKind.anniversary => UsIcons.heart,
+    NotificationKind.bucket => UsIcons.star,
+    NotificationKind.question => UsIcons.question,
+    NotificationKind.therabot => UsIcons.therabot,
   };
 
   static String _hint(NotificationTarget t) => switch (t) {
@@ -447,31 +423,10 @@ class _AllCaughtUp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.huge),
-      child: Column(
-        children: [
-          Opacity(
-            opacity: 0.8,
-            child: MoodArt(
-              visual: MoodVisual.of(Mood.loved),
-              size: 96,
-              semantic: false,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text("You're all caught up", style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'New memories, notes, moods and special days will show up here.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
+    return const UsEmptyState(
+      icon: UsIcons.bell,
+      title: "You're all caught up",
+      message: 'New memories, notes, moods and special days will show up here.',
     );
   }
 }

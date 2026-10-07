@@ -15,7 +15,6 @@ import '../services/memory_service.dart';
 import '../services/scrapbook_service.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/us_icon.dart';
 import '../widgets/effects/floating_hearts.dart';
 import '../widgets/effects/motion.dart';
@@ -28,6 +27,7 @@ import '../widgets/timeline/scrapbook_layout.dart';
 import 'add_memory_sheet.dart';
 import 'memory_detail_screen.dart';
 import '../theme/us_palette.dart';
+import '../widgets/molecules/us_states.dart';
 
 /// The couple's story as one big scrapbook: newest month at the top, each
 /// month a cluster of framed photos, paper notes and tickets. Pinch,
@@ -361,8 +361,8 @@ class _TimelineScreenState extends State<TimelineScreen>
       ? 'you'
       : (_names[m.authorId] ?? 'your partner');
 
-  void _showMessage(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _showMessage(String text, {bool error = false}) =>
+      showUsMessage(context, text, error: error);
 
   Future<void> _add() async {
     final saved = await showModalBottomSheet<bool>(
@@ -638,7 +638,9 @@ class _TimelineScreenState extends State<TimelineScreen>
     setState(_relayout);
     if (removed.isNotEmpty) {
       ScrapbookService.removeDecorations(removed).catchError((_) {
-        if (mounted) _showMessage("Couldn't remove that just now.");
+        if (mounted) {
+          _showMessage("Couldn't remove that just now.", error: true);
+        }
       });
     }
     _scheduleSave();
@@ -1136,7 +1138,7 @@ class _TimelineScreenState extends State<TimelineScreen>
         _undo.add(_Undo(addedLinkId: link.id));
       });
     } catch (e) {
-      if (mounted) _showMessage(friendlyError(e));
+      if (mounted) _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -1166,7 +1168,7 @@ class _TimelineScreenState extends State<TimelineScreen>
         });
       }
     } catch (e) {
-      if (mounted) _showMessage(friendlyError(e));
+      if (mounted) _showMessage(friendlyError(e), error: true);
     }
   }
 
@@ -1289,6 +1291,7 @@ class _TimelineScreenState extends State<TimelineScreen>
       if (mounted) {
         _showMessage(
           "Couldn't save the scrapbook just now. It will try again.",
+          error: true,
         );
       }
     } finally {
@@ -1315,40 +1318,18 @@ class _TimelineScreenState extends State<TimelineScreen>
     if (_loading) {
       content = const SkeletonList();
     } else if (_error != null) {
-      content = Padding(
-        padding: const EdgeInsets.all(AppSpacing.screenMargin),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _error!,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            AppButton(
-              label: 'Try again',
-              variant: AppButtonVariant.outlined,
-              onPressed: _load,
-            ),
-          ],
-        ),
-      );
+      content = UsErrorNotice(message: _error!, onRetry: _load, centered: true);
     } else if (_memories.isEmpty) {
       content = _EmptyTimeline(onAdd: _add);
     } else if (layout == null || layout.pieces.isEmpty) {
-      content = Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.huge),
-          child: Text(
-            'Nothing matches "${_search.text.trim()}".',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: NotePalette.muted,
-            ),
-          ),
+      content = UsEmptyState(
+        icon: UsIcons.search,
+        title: 'Nothing matches "${_search.text.trim()}"',
+        message: 'Try a title, a place or a tag.',
+        titleStyle: theme.textTheme.titleMedium?.copyWith(
+          color: NotePalette.cream,
         ),
+        mutedColor: NotePalette.muted,
       );
     } else {
       content = LayoutBuilder(
@@ -1503,13 +1484,13 @@ class _TimelineScreenState extends State<TimelineScreen>
                     style: const TextStyle(color: NotePalette.cream),
                     decoration: InputDecoration(
                       hintText: 'Find a memory: title, story, place or tag',
-                      prefixIcon: const Icon(Icons.search_rounded),
+                      prefixIcon: const UsIcon(UsIcons.search, size: 20),
                       suffixIcon: _search.text.isEmpty
                           ? null
                           : IconButton(
                               tooltip: 'Clear',
                               onPressed: _search.clear,
-                              icon: const Icon(Icons.close_rounded),
+                              icon: const UsIcon(UsIcons.close, size: 20),
                             ),
                     ),
                   ),
@@ -1539,7 +1520,7 @@ class _ConnectBanner extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.timeline_rounded, size: 16, color: NotePalette.rose),
+        const UsIcon(UsIcons.link, size: 16, color: NotePalette.rose),
         const SizedBox(width: 8),
         Text(
           'Tap another memory to connect',
@@ -1952,10 +1933,9 @@ class _MonthLabels extends StatelessWidget {
           final size = sizes[(month.year, month.month)]!;
           final top = month.headingRect.top * s + tr.y - _pad;
           if (top < -size.height || top > viewport.height) continue;
-          final left = (month.headingRect.left * s + tr.x).clamp(
-            8.0,
-            math.max(8.0, viewport.width - size.width - 8),
-          ).toDouble();
+          final left = (month.headingRect.left * s + tr.x)
+              .clamp(8.0, math.max(8.0, viewport.width - size.width - 8))
+              .toDouble();
           shown.add(month);
           boxes.add(Offset(left, top) & size);
         }

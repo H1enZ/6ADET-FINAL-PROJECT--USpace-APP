@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/memory.dart';
 import '../../theme/app_spacing.dart';
 import '../../utils/anniversary.dart';
+import '../atoms/us_icon.dart';
 
 enum MemoryCardLayout { list, grid }
 
@@ -79,17 +80,20 @@ class MemoryCard extends StatelessWidget {
                             '${longDate(memory.memoryDate)} \u00B7 added by $authorName',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: scheme.onSurfaceVariant),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
-                      tooltip: fav ? 'Remove from favourites' : 'Add to favourites',
+                      tooltip: fav
+                          ? 'Remove from favourites'
+                          : 'Add to favourites',
                       onPressed: onFavourite,
-                      icon: Icon(
-                        fav ? Icons.favorite : Icons.favorite_border,
+                      icon: UsIcon(
+                        fav ? UsIcons.heartFilled : UsIcons.heart,
                         color: fav ? scheme.primary : scheme.onSurfaceVariant,
                       ),
                     ),
@@ -113,19 +117,20 @@ class MemoryPhoto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    Widget placeholder(IconData icon) => ColoredBox(
-          color: scheme.primaryContainer,
-          child: Center(child: Icon(icon, size: 40, color: scheme.primary)),
-        );
+    final placeholder = ColoredBox(
+      color: scheme.primaryContainer,
+      child: Center(
+        child: UsIcon(UsIcons.image, size: 40, color: scheme.primary),
+      ),
+    );
 
-    if (url == null) return placeholder(Icons.photo_outlined);
+    if (url == null) return placeholder;
     return Image.network(
       url!,
       fit: BoxFit.cover,
       loadingBuilder: (context, child, progress) =>
-          progress == null ? child : placeholder(Icons.photo_outlined),
-      errorBuilder: (context, error, stack) =>
-          placeholder(Icons.broken_image_outlined),
+          progress == null ? child : placeholder,
+      errorBuilder: (context, error, stack) => placeholder,
     );
   }
 }
