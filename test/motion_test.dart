@@ -30,10 +30,22 @@ void main() {
 
   testWidgets('cards that fade in end up fully visible', (tester) async {
     await tester.pumpWidget(app(const FadeSlideIn(index: 2, child: Text('Hello'))));
-    await tester.pumpAndSettle(const Duration(milliseconds: 100));
-    final opacity = tester.widget<Opacity>(find.ancestor(
-        of: find.text('Hello'), matching: find.byType(Opacity)).first);
-    expect(opacity.opacity, 1.0);
+    // FadeSlideIn fades with a FadeTransition (not an Opacity widget), so
+    // focus inside the card survives and the child isn't repainted.
+    double opacity() => tester
+        .widget<FadeTransition>(find
+            .descendant(of: find.byType(FadeSlideIn), matching: find.byType(FadeTransition))
+            .first)
+        .opacity
+        .value;
+
+    // The third card waits its turn in the stagger (2 x 55 ms) before
+    // fading. That wait is a timer, not a frame, so step the clock past it
+    // first; pumpAndSettle alone would return before the fade even starts.
+    expect(opacity(), 0.0);
+    await tester.pump(const Duration(milliseconds: 2 * 55));
+    await tester.pumpAndSettle();
+    expect(opacity(), 1.0);
   });
 
   testWidgets('the heart fills in and pops back to normal size', (tester) async {
