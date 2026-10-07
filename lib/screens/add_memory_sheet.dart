@@ -12,6 +12,7 @@ import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/section_label.dart';
 import '../widgets/atoms/us_icon.dart';
+import '../widgets/molecules/us_field_button.dart';
 import '../widgets/molecules/tag_picker.dart';
 
 /// One photo in the editor: either already saved, or newly picked.
@@ -444,7 +445,7 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
                 textCapitalization: TextCapitalization.sentences,
               ),
               const SizedBox(height: AppSpacing.lg),
-              _FieldButton(
+              UsFieldButton(
                 label: 'When',
                 value: longDate(_date),
                 icon: UsIcons.calendar,
@@ -495,68 +496,6 @@ class _AddMemorySheetState extends State<AddMemorySheet> {
 }
 
 /// Looks like a text field, opens a picker: the memory's date.
-class _FieldButton extends StatelessWidget {
-  const _FieldButton({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final String value;
-  final UsIconData icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ExcludeSemantics(
-          child: Text(
-            label.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs + 2),
-        Semantics(
-          button: true,
-          label: '$label, $value. Change date',
-          excludeSemantics: true,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(AppRadius.input),
-            child: InputDecorator(
-              decoration: InputDecoration(
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                  ),
-                  child: UsIcon(icon, size: 20, color: scheme.onSurfaceVariant),
-                ),
-                suffixIcon: Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.md),
-                  child: UsIcon(
-                    UsIcons.chevronRight,
-                    size: 16,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                suffixIconConstraints: const BoxConstraints(),
-              ),
-              child: Text(value, style: theme.textTheme.bodyLarge),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 /// A soft dashed outline for the empty photo area and the add tile.
 class _DashedBorder extends CustomPainter {

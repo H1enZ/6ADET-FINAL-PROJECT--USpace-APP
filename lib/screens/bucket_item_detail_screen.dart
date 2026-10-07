@@ -10,7 +10,10 @@ import '../utils/money.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/section_label.dart';
+import '../widgets/atoms/us_icon.dart';
 import '../widgets/effects/motion.dart';
+import '../widgets/molecules/us_confirm.dart';
+import '../widgets/molecules/us_field_button.dart';
 import 'bucket_item_sheet.dart';
 
 /// One bucket-list item: where, when, the budget and the savings log.
@@ -121,25 +124,15 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
   }
 
   Future<void> _deleteEntry(BucketContribution entry) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove this entry?'),
-        content: Text('${formatPeso(entry.amount)} on '
-            '${longDate(entry.savedOn)} will be removed from the savings log.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+    final confirmed = await showUsConfirm(
+      context,
+      title: 'Remove this entry?',
+      message: '${formatPeso(entry.amount)} on ${longDate(entry.savedOn)} '
+          'will be removed from the savings log.',
+      confirmLabel: 'Remove',
+      destructive: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     try {
       await BucketService.deleteContribution(entry.id);
       _changed = true;
@@ -169,7 +162,7 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
             IconButton(
               tooltip: 'Edit item',
               onPressed: _edit,
-              icon: const Icon(Icons.edit_outlined),
+              icon: const UsIcon(UsIcons.edit, size: 22),
             ),
           ],
         ),
@@ -178,7 +171,7 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
           onPressed: _loading ? null : _addSavings,
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
-          icon: const Icon(Icons.savings_outlined),
+          icon: const UsIcon(UsIcons.coins, size: 20),
           label: const Text('Add savings'),
         ),
         body: Center(
@@ -197,23 +190,26 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
                 children: [
                   Text(
                     item.title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      decoration:
-                          item.isDone ? TextDecoration.lineThrough : null,
-                    ),
+                    style: theme.textTheme.titleLarge,
                   ),
                   if (item.isDone) ...[
                     const SizedBox(height: AppSpacing.xs),
-                    Text('Done together \u2713',
-                        style: theme.textTheme.labelLarge
-                            ?.copyWith(color: scheme.tertiary)),
+                    Row(
+                      children: [
+                        UsIcon(UsIcons.check, size: 16, color: scheme.tertiary),
+                        const SizedBox(width: 6),
+                        Text('Done together',
+                            style: theme.textTheme.labelLarge
+                                ?.copyWith(color: scheme.tertiary)),
+                      ],
+                    ),
                   ],
                   const SizedBox(height: AppSpacing.md),
                   if (item.locationLabel != null)
-                    _InfoRow(icon: Icons.place_outlined, text: item.locationLabel!),
+                    _InfoRow(icon: UsIcons.pin, text: item.locationLabel!),
                   if (item.targetDate != null)
                     _InfoRow(
-                      icon: Icons.event_outlined,
+                      icon: UsIcons.calendar,
                       text: 'Target: ${longDate(item.targetDate!)}',
                     ),
                   const SizedBox(height: AppSpacing.lg),
@@ -279,7 +275,7 @@ class _BucketItemDetailScreenState extends State<BucketItemDetailScreen> {
 class _InfoRow extends StatelessWidget {
   const _InfoRow({required this.icon, required this.text});
 
-  final IconData icon;
+  final UsIconData icon;
   final String text;
 
   @override
@@ -290,7 +286,7 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          UsIcon(icon, size: 18, color: theme.colorScheme.primary),
           const SizedBox(width: AppSpacing.sm),
           Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
         ],
@@ -338,18 +334,18 @@ class _SavingsCard extends StatelessWidget {
           if (progress != null) ...[
             const SizedBox(height: AppSpacing.md),
             ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.chipBar),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
               child: AnimatedProgressBar(
                 value: progress,
-                minHeight: 10,
+                minHeight: 8,
                 color: item.isFunded ? scheme.tertiary : scheme.primary,
-                backgroundColor: scheme.primaryContainer,
+                backgroundColor: scheme.primary.withValues(alpha: 0.14),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               item.isFunded
-                  ? 'Goal reached \u2713'
+                  ? 'Goal reached'
                   : '${(progress * 100).floor()}% \u00B7 '
                       '${formatPeso(item.remaining!)} to go',
               style: item.isFunded
@@ -395,8 +391,7 @@ class _EntryTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
         backgroundColor: scheme.primaryContainer,
-        foregroundColor: scheme.primary,
-        child: const Icon(Icons.savings_outlined, size: 20),
+        child: UsIcon(UsIcons.coins, size: 20, color: scheme.primary),
       ),
       title: Text(formatPeso(entry.amount), style: theme.textTheme.titleMedium),
       subtitle: Text(
@@ -411,7 +406,7 @@ class _EntryTile extends StatelessWidget {
           : IconButton(
               tooltip: 'Remove entry',
               onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline),
+              icon: const UsIcon(UsIcons.trash, size: 20),
             ),
     );
   }
@@ -473,7 +468,7 @@ class _AddSavingsDialogState extends State<_AddSavingsDialog> {
               label: 'Amount (\u20B1)',
               controller: _amount,
               hintText: 'e.g. 500',
-              prefixIcon: Icons.savings_outlined,
+              usIcon: UsIcons.coins,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
@@ -489,10 +484,11 @@ class _AddSavingsDialogState extends State<_AddSavingsDialog> {
               onFieldSubmitted: (_) => _save(),
             ),
             const SizedBox(height: AppSpacing.md),
-            OutlinedButton.icon(
-              onPressed: _pickDate,
-              icon: const Icon(Icons.event_outlined),
-              label: Text('Saved on ${longDate(_date)}'),
+            UsFieldButton(
+              label: 'Saved on',
+              value: longDate(_date),
+              icon: UsIcons.calendar,
+              onTap: _pickDate,
             ),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.sm),

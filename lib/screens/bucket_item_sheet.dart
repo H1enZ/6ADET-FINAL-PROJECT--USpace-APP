@@ -9,6 +9,8 @@ import '../utils/money.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/app_text_field.dart';
 import '../widgets/atoms/section_label.dart';
+import '../widgets/atoms/us_icon.dart';
+import '../widgets/molecules/us_field_button.dart';
 
 /// Add a bucket-list item, or edit one when [item] is given.
 /// Only the title is required. Closes with `true` once saved.
@@ -137,7 +139,7 @@ class _BucketItemSheetState extends State<BucketItemSheet> {
                 label: 'What do you want to do together?',
                 controller: _title,
                 hintText: 'e.g. See the bamboo forest',
-                prefixIcon: Icons.favorite_border,
+                usIcon: UsIcons.heart,
                 maxLength: 120,
                 textCapitalization: TextCapitalization.sentences,
                 textInputAction: TextInputAction.next,
@@ -149,7 +151,7 @@ class _BucketItemSheetState extends State<BucketItemSheet> {
                 label: 'Country / State',
                 controller: _area,
                 hintText: 'e.g. Kyoto, Japan',
-                prefixIcon: Icons.public,
+                usIcon: UsIcons.globe,
                 maxLength: 80,
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
@@ -159,7 +161,7 @@ class _BucketItemSheetState extends State<BucketItemSheet> {
                 label: 'Specific spot',
                 controller: _spot,
                 hintText: 'e.g. Arashiyama Bamboo Grove',
-                prefixIcon: Icons.place_outlined,
+                usIcon: UsIcons.pin,
                 maxLength: 120,
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
@@ -171,20 +173,20 @@ class _BucketItemSheetState extends State<BucketItemSheet> {
                 label: 'Budget (sinking fund goal, \u20B1)',
                 controller: _budget,
                 hintText: 'e.g. 60,000',
-                prefixIcon: Icons.savings_outlined,
+                usIcon: UsIcons.coins,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 textInputAction: TextInputAction.done,
               ),
               const SizedBox(height: AppSpacing.md),
-              AppButton(
-                label: _targetDate == null
-                    ? 'Target date (optional)'
-                    : 'Target date: ${longDate(_targetDate!)}',
-                icon: Icons.event_outlined,
-                variant: AppButtonVariant.outlined,
-                onPressed: _saving ? null : _pickDate,
-                fullWidth: true,
+              UsFieldButton(
+                label: 'Target date',
+                value: _targetDate == null
+                    ? 'No date yet'
+                    : longDate(_targetDate!),
+                icon: UsIcons.calendar,
+                onTap: _saving ? null : _pickDate,
+                actionHint: 'Choose a date',
               ),
               if (_targetDate != null)
                 Align(

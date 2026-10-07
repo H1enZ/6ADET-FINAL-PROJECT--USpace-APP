@@ -80,6 +80,10 @@ abstract final class UsIcons {
   static const shuffle = UsIconData('shuffle');
   static const route = UsIconData('route');
 
+  // Bucket list.
+  static const coins = UsIconData('coins');
+  static const globe = UsIconData('globe');
+
   // Love note types.
   static const flower = UsIconData('flower');
   static const moon = UsIconData('moon');

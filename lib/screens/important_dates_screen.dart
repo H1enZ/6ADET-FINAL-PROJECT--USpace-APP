@@ -6,6 +6,9 @@ import '../services/dates_service.dart';
 import '../theme/app_spacing.dart';
 import '../utils/anniversary.dart';
 import '../widgets/atoms/app_text_field.dart';
+import '../widgets/atoms/us_icon.dart';
+import '../widgets/molecules/us_confirm.dart';
+import '../widgets/molecules/us_field_button.dart';
 
 /// All the couple's special dates, soonest first. Either partner can add or
 /// remove them. Returns `true` when something changed.
@@ -74,22 +77,14 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
   }
 
   Future<void> _delete(ImportantDate date) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove this date?'),
-        content: Text('"${date.title}" will be removed for both of you.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Remove')),
-        ],
-      ),
+    final ok = await showUsConfirm(
+      context,
+      title: 'Remove this date?',
+      message: '"${date.title}" will be removed for both of you.',
+      confirmLabel: 'Remove',
+      destructive: true,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await DatesService.delete(date.id);
       _changed = true;
@@ -119,7 +114,7 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
           onPressed: _loading ? null : _add,
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
-          icon: const Icon(Icons.add),
+          icon: const UsIcon(UsIcons.plus, size: 20),
           label: const Text('Add a date'),
         ),
         body: _loading
@@ -146,27 +141,7 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
                         ),
                       ),
                     for (final d in _dates)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: scheme.primaryContainer,
-                          foregroundColor: scheme.primary,
-                          child: const Icon(Icons.event_outlined),
-                        ),
-                        title: Text(d.title, style: theme.textTheme.titleMedium),
-                        subtitle: Text(
-                          '${longDate(d.eventDate)}'
-                          '${d.repeatsYearly ? ' \u00B7 every year' : ''}\n'
-                          '${_countdown(d)}',
-                          style: muted,
-                        ),
-                        isThreeLine: true,
-                        trailing: IconButton(
-                          tooltip: 'Remove',
-                          onPressed: () => _delete(d),
-                          icon: const Icon(Icons.delete_outline),
-                        ),
-                      ),
+                      _DateCard(date: d, onRemove: () => _delete(d)),
                   ],
                 ),
               ),
@@ -181,6 +156,84 @@ String _countdown(ImportantDate d) {
   if (days == 0) return 'Today';
   if (days == 1) return 'Tomorrow';
   return 'In $days days';
+}
+
+/// One special date: a soft card with the calendar mark, its name, the date
+/// (and "every year"), and how far away it is.
+class _DateCard extends StatelessWidget {
+  const _DateCard({required this.date, required this.onRemove});
+
+  final ImportantDate date;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final soon = (date.daysUntil() ?? 999) <= 7;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.xs,
+          AppSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: scheme.outline),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: BorderRadius.circular(AppRadius.input),
+              ),
+              child: UsIcon(UsIcons.calendar, size: 20, color: scheme.primary),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(date.title, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${longDate(date.eventDate)}'
+                    '${date.repeatsYearly ? ' \u00B7 every year' : ''}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              _countdown(date),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: soon ? scheme.primary : scheme.onSurfaceVariant,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Remove',
+              onPressed: onRemove,
+              icon: UsIcon(
+                UsIcons.trash,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _AddDateDialog extends StatefulWidget {
@@ -245,10 +298,11 @@ class _AddDateDialogState extends State<_AddDateDialog> {
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: AppSpacing.md),
-            OutlinedButton.icon(
-              onPressed: _pick,
-              icon: const Icon(Icons.event_outlined),
-              label: Text(_date == null ? 'Choose the date' : longDate(_date!)),
+            UsFieldButton(
+              label: 'Date',
+              value: _date == null ? 'Choose the date' : longDate(_date!),
+              icon: UsIcons.calendar,
+              onTap: _pick,
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

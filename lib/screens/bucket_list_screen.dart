@@ -5,12 +5,15 @@ import '../models/profile.dart';
 import '../services/auth_service.dart';
 import '../services/bucket_service.dart';
 import '../services/couple_service.dart';
+import '../theme/app_effects.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/atoms/app_button.dart';
 import '../widgets/atoms/filter_pill.dart';
 import '../utils/anniversary.dart';
 import '../utils/money.dart';
+import '../widgets/atoms/us_icon.dart';
 import '../widgets/effects/motion.dart';
+import '../widgets/molecules/us_confirm.dart';
 import 'bucket_item_detail_screen.dart';
 import 'bucket_item_sheet.dart';
 
@@ -133,28 +136,16 @@ class _BucketListScreenState extends State<BucketListScreen> {
   }
 
   Future<void> _delete(BucketItem item) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete item?'),
-        content: Text(
-          '"${item.title}" will be removed from the shared list, '
+    final confirmed = await showUsConfirm(
+      context,
+      title: 'Delete this goal?',
+      message: '"${item.title}" will be removed from your shared list, '
           'with its savings log.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      destructive: true,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     try {
       await BucketService.delete(item.id);
@@ -181,7 +172,7 @@ class _BucketListScreenState extends State<BucketListScreen> {
         shape: const CircleBorder(),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
-        child: const Icon(Icons.add),
+        child: const UsIcon(UsIcons.plus, size: 26),
       ),
       body: _loading
           ? const SkeletonList()
@@ -307,8 +298,8 @@ class _BucketListScreenState extends State<BucketListScreen> {
                   color: Theme.of(context).colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(AppRadius.card),
                 ),
-                child: Icon(
-                  Icons.delete_outline,
+                child: UsIcon(
+                  UsIcons.trash,
                   color: Theme.of(context).colorScheme.onErrorContainer,
                 ),
               ),
@@ -349,11 +340,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.check_circle_outline,
-            size: 48,
-            color: theme.colorScheme.primary,
-          ),
+          UsIcon(UsIcons.star, size: 40, color: theme.colorScheme.primary),
           const SizedBox(height: AppSpacing.lg),
           Text('Nothing on your list yet', style: theme.textTheme.titleMedium),
           const SizedBox(height: AppSpacing.xs),
@@ -367,7 +354,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
           AppButton(
             label: 'Add your first goal',
-            icon: Icons.add,
+            usIcon: UsIcons.plus,
             onPressed: onAdd,
           ),
         ],
@@ -398,8 +385,9 @@ class _FilteredEmptyState extends StatelessWidget {
   }
 }
 
-/// One row: checkbox to tick it done, and tap anywhere else to open it.
-/// Shows where, when, and savings progress when there is a budget.
+/// One goal as a soft card: a round tick to mark it done together, then
+/// its title, where and when, and a slim savings bar when there is a budget.
+/// Tap anywhere else to open it.
 class _BucketRow extends StatelessWidget {
   const _BucketRow({
     required this.item,
@@ -415,91 +403,137 @@ class _BucketRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final muted =
-        theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+    final done = item.isDone;
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
     final progress = item.progress;
     final location = item.locationLabel;
+    final meta = [
+      ?location,
+      if (item.targetDate != null) longDate(item.targetDate!),
+    ].join(' \u00B7 ');
 
     return InkWell(
       onTap: onOpen,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.xs,
-          AppSpacing.sm,
+          AppSpacing.xs,
           AppSpacing.lg,
           AppSpacing.md,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Checkbox(
-              value: item.isDone,
-              onChanged: (_) => onToggle(),
-              activeColor: scheme.tertiary,
+            // A round tick, 48 px to tap.
+            Semantics(
+              button: true,
+              checked: done,
+              label: done ? 'Mark as not done' : 'Mark as done together',
+              excludeSemantics: true,
+              child: InkResponse(
+                onTap: onToggle,
+                radius: 24,
+                child: SizedBox.square(
+                  dimension: AppSpacing.touchTarget,
+                  child: Center(
+                    child: AnimatedContainer(
+                      duration: motionOff(context)
+                          ? Duration.zero
+                          : AppMotion.quick,
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: done ? scheme.tertiary : Colors.transparent,
+                        border: Border.all(
+                          color: done ? scheme.tertiary : scheme.outline,
+                          width: 1.6,
+                        ),
+                      ),
+                      child: done
+                          ? Center(
+                              child: UsIcon(
+                                UsIcons.check,
+                                size: 14,
+                                color: scheme.onTertiary,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        decoration:
-                            item.isDone ? TextDecoration.lineThrough : null,
-                        color: item.isDone ? scheme.tertiary : null,
-                      ),
-                    ),
-                    if (location != null) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Row(
-                        children: [
-                          Icon(Icons.place_outlined,
-                              size: 16, color: scheme.primary),
-                          const SizedBox(width: AppSpacing.xs),
-                          Expanded(
-                            child: Text(location,
+                child: AnimatedOpacity(
+                  opacity: done ? 0.7 : 1,
+                  duration: motionOff(context) ? Duration.zero : AppMotion.quick,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.title, style: theme.textTheme.titleMedium),
+                      if (meta.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            if (location != null) ...[
+                              UsIcon(
+                                UsIcons.pin,
+                                size: 14,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            Expanded(
+                              child: Text(
+                                meta,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: muted),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (item.targetDate != null) ...[
-                      const SizedBox(height: 2),
-                      Text('Target: ${longDate(item.targetDate!)}',
-                          style: muted),
-                    ],
-                    if (progress != null) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.chipBar),
-                        child: AnimatedProgressBar(
-                          value: progress,
-                          minHeight: 6,
-                          color: item.isFunded
-                              ? scheme.tertiary
-                              : scheme.primary,
-                          backgroundColor: scheme.primaryContainer,
+                                style: muted,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        '${formatPeso(item.saved)} of '
-                        '${formatPeso(item.budget!)} saved',
-                        style: muted,
-                      ),
+                      ],
+                      if (done) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Done together',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: scheme.tertiary,
+                          ),
+                        ),
+                      ] else if (progress != null) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          child: AnimatedProgressBar(
+                            value: progress,
+                            minHeight: 5,
+                            color: item.isFunded
+                                ? scheme.tertiary
+                                : scheme.primary,
+                            backgroundColor: scheme.primary.withValues(
+                              alpha: 0.14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${formatPeso(item.saved)} of '
+                          '${formatPeso(item.budget!)} saved',
+                          style: muted,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.md),
-              child: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
             ),
           ],
         ),
