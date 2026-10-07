@@ -95,10 +95,18 @@ class CoupleSync {
 
   /// Closes every connection (on sign-out).
   static void reset() {
-    for (final hub in _hubs.values) {
-      hub.close();
-    }
+    // Take them out first: closing a hub removes it from [_hubs], which
+    // must not happen while looping over the map itself (that threw, and
+    // stopped sign-out before it could leave the screen).
+    final hubs = _hubs.values.toList();
     _hubs.clear();
+    for (final hub in hubs) {
+      try {
+        hub.close();
+      } catch (_) {
+        // Sign-out goes on regardless; the connection is dropped anyway.
+      }
+    }
   }
 
   static void _closed(_Hub hub) {
