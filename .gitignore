@@ -31,3 +31,7 @@ Thumbs.db
 
 # Supabase CLI local cache (project link, version check). Never commit.
 supabase/.temp/
+
+# Claude Code local files (assistant memory and settings). Never commit.
+.claude/
+CLAUDE.md
