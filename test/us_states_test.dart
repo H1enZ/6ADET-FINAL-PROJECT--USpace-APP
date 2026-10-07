@@ -12,26 +12,33 @@ import 'package:final_project/widgets/atoms/us_icon.dart';
 import 'package:final_project/widgets/molecules/us_states.dart';
 
 Widget _app(Widget child) => MaterialApp(
-      theme: AppTheme.dark,
-      home: Scaffold(body: child),
-    );
+  theme: AppTheme.dark,
+  home: Scaffold(body: child),
+);
 
 void main() {
   group('UsEmptyState', () {
-    testWidgets('shows the title, the line and a working action',
-        (tester) async {
+    testWidgets('shows the title, the line and a working action', (
+      tester,
+    ) async {
       var added = 0;
-      await tester.pumpWidget(_app(UsEmptyState(
-        icon: UsIcons.star,
-        title: 'Nothing on your list yet',
-        message: 'Add something you both want to experience together.',
-        actionLabel: 'Add your first goal',
-        onAction: () => added++,
-      )));
+      await tester.pumpWidget(
+        _app(
+          UsEmptyState(
+            icon: UsIcons.star,
+            title: 'Nothing on your list yet',
+            message: 'Add something you both want to experience together.',
+            actionLabel: 'Add your first goal',
+            onAction: () => added++,
+          ),
+        ),
+      );
 
       expect(find.text('Nothing on your list yet'), findsOneWidget);
-      expect(find.text('Add something you both want to experience together.'),
-          findsOneWidget);
+      expect(
+        find.text('Add something you both want to experience together.'),
+        findsOneWidget,
+      );
       expect(find.byType(UsIcon), findsWidgets);
 
       await tester.tap(find.text('Add your first goal'));
@@ -57,14 +64,19 @@ void main() {
 
   group('UsErrorNotice', () {
     for (final centered in [false, true]) {
-      testWidgets('shows the message and retries (centered: $centered)',
-          (tester) async {
+      testWidgets('shows the message and retries (centered: $centered)', (
+        tester,
+      ) async {
         var tries = 0;
-        await tester.pumpWidget(_app(UsErrorNotice(
-          message: "Couldn't reach USpace just now.",
-          onRetry: () => tries++,
-          centered: centered,
-        )));
+        await tester.pumpWidget(
+          _app(
+            UsErrorNotice(
+              message: "Couldn't reach USpace just now.",
+              onRetry: () => tries++,
+              centered: centered,
+            ),
+          ),
+        );
 
         expect(find.text("Couldn't reach USpace just now."), findsOneWidget);
         await tester.tap(find.text('Try again'));
@@ -87,28 +99,37 @@ void main() {
   });
 
   group('showUsMessage', () {
-    testWidgets('shows the text, with an alert icon only for errors',
-        (tester) async {
-      await tester.pumpWidget(_app(Builder(
-        builder: (context) => Column(children: [
-          TextButton(
-            onPressed: () => showUsMessage(context, 'Saved.'),
-            child: const Text('ok'),
+    testWidgets('shows the text, with an alert icon only for errors', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          Builder(
+            builder: (context) => Column(
+              children: [
+                TextButton(
+                  onPressed: () => showUsMessage(context, 'Saved.'),
+                  child: const Text('ok'),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      showUsMessage(context, "Couldn't save.", error: true),
+                  child: const Text('fail'),
+                ),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: () =>
-                showUsMessage(context, "Couldn't save.", error: true),
-            child: const Text('fail'),
-          ),
-        ]),
-      )));
+        ),
+      );
 
       await tester.tap(find.text('ok'));
       await tester.pump();
       expect(find.text('Saved.'), findsOneWidget);
       expect(
         find.descendant(
-            of: find.byType(SnackBar), matching: find.byType(SvgPicture)),
+          of: find.byType(SnackBar),
+          matching: find.byType(SvgPicture),
+        ),
         findsNothing,
       );
 
@@ -119,7 +140,9 @@ void main() {
       expect(find.text("Couldn't save."), findsOneWidget);
       expect(
         find.descendant(
-            of: find.byType(SnackBar), matching: find.byType(SvgPicture)),
+          of: find.byType(SnackBar),
+          matching: find.byType(SvgPicture),
+        ),
         findsOneWidget,
       );
     });
@@ -128,26 +151,31 @@ void main() {
   group('friendlyError', () {
     test("keeps the database's own sentences", () {
       expect(
-        friendlyError(const PostgrestException(
-          message: 'No couple matches that code. Check it with your partner.',
-          code: 'P0001',
-        )),
+        friendlyError(
+          const PostgrestException(
+            message: 'No couple matches that code. Check it with your partner.',
+            code: 'P0001',
+          ),
+        ),
         'No couple matches that code. Check it with your partner.',
       );
     });
 
     test('never shows raw policy, constraint or token errors', () {
       const raw = [
-        ('new row violates row-level security policy for table "moods"',
-            '42501'),
+        (
+          'new row violates row-level security policy for table "moods"',
+          '42501',
+        ),
         ('duplicate key value violates unique constraint "x_pkey"', '23505'),
         ('value too long for type character varying(280)', '22001'),
         ('JWT expired', 'PGRST301'),
         ('relation "public.nope" does not exist', '42P01'),
       ];
       for (final (message, code) in raw) {
-        final shown =
-            friendlyError(PostgrestException(message: message, code: code));
+        final shown = friendlyError(
+          PostgrestException(message: message, code: code),
+        );
         expect(shown, isNot(contains(message)), reason: code);
         expect(shown, isNotEmpty);
       }
@@ -156,32 +184,38 @@ void main() {
     test('a session that ended asks you to sign in again', () {
       expect(
         friendlyError(
-            const PostgrestException(message: 'JWT expired', code: 'PGRST301')),
+          const PostgrestException(message: 'JWT expired', code: 'PGRST301'),
+        ),
         contains('Sign in again'),
       );
     });
 
     test('storage errors talk about the photo, not the bucket', () {
-      final shown = friendlyError(const StorageException(
-          'The resource was not found',
-          statusCode: '404'));
+      final shown = friendlyError(
+        const StorageException('The resource was not found', statusCode: '404'),
+      );
       expect(shown, isNot(contains('resource')));
       expect(shown, contains('photo'));
       expect(
         friendlyError(
-            const StorageException('Payload too large', statusCode: '413')),
+          const StorageException('Payload too large', statusCode: '413'),
+        ),
         contains('too large'),
       );
     });
 
     test('our own messages pass through', () {
-      expect(friendlyError(const AppException('Give the date a name.')),
-          'Give the date a name.');
+      expect(
+        friendlyError(const AppException('Give the date a name.')),
+        'Give the date a name.',
+      );
     });
 
     test('anything else gets the connection line', () {
-      expect(friendlyError(Exception('socket closed')),
-          contains('Check your connection'));
+      expect(
+        friendlyError(Exception('socket closed')),
+        contains('Check your connection'),
+      );
     });
   });
 }

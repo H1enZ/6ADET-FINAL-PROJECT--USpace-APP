@@ -35,3 +35,10 @@ supabase/.temp/
 # Claude Code local files (assistant memory and settings). Never commit.
 .claude/
 CLAUDE.md
+
+# Codex and other local AI tooling (worker rules, skills, helper scripts).
+# Local to this machine, not part of the app. Never commit.
+.agents/
+AGENTS.md
+skills-lock.json
+tools/

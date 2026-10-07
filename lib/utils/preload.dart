@@ -16,10 +16,7 @@ Future<void> preloadCritical({
   Duration limit = const Duration(milliseconds: 2500),
 }) async {
   try {
-    await Future.wait([
-      GoogleFonts.pendingFonts(),
-      _icons(),
-    ]).timeout(limit);
+    await Future.wait([GoogleFonts.pendingFonts(), _icons()]).timeout(limit);
   } catch (_) {
     // Timed out or offline: nothing to do, they load when shown.
   }
