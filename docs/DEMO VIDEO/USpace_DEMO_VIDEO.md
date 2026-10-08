@@ -45,6 +45,4 @@ All demo content is fictional. It includes made-up names, sample conversations, 
 
 > USpace is more than a messaging app. It's a private space where couples can preserve memories, share feelings, plan experiences, and stay connected even when they're physically apart.
 
----
 
-**Recording note:** The timestamps above are a **planned flow**, not verified timestamps from the video. The segment ending at **4:45** leaves approximately 15 seconds for the conclusion within a five-minute recording.
