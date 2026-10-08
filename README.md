@@ -1,6 +1,6 @@
 # USpace
 
-> A private space for two people in one relationship.
+> A private digital space that understands two people's relationship.
 
 ## Live demo: https://h1enz.github.io/USpace/
 
