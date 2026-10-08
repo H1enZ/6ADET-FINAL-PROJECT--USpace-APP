@@ -186,4 +186,3 @@ If there's one thing I'll take away from this experience, it's that AI can help 
 
 For me, that's the most important lesson I gained from creating USpace.
 
-More in [docs/REFLECTION.md](docs/REFLECTION.md).
