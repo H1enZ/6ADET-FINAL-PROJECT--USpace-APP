@@ -1,6 +1,6 @@
-# USpace
+# USpace: A private space for two - Documentation (Week 3)
 
-> A private space for two people in one relationship.
+*State of the project on 8 October 2026. Live demo: https://h1enz.github.io/6ADET-FINAL-PROJECT--USpace-APP/ . Tester accounts are in the README.*
 
 ## Live demo: https://h1enz.github.io/6ADET-FINAL-PROJECT--USpace-APP/
 
@@ -8,7 +8,7 @@ If the page shows an old version, press Ctrl + Shift + R or open it in a private
 
 **Course:** Applications Development and Emerging Technologies (6ADET), Holy Angel University
 **Author:** Mikko Panergo
-**AI use:** Built with AI assistance (Claude Code and OpenAI Codex). What the AI wrote, what I changed, and what I wrote myself (the Bucket List) is recorded in [AI-USAGE.md](../AI-USAGE.md).
+**AI use:** Built with AI assistance (Claude Code and OpenAI Codex). What the AI wrote, what I changed, and what I wrote myself (the Bucket List) is recorded in [AI-USAGE.md](../../AI-USAGE.md).
 
 ## Tester accounts
 
@@ -36,7 +36,7 @@ What is built (Weeks 1 to 3):
 - **Time Capsules:** notes and photos sealed until a chosen date, with a wax-seal opening ceremony. The sealed content stays hidden from both partners until then.
 - **Moods:** pick a mood and it is shared; matching moods merge into one shared state.
 - **Therabot:** a calm AI helper with Private Talk and Couple Reflection modes. What you say in private stays private.
-- **Bucket List:** things to do together, with a location, a budget and a shared savings log (written by me, see [AI-USAGE.md](../AI-USAGE.md)).
+- **Bucket List:** things to do together, with a location, a budget and a shared savings log (written by me, see [AI-USAGE.md](../../AI-USAGE.md)).
 - **Profile / Settings:** photo, name, birthday, theme, unlink partner, sign out.
 
 ## 2. Setup and installation
@@ -62,7 +62,7 @@ flutter pub get
 ### Step 2: Create the database
 
 1. In Supabase, create a new project.
-2. Open **SQL Editor**, paste the whole of [`supabase/schema.sql`](../supabase/schema.sql), and click **Run** once. You should see *Success. No rows returned*. This creates the tables, the security policies, the pairing functions and the private photo bucket.
+2. Open **SQL Editor**, paste the whole of [`supabase/schema.sql`](../../supabase/schema.sql), and click **Run** once. You should see *Success. No rows returned*. This creates the tables, the security policies, the pairing functions and the private photo bucket.
 3. Go to **Authentication > Sign In / Providers > Email** and turn off **Confirm email**, so test accounts with made-up emails can sign in straight away.
 
 ### Step 3: Add your configuration
@@ -102,7 +102,7 @@ flutter run -d chrome --dart-define=SUPABASE_URL=https://your-project-id.supabas
 
 **If you see "This build has no Supabase settings"**, the two values did not reach the app. Check that `.env` is in the project folder and that the names are spelled exactly as above.
 
-**Tests:** `flutter test` runs the widget and countdown tests. The database security tests are described in [`supabase/test/README.md`](../supabase/test/README.md).
+**Tests:** `flutter test` runs the widget and countdown tests. The database security tests are described in [`supabase/test/README.md`](../../supabase/test/README.md).
 
 ## 4. Features and usage
 
@@ -164,11 +164,11 @@ All screenshots use invented test accounts.
 
 | Sign in | Create account |
 |---|---|
-| ![Sign in](screenshots/02-sign-in.png) | ![Create account](screenshots/03-create-account.png) |
+| ![Sign in](../screenshots/02-sign-in.png) | ![Create account](../screenshots/03-create-account.png) |
 
 | Home | Timeline | Bucket List |
 |---|---|---|
-| ![Home](screenshots/03b-home-question-countdowns.png) | ![Timeline](screenshots/04-timeline.png) | ![Bucket List](screenshots/06-bucket-list.png) |
+| ![Home](../screenshots/03b-home-question-countdowns.png) | ![Timeline](../screenshots/04-timeline.png) | ![Bucket List](../screenshots/06-bucket-list.png) |
 
 These are from Weeks 2 and 3; the screens were restyled in October (see section 7).
 
@@ -181,7 +181,7 @@ Screenshots of the other Week 3 screens (Chat, Love Notes, Time Capsules, Therab
 - **Some screenshots predate the October redesign.** The live demo is the current version.
 - **No password reset.** The "Forgot password?" link from the mockup is not built.
 - **Sign in and Pair are two screens**, where the mockup shows them as one.
-- **Security audit (8 October 2026): no critical or high issues, 3 medium ones**, being fixed in stages: email confirmation is off on the live project, some broadcast channels were public (migration 021 makes them private), and pairing codes. Details in [docs/06-security-and-privacy.md](06-security-and-privacy.md).
+- **Security audit (8 October 2026): no critical or high issues, 3 medium ones**, being fixed in stages: email confirmation is off on the live project, some broadcast channels were public (migration 021 makes them private), and pairing codes. Details in [docs/06-security-and-privacy.md](../06-security-and-privacy.md).
 - **After a new deploy, the live link can show the old version** because the browser caches the app. Press Ctrl + Shift + R, or open it in a private window.
 - **The Supabase free tier pauses a project after about a week without use.** If the live app cannot sign in, the project may need to be resumed from the Supabase dashboard.
 
@@ -205,23 +205,23 @@ Screenshots of the other Week 3 screens (Chat, Love Notes, Time Capsules, Therab
 
 | Document | |
 |---|---|
-| [Proposal](01-proposal.md) | The problem, the users, the scope |
-| [Mockup and wireframes](02-mockup.md) | What it looks like, and the screen flow |
-| [Design system](03-design-system.md) | Colours, type, spacing, components |
-| [Weekly reports](04-weekly-reports.md) | What happened each week |
-| [Project journal](journal) | My reflections, week by week |
-| [Weekly documentation](documentation) | The seven required sections, per week |
-| [Weekly increment report](REPORT.md) | What changed, why, what broke |
-| [Demo video](05-demo-video.md) | The recording and what it shows |
-| [Security and privacy](06-security-and-privacy.md) | The checklist, filled in |
-| [AI usage](../AI-USAGE.md) | How AI was used, where it was wrong, and who wrote what |
+| [Proposal](../01-proposal.md) | The problem, the users, the scope |
+| [Mockup and wireframes](../02-mockup.md) | What it looks like, and the screen flow |
+| [Design system](../03-design-system.md) | Colours, type, spacing, components |
+| [Weekly reports](../04-weekly-reports.md) | What happened each week |
+| [Project journal](../journal) | My reflections, week by week |
+| [Weekly documentation](.) | The seven required sections, per week |
+| [Weekly increment report](../REPORT.md) | What changed, why, what broke |
+| [Demo video](../05-demo-video.md) | The recording and what it shows |
+| [Security and privacy](../06-security-and-privacy.md) | The checklist, filled in |
+| [AI usage](../../AI-USAGE.md) | How AI was used, where it was wrong, and who wrote what |
 
 ## Credits
 
 - Packages: `supabase_flutter` (sign-in and data), `google_fonts` (Playfair Display, Inter and handwriting fonts), `flutter_svg` (line icons), `image_picker`, `shared_preferences`, `device_preview` (opt-in phone frame). Full list in `pubspec.yaml`.
 - Fonts: Playfair Display, Inter, Lora, Caveat and La Belle Aurore, SIL Open Font License, via Google Fonts.
-- AI assistance: Claude Code (Anthropic) and OpenAI Codex. Details in [AI-USAGE.md](../AI-USAGE.md).
+- AI assistance: Claude Code (Anthropic) and OpenAI Codex. Details in [AI-USAGE.md](../../AI-USAGE.md).
 
 ## Licence
 
-MIT, see [LICENSE](../LICENSE).
+MIT, see [LICENSE](../../LICENSE).

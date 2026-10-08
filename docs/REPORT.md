@@ -51,3 +51,34 @@ This week was the foundation every later feature sits on. Sign-in, pairing and t
 - Finish the screenshots with test accounts.
 - Install Flutter locally and follow my README's setup steps to prove they work.
 - Security checklist, AI-USAGE.md entries, demo video and slides.
+
+---
+
+## Week of: 5 October to 8 October 2026 (Week 3 closing)
+
+### What changed this week
+
+- **Whole app redesigned** in ten tested batches: Home, Chat, Timeline (cocoa corkboard), Love Notes (paper letters), Time Capsules (parchment and candle wax), Therabot (quietest screen), Bucket List, Profile, pairing and sign-in, then shared loading, empty and error states.
+- **Refactor for one couple:** a shared couple context, one live-update service (`couple_sync.dart`), preloaded fonts and icons, and the largest files split up. Tagged `v1.0-refactor-stable`.
+- **Security audit** with no critical or high findings and three medium ones, followed by a first fix: private realtime channels (migration 021), tested on DEV against the real Realtime server.
+- **Documentation updated:** live demo link at the top of the README, two tester accounts, Week 3 report, journal and documentation, reflection, and real AI-USAGE entries.
+
+### Why
+
+The features were all there, so the risk had moved from "missing" to "not trustworthy": a private app must be private, and a redesign must feel like one product. The audit and refactor came before new features because a shaky foundation would have made every later change riskier.
+
+### What broke or what I got stuck on
+
+- **Public realtime channels** meant anyone who knew a channel name could listen. Replaced by private channels.
+- **A sealed capsule could still be edited.** The rule moved into the database.
+- **Chat scroll jumped** after a reload and **removed reactions did not reach the partner.** Both fixed.
+- **Test flakiness:** one fade-in test depended on timing and was made deterministic.
+- **The production rollout of the first security fix was stopped at step 0** to check it safely before applying anything.
+
+### What is left
+
+- Apply the audit fixes to the live project in stages.
+- Retake screenshots with the tester accounts.
+- Record the demo video and finish the slides.
+- Password reset.
+

@@ -2,16 +2,42 @@
 
 > A private space for two people in one relationship.
 
-**Live app:** https://h1enz.github.io/6ADET-FINAL-PROJECT--USpace-APP/
+## Live demo: https://h1enz.github.io/6ADET-FINAL-PROJECT--USpace-APP/
+
+If the page shows an old version, press Ctrl + Shift + R or open it in a private window. Sign in with one of the [tester accounts](#tester-accounts) below.
+
 **Course:** Applications Development and Emerging Technologies (6ADET), Holy Angel University
 **Author:** Mikko Panergo
-**AI use:** Built with AI assistance (Claude, by Anthropic). What the AI wrote, what I changed, and what I wrote myself is recorded in [AI-USAGE.md](AI-USAGE.md).
+**AI use:** Built with AI assistance (Claude Code and OpenAI Codex). What the AI wrote, what I changed, and what I wrote myself (the Bucket List) is recorded in [AI-USAGE.md](AI-USAGE.md).
+
+## Tester accounts
+
+Two invented accounts, already paired as one couple, so you can try every feature and see both sides (chat, moods, notes, Time Capsules) without signing up. Use two different browsers, or one normal and one private window.
+
+| | Email | Password |
+|---|---|---|
+| Tester A | TESTER_A_EMAIL | TESTER_A_PASSWORD |
+| Tester B | TESTER_B_EMAIL | TESTER_B_PASSWORD |
+
+These accounts hold only made-up data. Please do not add real personal information.
 
 ---
 
 ## 1. Overview
 
-USpace is a private app for couples, including long-distance ones. Two partners pair their accounts with an invite code and share one space that nobody else can see, starting with a countdown to their anniversary. The planned shared timeline, love notes, Time Capsules (notes sealed until a chosen date) and bucket list are being built week by week (see [section 7](#7-known-issues-and-next-steps)).
+USpace is a private app for couples, including long-distance ones. Two partners pair their accounts with an invite code and share one space that nobody else can see. Everything in it belongs to the couple and is protected in the database, not only in the screens.
+
+What is built (Weeks 1 to 3):
+
+- **Home:** greeting, today's mood (shared with your partner automatically), a daily question, countdowns to your anniversary, birthdays and special days, a recent activity feed and quick actions.
+- **Chat:** private realtime chat with reactions.
+- **Timeline:** a scrapbook of memories with up to 10 photos, a story, location and tags, shown on an editable, zoomable corkboard with Polaroids, tape and decorations.
+- **Love Notes:** letters in categories, with an optional photo.
+- **Time Capsules:** notes and photos sealed until a chosen date, with a wax-seal opening ceremony. The sealed content stays hidden from both partners until then.
+- **Moods:** pick a mood and it is shared; matching moods merge into one shared state.
+- **Therabot:** a calm AI helper with Private Talk and Couple Reflection modes. What you say in private stays private.
+- **Bucket List:** things to do together, with a location, a budget and a shared savings log (written by me, see [AI-USAGE.md](AI-USAGE.md)).
+- **Profile / Settings:** photo, name, birthday, theme, unlink partner, sign out.
 
 ## 2. Setup and installation
 
@@ -88,12 +114,15 @@ The primary flow, screen by screen:
 | 2 | **Sign in** | Sign in with email and password, or tap **Create an account** to add your name and sign up. Passwords need at least 8 characters. | Pair (new account) or Home (already paired) |
 | 3 | **Pair with your partner** | **Start our space** (optionally pick your anniversary date first) to get a 6-character invite code, or type your partner's code and tap **Join space**. | Home |
 | 4 | **Home** | See both names and the anniversary card: days until your next anniversary, total days together, and a ring that fills through the year. Tap the card to set or change the date. Until your partner joins, a pink box shows the invite code with a copy button. Pull down to refresh. | Any tab |
-| 5 | **Profile** | See your name and email. **Sign out** returns to Sign in. | Sign in |
-| 6 | **Timeline, Love Notes, Bucket List** | Placeholders marked "Being built". | |
+| 5 | **Timeline, Love Notes, Time Capsules, Chat, Therabot** | Add memories, write letters, seal a capsule, chat, or talk to Therabot. | Back to any tab |
+| 6 | **Bucket List** | Add things to do together with a place and budget, log savings, tick items done. | Item page |
+| 7 | **Profile** | Change your photo, name, birthday and theme. Unlink partner or **Sign out**. | Sign in |
 
-**Navigation:** a bottom bar with five tabs on phones, and a side rail on screens 840 px and wider. The theme follows the device's light or dark setting.
+**Navigation:** a bottom bar on phones, and a side rail on screens 840 px and wider. The theme follows the device's light or dark setting.
 
-**Trying the two-person flow:** sign up in one browser and tap **Start our space**. In a *different* browser (a second private window in the same browser usually shares the first login), sign up with another email and join with the code. Pull down on Home in the first browser and both names appear.
+**Fastest way to try it:** sign in with the two [tester accounts](#tester-accounts) above, one per browser.
+
+**Trying the two-person flow with your own accounts:** sign up in one browser and tap **Start our space**. In a *different* browser (a second private window in the same browser usually shares the first login), sign up with another email and join with the code. Pull down on Home in the first browser and both names appear.
 
 **Privacy rules the app enforces** (in the database, not just the screens):
 
@@ -109,41 +138,25 @@ lib/
 ├── main.dart               Start-up: connects to Supabase, applies the theme, opens Splash
 ├── config.dart             Reads SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY at build time
 ├── models/                 Plain data classes built from database rows
-│   ├── couple.dart
-│   └── profile.dart
 ├── services/               All Supabase calls live here, not in screens
-│   ├── auth_service.dart   Sign up, sign in, sign out, readable error messages
-│   └── couple_service.dart Profile, couple, members, create/join couple, anniversary
-├── screens/                One file per screen (state is setState inside each)
-│   ├── splash_screen.dart  Seal and session check, tap to continue; restartFlow() re-runs it
-│   ├── sign_in_screen.dart
-│   ├── pair_screen.dart
-│   ├── main_shell.dart     Holds the five tabs
-│   ├── home_screen.dart
-│   ├── profile_screen.dart
-│   ├── coming_soon_screen.dart
-│   └── config_missing_screen.dart
-├── theme/                  The design system from docs/03-design-system.md
-│   ├── app_colors.dart     Light and dark colour schemes
-│   ├── app_typography.dart Poppins and Inter type scale
-│   ├── app_spacing.dart    4 dp spacing scale and corner radii
-│   └── app_theme.dart      Builds ThemeData from the three files above
-├── utils/
-│   └── anniversary.dart    Countdown maths (pure Dart, unit tested)
-└── widgets/                Reusable pieces, named as in the design system
-    ├── atoms/              app_button, app_text_field, section_label, unlock_ring, seal_badge
-    ├── molecules/          countdown_card
-    └── organisms/          app_shell (bottom bar or side rail)
+│   └── couple_sync.dart    One live-update service per couple (realtime)
+├── screens/                One file per screen; subfolders for Therabot and Time Capsules
+├── theme/                  Colours, typography, spacing, ThemeData (docs/03-design-system.md)
+├── utils/                  Pure Dart helpers (countdown maths, money), unit tested
+└── widgets/                atoms / molecules / organisms, as in the design system
 
+assets/                     3D mood artwork, chat reaction artwork, USpace line icons
 supabase/
-├── schema.sql              Tables, row-level security, pairing functions, photo bucket
-└── test/                   33 security checks run against schema.sql
+├── schema.sql              Base tables, row-level security, pairing functions, photo buckets
+├── migrations/             002 to 021: one file per later change
+├── functions/              Edge Functions: Therabot, capsule-photo
+└── test/                   Security checks against the database rules (see its README)
 
-test/                       Widget tests and countdown unit tests
-docs/                       Proposal, mockup, design system, weekly reports, security checklist
+test/                       Widget and unit tests
+docs/                       Proposal, mockup, design system, weekly reports, journal, security checklist
 ```
 
-**Where state lives:** each screen holds its own state with `setState`. Shared data lives in Supabase and is loaded through `services/`. Supabase keeps the login session, so a returning user stays signed in.
+**Where state lives:** each screen holds its own state with `setState`. Shared data lives in Supabase and is loaded through `services/`; `couple_sync.dart` keeps it fresh through realtime channels. Supabase keeps the login session, so a returning user stays signed in.
 
 ## 6. Screenshots
 
@@ -153,36 +166,31 @@ All screenshots use invented test accounts.
 |---|---|
 | ![Sign in](docs/screenshots/02-sign-in.png) | ![Create account](docs/screenshots/03-create-account.png) |
 
-| Timeline (placeholder) | Love Notes (placeholder) | Bucket List (placeholder) |
+| Home | Timeline | Bucket List |
 |---|---|---|
-| ![Timeline](docs/screenshots/08-placeholder.png) | ![Love Notes](docs/screenshots/08b-placeholder-love-notes.png) | ![Bucket List](docs/screenshots/08c-placeholder-bucket-list.png) |
+| ![Home](docs/screenshots/03b-home-question-countdowns.png) | ![Timeline](docs/screenshots/04-timeline.png) | ![Bucket List](docs/screenshots/06-bucket-list.png) |
 
-Still to add, retaken with test accounts: Splash, Pair, Home (waiting and paired), Profile, and the desktop layout.
+These are from Weeks 2 and 3; the screens were restyled in October (see section 7).
+
+Screenshots of the other Week 3 screens (Chat, Love Notes, Time Capsules, Therabot) are still to be retaken with the tester accounts; until then, use the live demo above.
 
 ## 7. Known issues and next steps
 
-### Not built yet
-
-- **Timeline, Love Notes, Time Capsules and Bucket List** are placeholder tabs. Their database tables and security policies already exist and are tested; the screens do not.
-- **"Recent memories" on Home** always says "No memories yet", because memories cannot be added until Timeline exists.
-- **No password reset.** The "Forgot password?" link from the mockup is not built.
-- **No way to edit your name, leave a couple, or switch the theme** from Profile yet. The theme follows the device setting.
-
 ### Known issues
 
-- **Partner joining does not update live.** The first partner has to pull down on Home to see that the second one has joined.
-- **Sign in and Pair are two screens**, where the mockup shows them as one. Splitting them made the flow simpler to build; merging them is still open.
-- **The setup steps have been tested through the automatic GitHub build, not yet on a fresh local machine.**
+- **Some screenshots predate the October redesign.** The live demo is the current version.
+- **No password reset.** The "Forgot password?" link from the mockup is not built.
+- **Sign in and Pair are two screens**, where the mockup shows them as one.
+- **Security audit (8 October 2026): no critical or high issues, 3 medium ones**, being fixed in stages: email confirmation is off on the live project, some broadcast channels were public (migration 021 makes them private), and pairing codes. Details in [docs/06-security-and-privacy.md](docs/06-security-and-privacy.md).
 - **After a new deploy, the live link can show the old version** because the browser caches the app. Press Ctrl + Shift + R, or open it in a private window.
 - **The Supabase free tier pauses a project after about a week without use.** If the live app cannot sign in, the project may need to be resumed from the Supabase dashboard.
 
 ### Next steps
 
-1. Timeline: add memories with a photo, caption and date, stored in the private photo bucket.
-2. Bucket List, written by me as my own-code section of `AI-USAGE.md`.
-3. Love Notes, then Time Capsules with the wax seal and unlock countdown.
-4. Profile: edit name, theme switch saved on the device.
-5. Live updates when a partner joins or adds something.
+1. Finish the security fixes from the audit.
+2. Retake all screenshots with the tester accounts.
+3. Password reset.
+4. Record the demo video and finish the final documents.
 
 ---
 
@@ -201,15 +209,19 @@ Still to add, retaken with test accounts: Splash, Pair, Home (waiting and paired
 | [Mockup and wireframes](docs/02-mockup.md) | What it looks like, and the screen flow |
 | [Design system](docs/03-design-system.md) | Colours, type, spacing, components |
 | [Weekly reports](docs/04-weekly-reports.md) | What happened each week |
+| [Project journal](docs/journal) | My reflections, week by week |
+| [Weekly documentation](docs/documentation) | The seven required sections, per week |
+| [Weekly increment report](docs/REPORT.md) | What changed, why, what broke |
+| [Reflection](docs/REFLECTION.md) | What I learned and my role in the project |
 | [Demo video](docs/05-demo-video.md) | The recording and what it shows |
 | [Security and privacy](docs/06-security-and-privacy.md) | The checklist, filled in |
 | [AI usage](AI-USAGE.md) | How AI was used, where it was wrong, and who wrote what |
 
 ## Credits
 
-- Packages: `supabase_flutter` (sign-in and data), `google_fonts` (Poppins and Inter), `device_preview` (phone frame). Full list in `pubspec.yaml`.
-- Fonts: Poppins and Inter, SIL Open Font License, via Google Fonts.
-- AI assistance: Claude (Anthropic). Details in [AI-USAGE.md](AI-USAGE.md).
+- Packages: `supabase_flutter` (sign-in and data), `google_fonts` (Playfair Display, Inter and handwriting fonts), `flutter_svg` (line icons), `image_picker`, `shared_preferences`, `device_preview` (opt-in phone frame). Full list in `pubspec.yaml`.
+- Fonts: Playfair Display, Inter, Lora, Caveat and La Belle Aurore, SIL Open Font License, via Google Fonts.
+- AI assistance: Claude Code (Anthropic) and OpenAI Codex. Details in [AI-USAGE.md](AI-USAGE.md).
 
 ## Licence
 

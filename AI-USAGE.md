@@ -1,52 +1,159 @@
 # AI usage
 
-This project was built with AI assistance. This file is the record of it. It is
-graded as the finals badge, and it is worth 100 points.
+This project was built with AI assistance, mainly **Claude Code** (Anthropic) and **OpenAI Codex**, under my direction. This file is the record: how I used AI, where it was wrong, and who wrote what. The history of this file in git shows it was kept up as the project went.
 
-Start it in week 1 and keep it up as you go. The commit history of this file is
-part of the evidence: a file written all at once the night before the deadline
-looks exactly like what it is.
+Live demo: https://h1enz.github.io/6ADET-FINAL-PROJECT--USpace-APP/
+
+Commit links use the repository https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP
 
 ## 1. How I used AI
 
-At least six entries. One per real use. Every entry needs a commit link.
+### 2026-09-28 - Database with row-level security
 
-### YYYY-MM-DD - short title
+- **Tool:** Claude Code
+- **What I asked for:** A Supabase schema for a couples app: couples, profiles, memories, notes, bucket items, pairing by invite code, a private photo bucket, and security so only the two partners can see their rows.
+- **What it gave back:** `supabase/schema.sql` and a test suite that tries to break the rules (another couple reading rows, a third person joining, faking the author, opening a Time Capsule early).
+- **What I kept, what I changed, and why:** I kept the design, because the privacy rule lives in the database and a screen bug cannot leak data. I made it run the 33 tests before I ran the SQL on Supabase. Later weeks grew the tests as new tables were added.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/121ef38
 
-- **Tool:**
-- **What I asked for:**
-- **What it gave back:**
-- **What I kept, what I changed, and why:**
-- **Commit:** https://github.com/YOUR-USERNAME/YOUR-REPO/commit/SHA
+### 2026-09-28 - Theme and shared widgets from my design system
+
+- **Tool:** Claude Code
+- **What I asked for:** Turn `docs/03-design-system.md` into a Flutter theme and reusable widgets.
+- **What it gave back:** Colour schemes, type scale, spacing, and atoms/molecules/organisms (button, text field, countdown card, app shell).
+- **What I kept, what I changed, and why:** I kept the structure. In October I replaced the Poppins/rose look with the deep plum, cocoa and cream direction with Playfair Display and Inter, once the app felt too generic.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/d677a3d
+
+### 2026-09-29 - Timeline and memories
+
+- **Tool:** Claude Code
+- **What I asked for:** Memories with a photo, caption and date in the private bucket, a year filter, a detail page, and a favourite that either partner can set.
+- **What it gave back:** The Memory model and service, the Timeline, the add-memory sheet and the detail screen, plus migration 002 for favourites.
+- **What I kept, what I changed, and why:** I kept it and later asked for a full scrapbook: up to 10 photos, story, location, tags, editing by both partners, and in October a zoomable corkboard canvas with Polaroids, tape and decorations.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/5d680ca
+
+### 2026-09-30 - Home, moods, daily question and chat database
+
+- **Tool:** Claude Code
+- **What I asked for:** A Home page with greeting, mood, daily question, countdowns, activity feed and quick actions, and the database for chat, moods and affection.
+- **What it gave back:** Migration 006, the services, and the new Home.
+- **What I kept, what I changed, and why:** I kept the data model. I rewrote the mood rules myself in the prompts: picking a mood shares it automatically, there is no "Share mood" button, and matching moods merge into one state while notes never merge.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/215a758
+
+### 2026-10-02 to 10-05 - Therabot
+
+- **Tool:** Claude Code (Edge Function and Flutter UI), Groq for the model behind it
+- **What I asked for:** A calm AI helper for couples with a private mode and a shared reflection mode, where private words never reach the partner.
+- **What it gave back:** A Supabase Edge Function, the guided chat, private next steps, and migrations 011, 016 and 017.
+- **What I kept, what I changed, and why:** I kept the privacy split and asked for the quietest screen in the app with minimal decoration, so it feels safe and not like a game.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/085ad93
+
+### 2026-10-04 - Time Capsules
+
+- **Tool:** Claude Code
+- **What I asked for:** Capsules sealed until a chosen date, photo first and letter second, with a ceremony when opened.
+- **What it gave back:** A secure data model (migration 014 and an Edge Function that serves the photo only after unlock), then the vintage parchment and candle-wax redesign.
+- **What I kept, what I changed, and why:** I kept the design. I asked for follow-up fixes where the security was not tight enough (see Case 3 below).
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/59f786b
+
+### 2026-10-06 to 10-07 - UI redesign program (batches 1 to 10)
+
+- **Tool:** Claude Code, with Figma and Playwright for reference and browser testing
+- **What I asked for:** A consistent romantic, warm, private look across Home, Chat, Timeline, Love Notes, Time Capsules, Therabot, Bucket List and Profile, and one set of loading, empty and error states.
+- **What it gave back:** The redesign in ten focused batches, each tested on its own before the next.
+- **What I kept, what I changed, and why:** I reviewed each batch against my design rules (no typed emoji as icons, calm motion, respect reduced motion) and asked for changes where it did not match.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/7c1ce64
+
+### 2026-10-08 - Realtime refactor and security audit
+
+- **Tool:** Claude Code
+- **What I asked for:** Clean up the code, make updates live without refreshing, then audit the security without changing anything.
+- **What it gave back:** One shared couple context, one live-update service (`couple_sync.dart`), faster font and icon loading, the largest files split up, and a written audit with no critical or high findings and three medium ones.
+- **What I kept, what I changed, and why:** I kept the refactor, which is tagged `v1.0-refactor-stable`. I asked for the fixes to go in phases, DEV first, and production only on my say-so.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/a49f3dd
 
 ## 2. Where the AI got it wrong
 
-Three cases. Be specific. If you write that the AI was never wrong, this section
-scores zero.
+### Case 1 - The wrong stack
 
-### Case 1 - short title
+- **What it gave me:** A complete Python/Flask app, after I answered "Python backend + frontend" to a quick question.
+- **What was wrong with it:** My own proposal said Flutter and Supabase, and GitHub Pages cannot run a Python server, so the live link could never have worked. The AI built exactly what I said, without checking it against my proposal or the course template.
+- **What I did instead:** Threw it away and rebuilt on Flutter + Supabase. Lesson: the AI follows my answer, so the answer has to be checked against my own documents first.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/121ef38 (the first commit of the real stack)
 
-- **What it gave me:**
-- **What was wrong with it:**
-- **What I did instead:**
-- **Commit:** https://github.com/YOUR-USERNAME/YOUR-REPO/commit/SHA
+### Case 2 - A splash screen that did not match my mockup
+
+- **What it gave me:** A splash that flashed for under a second and looked like the sign-in screen. When rebuilt, everything was stuck to the left.
+- **What was wrong with it:** It ran without errors but ignored my mockup (wax seal, tagline, loading dots). The code does not know what my design looks like.
+- **What I did instead:** Compared the live app with my mockup, asked for the wax seal, a wait-for-tap, and centring.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/15bb2d6 and https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/ff8414d
+
+### Case 3 - A sealed Time Capsule that was not fully sealed
+
+- **What it gave me:** A capsule model where the photo could still be changed on a capsule that was already sealed, and a cancel flow that skipped the grace-period reopen.
+- **What was wrong with it:** Sealing is the whole point of a Time Capsule. Letting the content change after sealing, or cancelling without reopening, breaks the promise to both partners.
+- **What I did instead:** Asked for the rule to be enforced in the database: a sealed capsule must be reopened before its photo can change, and a capsule in its grace period is reopened before it is cancelled.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/d237dfa and https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/f5904a4
+
+### Case 4 - Realtime channels anyone could join
+
+- **What it gave me:** Live updates through broadcast channels that were public.
+- **What was wrong with it:** The audit found that anyone who knew a channel name could listen to or send on it. That is not acceptable for a private couples app.
+- **What I did instead:** Asked for private channels that only the two partners can join, migration 021, and a test that proves another couple and signed-out visitors cannot join. It is on DEV and being rolled out to production in stages.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/a49f3dd (the realtime service); migration 021 is in `supabase/migrations/`
+
+### Case 5 - My own Bucket List bugs, found in review
+
+- **What it gave me:** This one is mine. My first Bucket List had five bugs, including a Save button that could never be tapped and a text controller disposed while its dialog was still closing.
+- **What was wrong with it:** I wrote code that compiled but did not behave. I only found out when a review pointed at them.
+- **What I did instead:** Fixed each one and learned why (a button is disabled when its condition can never become true; a controller must outlive the closing animation).
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/66d7f49
 
 ## 3. Who wrote what
 
-At least a fifth of this project is code you wrote yourself. Name it, and explain
-it in your own words.
+### My role: project creator and AI orchestrator
 
-> Group projects: give each member their own heading below, and use your GitHub
-> handle as the heading. You are graded on your own section.
+Throughout USpace I was the project creator, AI orchestrator and prompt engineer.
 
-### Written by me
+I developed the original concept and decided how the app should look, work and feel. I used Claude Code, together with OpenAI Codex, to turn those ideas into working Flutter features.
 
-- **File:**
-- **Commit:**
-- **What it does and why it is built this way:**
+My responsibilities:
+
+- Developing the original concept and overall vision of USpace.
+- Planning features and defining how they should function.
+- Writing detailed prompts and directing AI coding agents.
+- Coordinating development between Claude Code and Codex.
+- Reviewing AI-generated implementations and requesting improvements.
+- Manually organising, replacing and fixing application assets.
+- Identifying problems and directing debugging.
+- Making final decisions about the design and functionality.
+
+AI generated much of the source code. I was responsible for directing it and deciding what the final product should become.
+
+### Written by me: the Bucket List
+
+- **File:** `lib/models/bucket_item.dart`, `lib/services/bucket_service.dart`, `lib/screens/bucket_list_screen.dart`
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/9db3076 (model, service, tests) and https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/66d7f49 (the screen)
+- **What it does and why it is built this way:** The Bucket List is the part I personally coded. I chose it because it is the simplest feature, its table already existed, and I wanted to understand how Flutter handles user interaction, state, and showing and updating stored data. It lets a couple organise activities and goals they want to do together: adding items, showing their information, marking them done, and deleting them. Writing it taught me Flutter widgets, `setState`, how a screen calls a service, and how a service talks to the database through row-level security.
+
+**What happened after:** I later extended it with a location, a budget and a savings log (migration 003 and the item page, commit 146db7b), and in October the screen was restyled as part of the AI-assisted UI redesign (batch 9, commit fce39b1). The first version and its logic are mine; the later extensions and the restyle were done with AI help. <!-- CHECK: confirm in your own words how much of commit 146db7b you wrote yourself. -->
 
 ### The AI-written part I understand best
 
-- **File:**
-- **Commit:**
-- **What it does and why we kept it:**
+- **File:** `lib/services/couple_sync.dart`
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/a49f3dd
+- **What it does and why we kept it:** It is one live-update service for the whole couple. Before, each screen refreshed on its own, so a partner's message or mood only showed after pulling down. Now the app opens one set of channels that only the two partners can join, and screens listen to it. We kept it because it made updates instant and removed a lot of duplicated refresh code. <!-- CHECK: reword this in your own voice and correct anything that is not how you understand it. -->
+
+### AI-generated and AI-assisted code
+
+The remaining major features were developed primarily with Claude Code and OpenAI Codex under my direction: authentication, partner pairing, Home, Chat, Timeline, Memories, Love Notes, Moods, Time Capsules, Therabot and the supporting database. For these I provided the requirements, designed the intended experience, reviewed the output and directed the revisions.
+
+I acknowledge that writing prompts and reviewing generated code is different from personally writing source code.
+
+## 4. Reflection
+
+USpace is my experience combining manual programming with AI-assisted software engineering. AI speeds up development a great deal, but the developer must still understand the requirements, spot wrong implementations and make the decisions. Writing the Bucket List myself let me practise Flutter directly, and orchestrating Claude Code and Codex taught me prompt engineering, problem solving and managing an AI workflow.
+
+**My role was to create the vision, direct the development, evaluate the results, and personally implement the Bucket List.**
+
+More in [docs/REFLECTION.md](docs/REFLECTION.md).

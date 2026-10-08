@@ -88,6 +88,49 @@
 
 ---
 
+## Week 3 (September 28, 2026 to October 8, 2026)
+
+**Done this week**
+- Redesigned Home: greeting, today's mood, a daily question, countdowns to anniversary, birthdays and special days, an activity feed and quick actions (migration 006).
+- Built a private realtime chat with reactions, and moods that share automatically with the partner (matching moods merge into one shared state; notes never merge).
+- Upgraded the Timeline into a scrapbook: up to 10 photos, story, location, tags, editing by both partners, then an editable, zoomable corkboard with Polaroids, tape and decorations (migrations 009, 010, 018, 019).
+- Built Love Notes as paper letters with categories and an optional photo (migrations 007, 015).
+- Built Time Capsules that stay sealed for both partners until a chosen date, with a wax-seal ceremony and a server-side photo function (migration 014).
+- Built Therabot, a calm AI helper with Private Talk and Couple Reflection and private next steps (migrations 011, 016, 017).
+- Redesigned the whole app in ten tested batches around a deep plum, cocoa, dusty rose and cream palette with Playfair Display and Inter, plus shared loading, empty and error states.
+- Refactored: one shared couple context and one live-update service, faster font and icon loading, the largest files split up. Tagged `v1.0-refactor-stable`.
+- Ran a security audit (no critical or high findings, three medium) and started fixing it in stages: private realtime channels (migration 021, tested on DEV).
+- Added two tester accounts and the live demo link at the top of the README, and wrote the Week 3 journal, documentation, reflection and AI-USAGE entries.
+
+**In progress**
+- Applying the security fixes to the live project, DEV first.
+- Retaking screenshots with the tester accounts.
+- Demo video.
+
+**Blocked or stuck on**
+- A sealed Time Capsule's photo could still be changed, and cancelling skipped the grace-period reopen. Fixed in the database.
+- Realtime channels were public, so anyone who knew a name could join. Replaced with private channels that only the two partners can join.
+- Scroll jumping in chat after a reload, and a reaction removal that did not reach the partner. Both fixed.
+- The timeline lagged on iOS and while zooming. Reduced the redraw work.
+
+**Decisions made, and why**
+- **Design rules written down first:** a palette, fonts, motion rules and a screen personality for each tab, so every later change had something to be checked against.
+- **Mood sharing is automatic:** no "Share mood" button, and notes never merge, so a match never hides what someone wrote.
+- **Security in the database:** sealed capsules and private Therabot talks are enforced by row-level security and Edge Functions, not the screens.
+- **Audit before more features:** the last days went to cleanup, realtime and security, not new screens.
+- **Production only on request:** schema and security changes go to DEV first and to the live project only when I say so.
+
+**Hours spent, roughly:**
+- 40
+
+**Next week I will:**
+- Finish the security fixes and apply them to the live project.
+- Retake all screenshots with the tester accounts.
+- Record the demo video.
+- Make sure I can explain every part of the project.
+
+---
+
 ## Week N (date to date)
 
 **Done this week**
