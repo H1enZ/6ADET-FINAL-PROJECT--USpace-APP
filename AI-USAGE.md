@@ -72,14 +72,6 @@ Commit links use the repository https://github.com/H1enZ/6ADET-FINAL-PROJECT--US
 - **What I kept, what I changed, and why:** I kept the refactor, which is tagged `v1.0-refactor-stable`. I asked for the fixes to go in phases, DEV first, and production only on my say-so.
 - **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/a49f3dd
 
-### 2026-10-08 - Demo data, screenshots and documentation for the final submission
-
-- **Tool:** Claude Code
-- **What I asked for:** Fill the two tester accounts with sample data for my video presentation (moods, pictures, a customized Timeline, a Time Capsule, notes, Therabot answers), retake the screenshots, and update the README, journal, weekly report, documentation, reflection and this file.
-- **What it gave back:** Pictures drawn with a small script, a headless-browser script that drove the live app as both testers, the new screenshots, and the written documents.
-- **What I kept, what I changed, and why:** I kept the data and screenshots because they use invented content only. I decided what the demo should show and checked the documents against what I actually did. The commit history of the docs folder shows this was written alongside the work.
-- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/f992a68
-
 ## 2. Where the AI got it wrong
 
 ### Case 1 - The wrong stack
