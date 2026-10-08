@@ -40,8 +40,10 @@ The redesign went in ten batches, one screen area at a time, each tested before 
 
 ### 8. What I am proud of
 
-Two accounts, two browsers, and a message, a mood and a reaction appearing on the other side without refreshing. It felt like the first week's pairing moment all over again, but now there is a whole shared space behind it.
+Two accounts, two browsers, and a message, a mood and a reaction appearing on the other side without refreshing. It felt like the first week's pairing moment all over again, but now there is a whole shared space behind it. I am also proud that I got there by learning to work with AI properly, not by fighting it or letting it run.
 
 ## Overall
 
-This week taught me the difference between generating an app and building one. The AI can generate quickly, but the vision, the privacy rules, the review and the "no, that is not right yet" were mine. My plan for Week 4 is to finish the security fixes, retake the screenshots with the tester accounts, record the demo video, and make sure I can explain every part of the project when I present it.
+This week I learned to maximize AI, to embrace it, and to orchestrate it well. Embracing it meant I stopped treating AI as a shortcut I should feel guilty about and started treating it as a team I could lead: Claude Code as the lead, Codex as a second opinion and worker, each with a clear role. Maximizing it meant giving it what it needs to do its best work: written design rules, clear security rules, small batches, and a test after every batch. Orchestrating it meant that I decided what to build, in what order, and when something was wrong. The AI can generate quickly, but the vision, the privacy rules, the review and the "no, that is not right yet" were mine.
+
+My plan for Week 4 is to finish the security fixes, record the demo video, and make sure I can explain every part of the project when I present it.
