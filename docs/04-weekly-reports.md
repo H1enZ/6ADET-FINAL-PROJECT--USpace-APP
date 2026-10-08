@@ -104,7 +104,7 @@
 
 **In progress**
 - Applying the security fixes to the live project, DEV first.
-- Demo video.
+- Demo video (recorded on 9 October, see Week 4).
 
 **Blocked or stuck on**
 - A sealed Time Capsule's photo could still be changed, and cancelling skipped the grace-period reopen. Fixed in the database.
@@ -129,21 +129,33 @@
 
 ---
 
-## Week N (date to date)
+## Week 4 (October 9, 2026)
 
 **Done this week**
--
+- Completed the security and privacy checklist and added `SECURITY.md`.
+- Finished AI-USAGE.md: nine "how I used AI" entries, six cases where the AI (or I) got it wrong, who wrote what, every entry linked to a commit, and the commit links updated to the renamed repository.
+- Tidied the repository for hand-in: corrected the LICENSE copyright holder, removed a leftover file, documented the optional settings in `.env.example`.
+- Recorded the demo video against the live app with the two tester accounts.
+- Wrote the weekly increment report for Weeks 1 to 4 (`docs/REPORT.md`).
 
 **In progress**
--
+- Adding the demo video to the repository or linking a hosted copy.
+- Slides.
 
 **Blocked or stuck on**
--
+- Every commit link in AI-USAGE.md used the old repository name, which only worked through GitHub's redirect. I replaced them all.
+- A push was rejected because I had edited files on GitHub. I merged the remote changes instead of rebasing, so no history was rewritten.
+- Only about 2% of the Flutter code is written by me (the Bucket List). I recorded the real figure instead of inflating it.
 
 **Decisions made, and why**
--
+- **Be honest about the split:** the AI wrote most of the code under my direction, and AI-USAGE.md says so, because catching bad code and being honest about it is the point of the exercise.
+- **Merge, not rebase:** the commit links in AI-USAGE.md depend on the history staying as it is.
+- **Production only on request:** the remaining audit fixes go to the live project in stages, when I say so.
 
 **Hours spent, roughly:**
+- 6
 
 **Next week I will:**
--
+- Apply the remaining audit fixes to the live project in stages.
+- Add password reset.
+- Make sure I can explain every part of the project.
