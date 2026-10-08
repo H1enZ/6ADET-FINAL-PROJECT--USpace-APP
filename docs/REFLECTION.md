@@ -35,7 +35,7 @@ The Bucket List is the feature I coded by hand. I chose it because I wanted to u
 - Every serious defect found in this project was a place where a rule lived in the interface instead of the database: a sealed capsule whose photo could still change, and realtime channels anyone could join. The fixes moved the rule to the server. That is a good instinct to keep.
 - The Bucket List is the clearest evidence of understanding in the repository, because its bugs were found, explained and fixed by the author. A useful next step is to trace one other feature, for example how a chat message goes from the text field to the partner's screen through `couple_sync.dart`, and explain it in the same way.
 - Several commits are named "Create DOCUMENTATION" and "Delete docs/DOCUMENTATION" in a row, which shows documentation was done through the GitHub website under pressure. Keeping docs in the same commits as the features they describe would make the history easier to trust.
-- Remaining work that matters most: apply the audit's medium-severity fixes to production in stages, add sample content to the test couple, and record the demo.
+- Remaining work that matters most: apply the audit's medium-severity fixes to production in stages, and record the demo.
 
 ## What I would do differently
 

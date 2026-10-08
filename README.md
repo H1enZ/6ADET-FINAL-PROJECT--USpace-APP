@@ -160,25 +160,35 @@ docs/                       Proposal, mockup, design system, weekly reports, jou
 
 ## 6. Screenshots
 
-Taken on 8 October 2026 from the live demo, signed in with the two [tester accounts](#tester-accounts). All data is invented.
+Taken on 8 October 2026 from the live demo, signed in with the two [tester accounts](#tester-accounts). The test couple has sample data: six memories on the Timeline (with three frame styles and a sticky note), a love note, a sealed Time Capsule, shared moods, chat messages, a finished Therabot reflection and a Bucket List goal. All of it is invented, and the pictures were drawn for this project.
 
 | Sign in | Pair | Home |
 |---|---|---|
-| <img src="docs/screenshots/10-sign-in.png" width="250" alt="Sign in"> | <img src="docs/screenshots/11-pair.png" width="250" alt="Pair with your partner"> | <img src="docs/screenshots/12-home.png" width="250" alt="Home with the shared mood card"> |
+| <img src="docs/screenshots/10-sign-in.png" width="250" alt="Sign in"> | <img src="docs/screenshots/11-pair.png" width="250" alt="Pair with your partner"> | <img src="docs/screenshots/12-home.png" width="250" alt="Home"> |
 
-| Home, For us | Chat | Timeline |
+| Different moods | Same mood, merged | Home, For us |
 |---|---|---|
-| <img src="docs/screenshots/13-home-for-us.png" width="250" alt="Home quick actions and Therabot"> | <img src="docs/screenshots/14-chat.png" width="250" alt="Private chat"> | <img src="docs/screenshots/15-timeline.png" width="250" alt="Timeline"> |
+| <img src="docs/screenshots/21-moods-different.png" width="250" alt="Two different moods shown separately"> | <img src="docs/screenshots/22-moods-merged.png" width="250" alt="Matching moods merged into Loved together"> | <img src="docs/screenshots/13-home-for-us.png" width="250" alt="Home quick actions"> |
 
-| Love Notes | Time Capsules | Therabot |
+| Chat | Timeline | Timeline, customized |
 |---|---|---|
-| <img src="docs/screenshots/16-love-notes.png" width="250" alt="Love Notes"> | <img src="docs/screenshots/17-time-capsules.png" width="250" alt="Time Capsules"> | <img src="docs/screenshots/18-therabot.png" width="250" alt="Therabot"> |
+| <img src="docs/screenshots/14-chat.png" width="250" alt="Private chat between the two partners"> | <img src="docs/screenshots/15-timeline.png" width="250" alt="Scrapbook timeline with six memories"> | <img src="docs/screenshots/23-timeline-customized.png" width="250" alt="Timeline with film, postcard and taped frames and a sticky note"> |
 
-| Bucket List | Profile |
-|---|---|
-| <img src="docs/screenshots/19-bucket-list.png" width="250" alt="Bucket List"> | <img src="docs/screenshots/20-profile.png" width="250" alt="Profile"> |
+| Love Notes | Time capsule preview | Capsule sealed |
+|---|---|---|
+| <img src="docs/screenshots/16-love-notes.png" width="250" alt="A love note with a photo"> | <img src="docs/screenshots/24-capsule-preview.png" width="250" alt="Time capsule preview with a photo and a parchment letter"> | <img src="docs/screenshots/25-capsule-sealed.png" width="250" alt="Sealed capsule with a wax seal"> |
 
-The test couple has no memories or notes yet, so Timeline, Love Notes, Time Capsules and Bucket List show their empty states. The Timeline corkboard and Time Capsule ceremony fill up as you add content; try them in the live demo.
+| Time Capsules list | Therabot | Therabot privacy |
+|---|---|---|
+| <img src="docs/screenshots/17-time-capsules.png" width="250" alt="Time capsules list showing one sealed capsule"> | <img src="docs/screenshots/18-therabot.png" width="250" alt="Therabot hub"> | <img src="docs/screenshots/26-therabot-privacy.png" width="250" alt="Therabot privacy notice"> |
+
+| Therabot, private chat | Therabot, both finished | Shared reflection |
+|---|---|---|
+| <img src="docs/screenshots/27-therabot-chat.png" width="250" alt="Private Therabot conversation"> | <img src="docs/screenshots/28-therabot-session.png" width="250" alt="Reflection session status"> | <img src="docs/screenshots/29-therabot-shared.png" width="250" alt="Shared reflection made from short summaries"> |
+
+| Bucket List | Savings log | Profile |
+|---|---|---|
+| <img src="docs/screenshots/19-bucket-list.png" width="250" alt="Bucket list"> | <img src="docs/screenshots/30-bucket-savings.png" width="250" alt="Bucket item with a savings log"> | <img src="docs/screenshots/20-profile.png" width="250" alt="Profile"> |
 
 ## 7. Known issues and next steps
 
@@ -193,9 +203,9 @@ The test couple has no memories or notes yet, so Timeline, Love Notes, Time Caps
 ### Next steps
 
 1. Finish the security fixes from the audit.
-2. Add sample memories and notes so the empty-state screens have content.
+2. Record the demo video (see [the demo plan](docs/05-demo-video.md)).
 3. Password reset.
-4. Record the demo video and finish the final documents.
+4. Finish the final documents.
 
 ---
 

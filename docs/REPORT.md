@@ -78,7 +78,6 @@ The features were all there, so the risk had moved from "missing" to "not trustw
 ### What is left
 
 - Apply the audit fixes to the live project in stages.
-- Add sample content to the test couple.
 - Record the demo video and finish the slides.
 - Password reset.
 
