@@ -72,6 +72,14 @@ Commit links use the repository https://github.com/H1enZ/6ADET-FINAL-PROJECT--US
 - **What I kept, what I changed, and why:** I kept the refactor, which is tagged `v1.0-refactor-stable`. I asked for the fixes to go in phases, DEV first, and production only on my say-so.
 - **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/a49f3dd
 
+### 2026-10-08 - Demo data, screenshots and documentation for the final submission
+
+- **Tool:** Claude Code
+- **What I asked for:** Fill the two tester accounts with sample data for my video presentation (moods, pictures, a customized Timeline, a Time Capsule, notes, Therabot answers), retake the screenshots, and update the README, journal, weekly report, documentation, reflection and this file.
+- **What it gave back:** Pictures drawn with a small script, a headless-browser script that drove the live app as both testers, the new screenshots, and the written documents.
+- **What I kept, what I changed, and why:** I kept the data and screenshots because they use invented content only. I decided what the demo should show and checked the documents against what I actually did. The commit history of the docs folder shows this was written alongside the work.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/f992a68
+
 ## 2. Where the AI got it wrong
 
 ### Case 1 - The wrong stack
@@ -108,6 +116,13 @@ Commit links use the repository https://github.com/H1enZ/6ADET-FINAL-PROJECT--US
 - **What was wrong with it:** I wrote code that compiled but did not behave. I only found out when a review pointed at them.
 - **What I did instead:** Fixed each one and learned why (a button is disabled when its condition can never become true; a controller must outlive the closing animation).
 - **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/66d7f49
+
+### Case 6 - A dead live link and a wrong password in my own documents
+
+- **What it gave me:** A README with the live demo link at the top and a tester password.
+- **What was wrong with it:** The repository had been renamed to `USpace`, so the GitHub Pages link returned a 404, and one tester password was missing an "s". The AI wrote what I gave it without testing either.
+- **What I did instead:** Opened the live link and signed in as both testers, found both problems, and corrected the README and every document that used them.
+- **Commit:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commit/6ea3f2f
 
 ## 3. Who wrote what
 
