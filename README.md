@@ -230,6 +230,7 @@ Taken on 8 October 2026 from the live demo, signed in with the two [tester accou
 | [Reflection](docs/REFLECTION.md) | What I learned and my role in the project |
 | [Demo video](docs/05-demo-video.md) | The recording and what it shows |
 | [Security and privacy](docs/06-security-and-privacy.md) | The checklist, filled in |
+| [Security policy](SECURITY.md) | How privacy is protected and how to report a problem |
 | [AI usage](AI-USAGE.md) | How AI was used, where it was wrong, and who wrote what |
 
 ## Credits
