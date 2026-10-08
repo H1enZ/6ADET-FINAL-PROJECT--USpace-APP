@@ -8,7 +8,6 @@ This week was challenging but meaningful. I ran into problems with the tech stac
 
 The first version of USpace was a Python/Flask app, and it had to be thrown out. The reason was my own answer: when I was asked which stack to use, I chose "Python backend + frontend", even though my own proposal already said Flutter and Supabase. The Flask app could never have worked for this course, because GitHub Pages only hosts static files and cannot run a Python server.
 
-<!-- CHECK: the sentence below is a guess at why. Replace it with the real reason you picked Python in that moment. -->
 I answered quickly without opening my own proposal or my repo first.
 
 It was frustrating to see that work thrown away, even though it did not take long to build. The lesson is simple: before writing any code, I should reread my own proposal and the course template, and check where the project will be deployed. Those three things decide the stack, not what I feel like using that day.

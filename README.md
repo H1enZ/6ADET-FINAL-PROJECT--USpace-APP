@@ -228,7 +228,7 @@ Taken on 8 October 2026 from the live demo, signed in with the two [tester accou
 | [Weekly reports](docs/04-weekly-reports.md) | What happened each week |
 | [Project journal](docs/journal) | My reflections, week by week |
 | [Weekly documentation](docs/documentation) | The seven required sections, per week |
-| [Weekly increment report](docs/REPORT.md) | What changed, why, what broke |
+| [Weekly increment report](docs/04-weekly-reports.md) | What changed, why, what broke |
 | [Reflection](docs/REFLECTION.md) | What I learned and my role in the project |
 | [Demo video](docs/05-demo-video.md) | The recording and what it shows |
 | [Security and privacy](docs/06-security-and-privacy.md) | The checklist, filled in |

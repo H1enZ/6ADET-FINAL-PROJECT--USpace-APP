@@ -226,7 +226,7 @@ Taken on 8 October 2026 from the live demo, signed in with the two [tester accou
 | [Weekly reports](../04-weekly-reports.md) | What happened each week |
 | [Project journal](../journal) | My reflections, week by week |
 | [Weekly documentation](.) | The seven required sections, per week |
-| [Weekly increment report](../REPORT.md) | What changed, why, what broke |
+| [Weekly increment report](../04-weekly-reports.md) | What changed, why, what broke |
 | [Demo video](../05-demo-video.md) | The recording and what it shows |
 | [Security and privacy](../06-security-and-privacy.md) | The checklist, filled in |
 | [AI usage](../../AI-USAGE.md) | How AI was used, where it was wrong, and who wrote what |

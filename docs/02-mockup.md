@@ -22,7 +22,6 @@ The same six screens with the bottom nav replaced by a side rail. Two sheets.
 
 ![What changed, and why](assets/mockup-changes.png)
 
-Full document, all sheets in one file: [USpace_Mockup_Full.pdf](assets/USpace_Mockup_Full.pdf)
 
 ## Wireframes
 

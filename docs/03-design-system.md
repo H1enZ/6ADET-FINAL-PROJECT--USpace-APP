@@ -4,7 +4,7 @@ The reference I open every time I build a screen. Everything below is what goes 
 
 ![Design system](assets/design-system.png)
 
-[Design system (PDF, 8 pages)](assets/design-system.pdf) — the full version: every role, both schemes as Dart, all 19 components with their constructors, and the screens × components matrix.
+The full version is this page: every role, both schemes as Dart, all 19 components with their constructors, and the screens × components matrix.
 
 **Theme mode: light and dark.** Decided now rather than retrofitted, because the Profile screen has a theme switch and a light-only app would ship a control that does nothing. **Fonts:** Poppins for display and titles, Inter for everything the user reads, both through `google_fonts`.
 
