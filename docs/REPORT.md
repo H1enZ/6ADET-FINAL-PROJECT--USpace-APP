@@ -2,11 +2,13 @@
 
 **Project:** USpace, a private app for two people in one relationship
 **Live app:** https://h1enz.github.io/USpace/
-**Commits:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commits/main
+**Commits:** https://github.com/H1enZ/USpace/commits/main
 
 ---
 
-## Week of: 28 September to 4 October 2026 (Week 1)
+## Week 1: 16 to 23 September 2026
+
+*Submitted late: the work below was done on 28 to 29 September 2026.*
 
 ### What changed this week
 
@@ -54,25 +56,68 @@ This week was the foundation every later feature sits on. Sign-in, pairing and t
 
 ---
 
-## Week of: 5 October to 8 October 2026 (Week 3 closing)
+## Week 2: 23 to 27 September 2026
+
+*Submitted late: the work below was done on 29 to 30 September 2026.*
 
 ### What changed this week
 
-- **Whole app redesigned** in ten tested batches: Home, Chat, Timeline (cocoa corkboard), Love Notes (paper letters), Time Capsules (parchment and candle wax), Therabot (quietest screen), Bucket List, Profile, pairing and sign-in, then shared loading, empty and error states.
-- **Refactor for one couple:** a shared couple context, one live-update service (`couple_sync.dart`), preloaded fonts and icons, and the largest files split up. Tagged `v1.0-refactor-stable`.
-- **Security audit** with no critical or high findings and three medium ones, followed by a first fix: private realtime channels (migration 021), tested on DEV against the real Realtime server.
-- **Documentation updated:** live demo link at the top of the README, two tester accounts, Week 3 report, journal and documentation, reflection, and real AI-USAGE entries.
+- **Timeline built:** memories with a photo, caption and date in the private photo bucket, a year filter, a detail page, and delete for the author. A database function (migration 002) lets either partner favourite a memory without being able to edit it.
+- **Bucket List written by me** (model, service and screen with To do / Done / All filters, ticking and swipe to delete), then extended with a location, a budget and a shared savings log with a progress bar and the amount to save each month (migration 003). No real money moves through the app.
+- **Profile built:** a profile photo in its own private bucket, editable name, and birthday with countdowns for both partners on Profile and Home (migration 004).
+- **Light / Dark / System theme switch** that is remembered on the device.
+- **Security checklist filled in and acted on:** GitHub Actions pinned to commit SHAs, server-side photo size and type limits (migration 005), secret scanning and push protection on, and git switched to my no-reply email.
+- **Database tests grew from 33 to 61,** all passing.
+- **Documentation:** Week 1 and Week 2 pages and screenshots taken with test accounts, and weekly reports for both weeks.
 
 ### Why
 
-The features were all there, so the risk had moved from "missing" to "not trustworthy": a private app must be private, and a redesign must feel like one product. The audit and refactor came before new features because a shaky foundation would have made every later change riskier.
+Week 1 gave me sign-in, pairing and Home, but the app had nothing in it yet. Memories and the Bucket List were the first features a couple would actually use together, and the Bucket List was the part I had promised to write myself, so I did it early while the schema was small. The security checklist went in the same week so the privacy rules were checked while there were few tables to check.
 
 ### What broke or what I got stuck on
 
+- **"Could not find the table `public.bucket_contributions`"** because I pushed the code before running the migration. Running migrations 002 and 003 fixed it.
+- **Profile photos failed with "Bucket not found"** because the last part of a migration had not run. A repair script that only adds what is missing fixed it.
+- **My first Bucket List had five bugs,** including a Save button that could never be tapped and a text controller disposed while its dialog was still closing. A review found them and I fixed each one.
+- **Pasting SQL from VS Code into the Supabase editor did not work;** copying from a browser tab did.
+- **Pushes were rejected** because GitHub had newer commits. Pulling before pushing fixed it.
+- **Two folders that differed only in capital letters,** which Windows treats as one, after I created one on GitHub and one on my PC. I removed the duplicate and now create files only from my PC.
+
+### What is left
+
+- A new Home: greeting, today's mood, a daily question, countdowns, an activity feed and quick actions.
+- Love Notes and Time Capsules that stay sealed until a chosen date.
+- Upgrade the Timeline into a scrapbook.
+- A private realtime chat.
+
+---
+
+## Week 3: 28 September to 8 October 2026
+
+### What changed this week
+
+- **New Home** (migration 006): greeting, today's mood, a daily question, countdowns to the anniversary, birthdays and special days, an activity feed and quick actions.
+- **Private realtime chat** with reactions, and **moods that share automatically** with the partner. Matching moods merge into one shared state, and notes never merge.
+- **Timeline became a scrapbook:** up to 10 photos, story, location, tags, editing by both partners, then an editable, zoomable corkboard with Polaroids, tape and decorations (migrations 009, 010, 018, 019).
+- **Love Notes** as paper letters with categories and an optional photo (migrations 007, 015).
+- **Time Capsules** that stay sealed for both partners until a chosen date, with a wax-seal ceremony and a server-side photo function (migration 014).
+- **Therabot,** a calm AI helper with Private Talk, Couple Reflection and private next steps (migrations 011, 016, 017).
+- **Whole app redesigned** in ten tested batches around deep plum, cocoa, dusty rose and cream with Playfair Display and Inter: Home, Chat, Timeline (cocoa corkboard), Love Notes (paper letters), Time Capsules (parchment and candle wax), Therabot (quietest screen), Bucket List, Profile, pairing and sign-in, then shared loading, empty and error states.
+- **Refactor for one couple:** a shared couple context, one live-update service (`couple_sync.dart`), preloaded fonts and icons, and the largest files split up. Tagged `v1.0-refactor-stable`.
+- **Security audit** with no critical or high findings and three medium ones, then a first fix: private realtime channels (migration 021), tested on DEV against the real Realtime server.
+- **Documentation updated:** live demo link at the top of the README, two tester accounts, Week 3 journal, documentation and reflection, and real AI-USAGE entries.
+
+### Why
+
+Week 2 left me with a working shell, so Week 3 was where USpace became the app I had in mind. I started by writing design rules (palette, fonts, motion, a personality for each screen), because the AI's output became much more consistent once it had something to check against. Once every feature existed, the risk moved from "missing" to "not trustworthy": a private app must be private, and a redesign must feel like one product. So the audit and refactor came before any new feature.
+
+### What broke or what I got stuck on
+
+- **A sealed Time Capsule's photo could still be changed,** and cancelling skipped the grace-period reopen. The rule moved into the database.
 - **Public realtime channels** meant anyone who knew a channel name could listen. Replaced by private channels.
-- **A sealed capsule could still be edited.** The rule moved into the database.
-- **Chat scroll jumped** after a reload and **removed reactions did not reach the partner.** Both fixed.
-- **Test flakiness:** one fade-in test depended on timing and was made deterministic.
+- **Chat scroll jumped** after a reload, and **removed reactions did not reach the partner.** Both fixed.
+- **The Timeline lagged on iOS and while zooming.** I reduced the redraw work.
+- **A fade-in test depended on timing** and was made deterministic.
 - **The production rollout of the first security fix was stopped at step 0** to check it safely before applying anything.
 
 ### What is left
@@ -81,3 +126,31 @@ The features were all there, so the risk had moved from "missing" to "not trustw
 - Record the demo video and finish the slides.
 - Password reset.
 
+---
+
+## Week 4: 9 October 2026 (submission day)
+
+### What changed this week
+
+- **Security and privacy checklist completed**, with a `SECURITY.md` that says what is protected, where, and how to report a problem.
+- **AI-USAGE.md finished:** nine "how I used AI" entries, six cases where the AI (or I) got it wrong, who wrote what (the Bucket List is my own code), every entry linked to a commit, and the placeholder notes replaced with my own explanation of `couple_sync.dart`. Commit links now use the renamed repository.
+- **Repository tidied for hand-in:** copyright holder corrected in the LICENSE, the leftover `START-HERE.md` removed, optional settings documented in `.env.example`, and the example Supabase URL and key updated.
+- **Demo video recorded** on 9 October against the live app with the two tester accounts. It is not in the repository yet.
+- **Demo data and screenshots** from the previous night were checked: invented names and pictures only.
+
+### Why
+
+The features and the redesign were done, so this last stretch was about being able to prove the work: a reviewer should be able to open the repository and see what is protected, how the AI was used, and which part I wrote. The checklist and AI-USAGE.md had to be finished from the real commit history, not written from memory on the last night.
+
+### What broke or what I got stuck on
+
+- **The old repository name in every commit link.** The repository was renamed to `USpace`, so my links pointed at a name that only works through GitHub's redirect. I replaced them all.
+- **A local branch that was one commit behind** after editing on GitHub. I used a fast-forward pull so no history was rewritten.
+- **Only about 2% of the code is written by me** (the Bucket List, roughly 820 of 47,500 lines in `lib/`). The badge asks for more, and I decided to state the real figure in AI-USAGE.md instead of inflating it.
+
+### What is left
+
+- Add the demo video to `docs/` or link a hosted copy, and update `docs/05-demo-video.md`.
+- Finish the slides.
+- Apply the remaining audit fixes to the live project in stages, on my say-so.
+- Password reset.
