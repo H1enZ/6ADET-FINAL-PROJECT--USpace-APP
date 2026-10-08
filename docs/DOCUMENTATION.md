@@ -2,7 +2,7 @@
 
 > A private space for two people in one relationship.
 
-## Live demo: https://h1enz.github.io/6ADET-FINAL-PROJECT--USpace-APP/
+## Live demo: https://h1enz.github.io/USpace/
 
 If the page shows an old version, press Ctrl + Shift + R or open it in a private window. Sign in with one of the [tester accounts](#tester-accounts) below.
 
@@ -16,8 +16,8 @@ Two invented accounts, already paired as one couple, so you can try every featur
 
 | | Email | Password |
 |---|---|---|
-| Tester A | TESTER_A_EMAIL | TESTER_A_PASSWORD |
-| Tester B | TESTER_B_EMAIL | TESTER_B_PASSWORD |
+| Tester A | testaccounts1@gmail.com | testaccounts1 |
+| Tester B | testaccounts2@gmail.com | testaccounts2 |
 
 These accounts hold only made-up data. Please do not add real personal information.
 
@@ -54,8 +54,8 @@ You also need Git, Google Chrome, and a free [Supabase](https://supabase.com) ac
 ### Step 1: Get the code
 
 ```bash
-git clone https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP.git
-cd 6ADET-FINAL-PROJECT--USpace-APP
+git clone https://github.com/H1enZ/USpace.git
+cd USpace
 flutter pub get
 ```
 
@@ -160,25 +160,30 @@ docs/                       Proposal, mockup, design system, weekly reports, jou
 
 ## 6. Screenshots
 
-All screenshots use invented test accounts.
+Taken on 8 October 2026 from the live demo, signed in with the two [tester accounts](#tester-accounts). All data is invented.
 
-| Sign in | Create account |
-|---|---|
-| ![Sign in](screenshots/02-sign-in.png) | ![Create account](screenshots/03-create-account.png) |
-
-| Home | Timeline | Bucket List |
+| Sign in | Pair | Home |
 |---|---|---|
-| ![Home](screenshots/03b-home-question-countdowns.png) | ![Timeline](screenshots/04-timeline.png) | ![Bucket List](screenshots/06-bucket-list.png) |
+| <img src="screenshots/10-sign-in.png" width="250" alt="Sign in"> | <img src="screenshots/11-pair.png" width="250" alt="Pair with your partner"> | <img src="screenshots/12-home.png" width="250" alt="Home with the shared mood card"> |
 
-These are from Weeks 2 and 3; the screens were restyled in October (see section 7).
+| Home, For us | Chat | Timeline |
+|---|---|---|
+| <img src="screenshots/13-home-for-us.png" width="250" alt="Home quick actions and Therabot"> | <img src="screenshots/14-chat.png" width="250" alt="Private chat"> | <img src="screenshots/15-timeline.png" width="250" alt="Timeline"> |
 
-Screenshots of the other Week 3 screens (Chat, Love Notes, Time Capsules, Therabot) are still to be retaken with the tester accounts; until then, use the live demo above.
+| Love Notes | Time Capsules | Therabot |
+|---|---|---|
+| <img src="screenshots/16-love-notes.png" width="250" alt="Love Notes"> | <img src="screenshots/17-time-capsules.png" width="250" alt="Time Capsules"> | <img src="screenshots/18-therabot.png" width="250" alt="Therabot"> |
+
+| Bucket List | Profile |
+|---|---|
+| <img src="screenshots/19-bucket-list.png" width="250" alt="Bucket List"> | <img src="screenshots/20-profile.png" width="250" alt="Profile"> |
+
+The test couple has no memories or notes yet, so Timeline, Love Notes, Time Capsules and Bucket List show their empty states. The Timeline corkboard and Time Capsule ceremony fill up as you add content; try them in the live demo.
 
 ## 7. Known issues and next steps
 
 ### Known issues
 
-- **Some screenshots predate the October redesign.** The live demo is the current version.
 - **No password reset.** The "Forgot password?" link from the mockup is not built.
 - **Sign in and Pair are two screens**, where the mockup shows them as one.
 - **Security audit (8 October 2026): no critical or high issues, 3 medium ones**, being fixed in stages: email confirmation is off on the live project, some broadcast channels were public (migration 021 makes them private), and pairing codes. Details in [docs/06-security-and-privacy.md](06-security-and-privacy.md).
@@ -188,7 +193,7 @@ Screenshots of the other Week 3 screens (Chat, Love Notes, Time Capsules, Therab
 ### Next steps
 
 1. Finish the security fixes from the audit.
-2. Retake all screenshots with the tester accounts.
+2. Add sample memories and notes so the empty-state screens have content.
 3. Password reset.
 4. Record the demo video and finish the final documents.
 

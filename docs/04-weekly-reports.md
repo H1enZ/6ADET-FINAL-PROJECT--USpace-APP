@@ -104,7 +104,7 @@
 
 **In progress**
 - Applying the security fixes to the live project, DEV first.
-- Retaking screenshots with the tester accounts.
+- Adding sample content for the screenshots.
 - Demo video.
 
 **Blocked or stuck on**
@@ -125,7 +125,7 @@
 
 **Next week I will:**
 - Finish the security fixes and apply them to the live project.
-- Retake all screenshots with the tester accounts.
+- Add sample memories and notes so the empty-state screens have content.
 - Record the demo video.
 - Make sure I can explain every part of the project.
 

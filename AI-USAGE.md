@@ -2,7 +2,7 @@
 
 This project was built with AI assistance, mainly **Claude Code** (Anthropic) and **OpenAI Codex**, under my direction. This file is the record: how I used AI, where it was wrong, and who wrote what. The history of this file in git shows it was kept up as the project went.
 
-Live demo: https://h1enz.github.io/6ADET-FINAL-PROJECT--USpace-APP/
+Live demo: https://h1enz.github.io/USpace/
 
 Commit links use the repository https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP
 

@@ -1,7 +1,7 @@
 # Weekly Increment Report
 
 **Project:** USpace, a private app for two people in one relationship
-**Live app:** https://h1enz.github.io/6ADET-FINAL-PROJECT--USpace-APP/
+**Live app:** https://h1enz.github.io/USpace/
 **Commits:** https://github.com/H1enZ/6ADET-FINAL-PROJECT--USpace-APP/commits/main
 
 ---
@@ -78,7 +78,7 @@ The features were all there, so the risk had moved from "missing" to "not trustw
 ### What is left
 
 - Apply the audit fixes to the live project in stages.
-- Retake screenshots with the tester accounts.
+- Add sample content to the test couple.
 - Record the demo video and finish the slides.
 - Password reset.
 
