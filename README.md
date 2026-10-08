@@ -1,5 +1,7 @@
 # USpace
 
+[![Made with AI](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md)
+
 > A private digital space that understands two people's relationship.
 
 ## Live demo: https://h1enz.github.io/USpace/

@@ -1,6 +1,6 @@
 # AI usage
 
-This project was built with AI assistance, mainly **Claude Code** (Anthropic) and **OpenAI Codex**, under my direction. This file is the record: how I used AI, where it was wrong, and who wrote what. The history of this file in git shows it was kept up as the project went.
+This project was built with AI assistance, mainly **Claude Code** (Anthropic) and **OpenAI Codex**, under my direction. This file is the record: how I used AI, where it was wrong, and who wrote what. I want to be accurate about its history: I started it from the course template on 20 September, but I did not update it during Weeks 1 and 2, and wrote most of it on 8 and 9 October from my notes, my commit history and the AI conversations. Every entry links a real commit, so each one can be checked against the repository.
 
 Live demo: https://h1enz.github.io/USpace/
 
@@ -141,7 +141,10 @@ AI generated much of the source code. I was responsible for directing it and dec
 
 - **File:** `lib/models/bucket_item.dart`, `lib/services/bucket_service.dart`, `lib/screens/bucket_list_screen.dart`
 - **Commit:** https://github.com/H1enZ/USpace/commit/9db3076 (model, service, tests) and https://github.com/H1enZ/USpace/commit/66d7f49 (the screen)
-- **What it does and why it is built this way:** The Bucket List is the part I personally coded. I chose it because it is the simplest feature, its table already existed, and I wanted to understand how Flutter handles user interaction, state, and showing and updating stored data. It lets a couple organise activities and goals they want to do together: adding items, showing their information, marking them done, and deleting them. Writing it taught me Flutter widgets, `setState`, how a screen calls a service, and how a service talks to the database through row-level security.
+- **What it does and why it is built this way:** The Bucket List is the part I personally coded. I chose it because it is the simplest feature and its table already existed, so I could focus on how Flutter handles user interaction and stored data. It lets a couple add things they want to do together, filter them (To do / Done / All), tick them off, and swipe to delete.
+  - **Model (`bucket_item.dart`):** `BucketItem` is a plain class that mirrors one row of `bucket_items`. `fromMap` turns a database row into an object and treats a missing `is_done` as false, so a null never crashes the screen. I wrote `withDone` instead of a normal `copyWith` because `copyWith` with `??` cannot set a value back to null: unticking an item has to clear `completedAt`, and `?? ` would keep the old date.
+  - **Service (`bucket_service.dart`):** the screen never talks to Supabase directly; it calls `BucketService.list`, `add`, `setDone` and `delete`. Each is one query. `list` sorts not-done items first and newest first. I filter by `couple_id` but the real protection is row-level security in the database, which only returns rows of the user's own couple, so a bug in my screen cannot show another couple's list.
+  - **Screen (`bucket_list_screen.dart`):** state lives in the screen with `setState`: the list of items and the selected filter. Ticking an item updates the list on screen first so the checkbox feels instant, then saves to the database; if saving fails, it puts the old item back and shows an error. Deleting asks for confirmation first, and checks `mounted` after every `await` so it never touches a screen that has already closed. The add dialog keeps its text controller inside its own widget and disposes it only when the dialog is really gone, which is the fix for the crash described in Case 5.
 
 **What happened after:** I later extended it with a location, a budget and a savings log (migration 003 and the item page, commit 146db7b), and in October the screen was restyled as part of the AI-assisted UI redesign (batch 9, commit fce39b1). The first version and its logic are mine; the later extensions (commit 146db7b) and the restyle were done with AI help, so I do not count them as my own code.
 
@@ -159,8 +162,28 @@ I acknowledge that writing prompts and reviewing generated code is different fro
 
 ## 4. Reflection
 
-USpace is my experience combining manual programming with AI-assisted software engineering. AI speeds up development a great deal, but the developer must still understand the requirements, spot wrong implementations and make the decisions. Writing the Bucket List myself let me practise Flutter directly, and orchestrating Claude Code and Codex taught me prompt engineering, problem solving and managing an AI workflow.
+Looking back at the entire development process, I can say that creating USpace was both exciting and challenging.
 
-**My role was to create the vision, direct the development, evaluate the results, and personally implement the Bucket List.**
+There were moments when I felt proud because I could finally see the application I had imagined becoming real. There were also moments when I felt frustrated because something wasn't working, the design didn't match my expectations, or I had to repeat a process several times.
+
+But despite those challenges, I learned a lot about project planning, application development, prompt engineering, debugging, security, and decision-making. Most of all, I learned to maximize AI, embrace AI, and orchestrate AI well.
+
+What made this project meaningful to me was that it started with my own idea. I wanted to create something that could help couples feel appreciated, remembered, and connected, even when they were far away from each other.
+
+Seeing that idea turn into an actual application was a rewarding experience.
+
+I'm proud of what I accomplished, but I also recognize that I still have a lot to improve, especially when it comes to writing and understanding code independently.
+
+I don't consider USpace a perfect application, and I know there are still issues that need to be addressed. However, I see those imperfections as opportunities to learn.
+
+My role in this project was to create the vision, direct the development, evaluate the results, and personally implement the Bucket List feature.
+
+I learned to maximize AI, embrace AI, and orchestrate AI well, and honestly, it changed how I feel about it. At the start I was a little embarrassed to depend on AI so much, as if it meant the work was not really mine. Over time that feeling turned into something closer to pride. Once I stopped hiding it and embraced it, with Claude Code as my lead and OpenAI Codex as a second opinion, I could finally put all my energy into the part that mattered: what USpace should feel like. It was frustrating when the first results were generic, and it was a relief when I wrote down my design, mood, security and Git rules and the output suddenly matched what I had imagined. That is when I understood what it means to maximize AI: it does its best work when I give it clear direction, small steps and a test after every batch. And orchestrating it was the most satisfying part. Deciding the order, giving each tool its role, and saying "no, that is not right yet" when something was wrong made me feel like the director of the project and not just someone typing prompts.
+
+I also see this as more than a school project. The job market is changing fast, and AI is already part of how software gets built. I would rather not spend my time fighting it or pretending it does not exist. I would rather embrace it and learn to use it as early and as well as I can, so that by the time I am looking for work I already know how to direct it, check it and take responsibility for what it produces.
+
+If there's one thing I'll take away from this experience, it's that AI can help me build what I imagine, but it's still my responsibility to understand what I'm building, question the results, and keep learning along the way.
+
+For me, that's the most important lesson I gained from creating USpace.
 
 More in [docs/REFLECTION.md](docs/REFLECTION.md).
