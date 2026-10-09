@@ -9,8 +9,6 @@
 | **Landing page** | [h1enz.github.io/USpace/landing/](https://h1enz.github.io/USpace/landing/) |
 | **Live app** | [h1enz.github.io/USpace/](https://h1enz.github.io/USpace/) |
 | **Live demo (sample data)** | Use the paired [tester accounts](#tester-accounts) below to explore the app in two browsers. Sign-in required. |
-| **Demo video** | [Watch on Google Drive](https://drive.google.com/drive/folders/1xLpXpmEgaxzFTsB-vuYS3_B-xGaInN48?usp=sharing) |
-| **Course** | Applications Development and Emerging Technologies (6ADET), Holy Angel University |
 | **Author** | Mikko Panergo |
 
 **AI use:** Built with AI assistance (Claude Code and OpenAI Codex). What the AI wrote, what I changed, and what I wrote myself (the Bucket List) is recorded in [AI-USAGE.md](AI-USAGE.md).
