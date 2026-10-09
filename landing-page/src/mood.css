@@ -1,0 +1,77 @@
+@layer components {
+  .mood-phone { width: 300px; transform: rotate(4deg); animation: none; }
+  .mood-screen { overflow: hidden; border-radius: 21px 21px 29px 29px; background: linear-gradient(160deg, #2a182b, #190f1d 70%); padding: 17px 13px 0; }
+  .demo-topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .demo-topline > span:first-child { font: 600 1.25rem var(--serif); color: var(--cream); }
+  .demo-topline > span:first-child span { font-size: .65rem; color: var(--rose); }
+  .demo-badge { border: 1px solid #e39aae55; border-radius: 20px; padding: 3px 7px; color: var(--rose-light); font-size: .625rem; }
+  .demo-greeting { font-size: .688rem; margin-top: 20px; }
+  .demo-welcome { font: 500 1.65rem/1.3 var(--serif); color: var(--cream); margin: 4px 0 16px; }
+  .demo-anniversary { display: flex; align-items: center; gap: 9px; background: linear-gradient(115deg, #70334f, #3e284b); padding: 12px 10px; border-radius: 12px; font-size: .688rem; line-height: 1.5; color: var(--cream); border: 1px solid #e39aae30; }
+  .demo-anniversary .icon { width: 20px; height: 20px; color: var(--rose-light); }
+  .demo-anniversary small { display: block; color: #f0c8d6; font-size: .625rem; }
+  .mood-demo { --mood-glow: #dc769b; position: relative; text-align: center; padding: 20px 0 14px; }
+  .mood-demo[data-feeling='calm'] { --mood-glow: #aca5e6; }
+  .mood-demo[data-feeling='need_a_hug'] { --mood-glow: #e6b989; }
+  .mood-eyebrow { font-size: .625rem; text-transform: uppercase; letter-spacing: .16em; color: var(--rose-light); }
+  .mood-artwork { position: relative; display: grid; place-items: center; width: 100%; height: 148px; isolation: isolate; }
+  .mood-artwork::before { content: ''; position: absolute; width: 130px; height: 130px; border-radius: 50%; background: var(--mood-glow); opacity: .12; filter: blur(25px); z-index: -1; transition: background .5s; }
+  .mood-demo .demo-mood-image { width: 142px; height: 142px; aspect-ratio: 1; object-fit: contain; background: transparent; border-radius: 0; filter: drop-shadow(0 10px 14px #0002); }
+  .mood-orbit { position: absolute; width: 145px; height: 110px; border: 1px solid #e39aae22; border-radius: 50%; transform: rotate(-24deg); z-index: -1; }
+  .mood-spark { position: absolute; color: var(--rose-light); pointer-events: none; }
+  .spark-a { left: 16%; top: 24%; font-size: 1.1rem; }
+  .spark-b { right: 17%; bottom: 23%; font-size: .75rem; }
+  .demo-mood-title { font: 500 1.375rem/1.3 var(--serif); color: var(--cream); }
+  .demo-mood-message { font-size: .688rem; line-height: 1.6; min-height: 2.2rem; max-width: 220px; margin: 7px auto 14px; }
+  .mood-options { display: none; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .js .mood-options { display: grid; }
+  .mood-options button { min-height: 44px; padding: 8px 3px; border: 1px solid #e39aae45; border-radius: 10px; background: #fff3ec05; color: var(--cream); font-size: .625rem; line-height: 1.35; cursor: pointer; transition: background .25s, color .25s, transform .25s, box-shadow .25s; }
+  .mood-options button:hover { background: #e39aae20; transform: translateY(-3px); }
+  .mood-options button[aria-pressed='true'] { background: var(--rose); border-color: var(--rose); color: #2a0f1c; box-shadow: 0 5px 18px #e39aae20; }
+  .mood-demo-note { font-size: .625rem; margin-top: 12px; }
+  .demo-bottomline { display: flex; justify-content: space-between; align-items: center; gap: 6px; border-top: 1px solid var(--line); padding: 14px 1px; font-size: .625rem; color: var(--muted); }
+  .demo-bottomline .icon { width: 15px; height: 15px; color: var(--rose); }
+  .feature-mood-demo { padding: 0 30px 24px; }
+  .feature-mood-demo .mood-demo { padding-top: 14px; }
+  .feature-mood-demo .mood-eyebrow { display: none; }
+  .feature-mood-demo .mood-artwork { height: 175px; }
+  .feature-mood-demo .demo-mood-image { width: 180px; height: 180px; }
+  .feature-mood-demo .mood-options { max-width: 350px; margin-inline: auto; }
+  .feature-mood-demo .mood-options button { font-size: .75rem; }
+  .feature-mood-demo .demo-mood-message { max-width: 300px; font-size: .813rem; }
+  .feature-mood-demo .mood-demo-note { font-size: .688rem; }
+  .gallery-mood-demo { border-radius: 20px; padding: 35px 12px 25px; background: radial-gradient(ellipse at 50% 35%, #793f5850, transparent 65%), #211522; }
+  .gallery-mood-demo .mood-artwork { height: 210px; }
+  .gallery-mood-demo .demo-mood-image { width: 190px; height: 190px; }
+  .gallery-mood-demo .demo-mood-message { min-height: 3.4rem; }
+  .gallery-mood-demo[hidden], #preview-image[hidden] { display: none; }
+  .shows-mood-demo { min-height: 470px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .mood-phone:focus-within { translate: 0 0; }
+    .mood-demo:hover .mood-orbit { transform: rotate(24deg) scale(1.1); }
+    .mood-orbit { transition: transform 1s cubic-bezier(.2,.8,.2,1); }
+  }
+}
+@layer responsive {
+  @media (min-width: 801px) { .phone-composition { height: 680px; } .hero-grid { min-height: 820px; } .floating-label { left: -3%; bottom: 105px; } }
+  @media (max-width: 1100px) and (min-width: 801px) { .mood-phone { width: 265px; } }
+  @media (max-width: 800px) { .mood-phone { width: 280px; right: 2%; } .phone-composition { height: 680px; } }
+  @media (max-width: 560px) {
+    .mood-phone { width: 76%; right: 1%; top: 10px; }
+    .phone-back { width: 53%; left: 0; top: 95px; }
+    .phone-composition { height: 650px; }
+    .hero-visual .floating-label { display: none; }
+    .visual-annotation { bottom: 5px; }
+    .mood-screen { padding-inline: 10px; }
+    .demo-welcome { font-size: 1.4rem; }
+    .demo-mood-title { font-size: 1.2rem; }
+    .feature-mood-demo { padding-inline: 24px; }
+  }
+  @media (max-width: 380px) {
+    .mood-phone { width: 83%; }
+    .demo-anniversary { padding-inline: 6px; gap: 6px; }
+    .floating-label { padding: 9px 11px; bottom: 40px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .mood-options button:hover { transform: none; } }
+  @media (max-width: 800px) { .mood-phone { translate: none; } }
+}

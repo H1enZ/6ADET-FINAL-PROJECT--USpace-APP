@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#140c14" />
+    <style>
+      html{background:#140c14}#welcome-intro{display:none}
+      html[data-intro="active"] body> :not(#welcome-intro){visibility:hidden}
+      html[data-intro="active"] #welcome-intro{display:flex;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 40%,#5d2944,#140c14 68%);color:#fff3ec;opacity:1}
+      html[data-intro="active"]{overflow:hidden}
+      #welcome-intro .welcome-wordmark{font-family:'Playfair Display Variable',Georgia,serif;font-size:clamp(3.5rem,10vw,5.5rem);margin:20px 0 0}
+      #welcome-intro .welcome-wordmark,#welcome-intro .welcome-line,#welcome-intro .welcome-orbits i,#welcome-intro .welcome-orbits span{opacity:0;animation:none}
+      #welcome-intro .welcome-line{font:12px/1.6 system-ui;letter-spacing:.12em;text-align:center;padding:0 20px;color:#edb6c4}
+      #welcome-intro .welcome-orbits{position:relative;width:190px;height:130px;display:grid;place-items:center;color:#e39aae}
+      #welcome-intro .welcome-orbits i{position:absolute;width:115px;height:115px;border:1px solid #e39aae77;border-radius:50%;left:0}
+      #welcome-intro .welcome-orbits i:nth-child(2){left:auto;right:0}
+      #welcome-intro .welcome-orbits span{font-size:28px}
+    </style>
+    <script>
+      // Parsed before the body: the landing page cannot paint before this state.
+      window.USPACE_INTRO_MS = 4000;
+      document.documentElement.dataset.intro = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'done' : 'active';
+      window.uspaceSkipIntro = function () {
+        document.documentElement.dataset.intro = 'done';
+        document.dispatchEvent(new CustomEvent('uspace:intro-complete', {detail:{skipped:true}}));
+      };
+      document.addEventListener('keydown', function (event) {
+        if(event.key === 'Escape' && document.documentElement.dataset.intro !== 'done') window.uspaceSkipIntro();
+      });
+    </script>
+    <title>USpace — Your Love, Your Space.</title>
+    <meta name="description" content="A private little universe for two. Share memories, leave love notes, check in with each other, and dream together with USpace, a web app for couples." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="USpace — Your Love, Your Space." />
+    <meta property="og:description" content="A private little universe for everything that makes your relationship special. Discover USpace, a shared space for couples." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/polish.css" />
+    <link rel="stylesheet" href="/src/mood.css" />
+    <link rel="stylesheet" href="/src/timeline.css" />
+    <link rel="stylesheet" href="/src/capsule.css" />
+    <link rel="stylesheet" href="/src/story-motion.css" />
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <section id="welcome-intro" aria-label="Welcome to USpace">
+      <div class="welcome-orbits" aria-hidden="true"><i></i><i></i><span>♥</span></div>
+      <p class="welcome-wordmark">USpace</p><p class="welcome-line">A little universe. Just for two.</p>
+    </section>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="nav-wrap container">
+        <a class="wordmark" href="#home" aria-label="USpace home">USpace<span class="brand-heart" aria-hidden="true">♥</span></a>
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="Open navigation"><span></span><span></span></button>
+        <nav id="main-nav" aria-label="Main navigation">
+          <a href="#home">Home</a><a href="#features">Features</a><a href="#how-it-works">How It Works</a><a href="#about">About</a><a href="#faq">FAQ</a>
+          <a class="button button-small" href="#get-started">Get Started</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="home" aria-labelledby="hero-heading">
+        <div class="hero-atmosphere" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><i class="star star-one"></i><i class="star star-two"></i><i class="star star-three"></i></div>
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="tiny-orbits" aria-hidden="true"></span>A little universe. Just for two.</p>
+            <h1 id="hero-heading">Your Love,<br /><em>Your Space.</em></h1>
+            <p class="hero-description">A private little universe for everything that makes your relationship special.</p>
+            <p class="hero-support">The everyday hellos. The big little moments. The dreams you’re still dreaming. Keep them close, together.</p>
+            <div class="button-row"><a class="button" href="#preview">Explore USpace</a><a class="button button-outline" href="#features">Discover Features</a></div>
+            <div class="hero-footnote"><span class="icon icon-heart" aria-hidden="true"></span><span>Two people. One shared world.</span></div>
+          </div>
+          <figure class="hero-visual">
+            <div class="phone-composition">
+              <a class="phone phone-back" href="#preview" data-preview-link="timeline" aria-label="Edit the Timeline demo"><div class="phone-speaker" aria-hidden="true"></div><img src="/assets/screens/timeline.webp" width="620" height="1342" alt="USpace Timeline with sample memories arranged as Polaroids on a corkboard" fetchpriority="high" /><span class="timeline-phone-label">Try your Timeline ↗</span></a>
+              <div class="phone phone-front mood-phone"><div class="phone-speaker" aria-hidden="true"></div><div class="mood-screen"><div class="demo-topline"><span>USpace<span aria-hidden="true"> ♥</span></span><span class="demo-badge">Live demo</span></div><p class="demo-greeting">A little moment for you.</p><p class="demo-welcome">Hello, you two.</p><div class="demo-anniversary"><span class="icon icon-heart" aria-hidden="true"></span><div>Your everyday, together.<small>Make room for the little things.</small></div></div><div class="mood-demo" data-mood-demo><p class="mood-eyebrow">Today’s mood</p><div class="mood-artwork"><span class="mood-orbit" aria-hidden="true"></span><img class="demo-mood-image" src="/assets/moods/loved.webp" alt="" width="200" height="200" /><span class="mood-spark spark-a" aria-hidden="true">✦</span><span class="mood-spark spark-b" aria-hidden="true">♥</span></div><p class="demo-mood-title">Feeling loved.</p><p class="demo-mood-message">A little closer, just by being you.</p><div class="mood-options" role="group" aria-label="Choose your demo mood"><button type="button" data-mood="loved" aria-pressed="true">Loved</button><button type="button" data-mood="calm" aria-pressed="false">Calm</button><button type="button" data-mood="need_a_hug" aria-pressed="false">Need a hug</button></div><p class="mood-demo-note">Try a feeling. This space is yours.</p></div><div class="demo-bottomline"><span class="icon icon-home" aria-hidden="true"></span><span>A little universe for two</span><span class="icon icon-heart" aria-hidden="true"></span></div></div></div>
+              <div class="floating-label"><span class="icon icon-heart" aria-hidden="true"></span><span>A little closer,<br /><strong>even from afar.</strong></span></div>
+              <span class="visual-annotation">your everyday, together</span>
+            </div>
+            <figcaption>Choose a mood. Tap the Timeline. Make this little world yours.<br />Interactive demos · Not connected to an account</figcaption>
+          </figure>
+        </div>
+        <div class="hero-bottom container"><span>A place for the things that matter.</span><a href="#features">Take a closer look <span class="scroll-line" aria-hidden="true"></span></a><span>Made for your kind of love.</span></div>
+      </section>
+
+      <section class="features section container" id="features" aria-labelledby="features-heading">
+        <div class="section-heading reveal"><div><p class="eyebrow">The little things, all together</p><h2 id="features-heading">More than a chat.<br /><em>A world of your own.</em></h2></div><p>Give your memories a home, your feelings a voice, and your “someday” a place to begin.</p></div>
+        <div class="feature-grid">
+          <article class="feature-card timeline-card reveal">
+            <div class="card-copy"><span class="icon icon-timeline" aria-hidden="true"></span><p class="card-kicker">01 / Remember</p><h3>Your story, worth keeping.</h3><p>Turn photos, places, and little stories into a shared scrapbook. Arrange your memories in a way that feels like you.</p><a class="text-link" href="#preview" data-preview-link="timeline">Explore your Timeline</a></div>
+            <div class="timeline-art"><img src="/assets/screens/timeline.webp" alt="The app’s corkboard Timeline with illustrated sample photo memories" width="620" height="1342" loading="lazy" /></div>
+          </article>
+          <article class="feature-card mood-card reveal">
+            <div class="card-copy"><span class="icon icon-mood" aria-hidden="true"></span><p class="card-kicker">02 / Check in</p><h3>A little “how are you?”</h3><p>Share today’s mood. Let your partner know when you’re feeling loved, excited, or could really use a hug.</p></div>
+            <div class="feature-mood-demo" data-mood-mount></div>
+          </article>
+          <article class="feature-card notes-card reveal"><div class="card-copy"><span class="icon icon-note" aria-hidden="true"></span><p class="card-kicker">03 / Say it</p><h3>Words to come back to.</h3><p>Leave a Love Note, add a photo, and keep your favourite little reminders of “I choose you.”</p></div><div class="note-detail"><img src="/assets/screens/love-notes.webp" width="620" height="1342" loading="lazy" alt="A Love Note in the USpace app, using fictional sample content" /></div></article>
+          <article class="feature-card capsule-card reveal"><div class="card-copy"><span class="icon icon-capsule" aria-hidden="true"></span><p class="card-kicker">04 / Look forward</p><h3>A love letter to your future.</h3><p>Seal a note and photos in a Time Capsule. Choose a date, then wait for your words to find their moment.</p><a class="text-link" href="#preview" data-preview-link="capsules">Meet Time Capsules</a></div><div class="capsule-detail"><img src="/assets/screens/capsule-sealed.webp" width="620" height="1342" loading="lazy" alt="The real wax-seal ceremony shown when a USpace Time Capsule is sealed" /></div></article>
+        </div>
+        <div class="more-features reveal">
+          <article><span class="icon icon-chat" aria-hidden="true"></span><h3>Your everyday conversation</h3><p>Private couple messaging, photos, and reactions that say a little more.</p></article>
+          <article><span class="icon icon-calendar" aria-hidden="true"></span><h3>Days worth counting down</h3><p>Keep anniversaries, birthdays, and your own special dates close.</p></article>
+          <article><span class="icon icon-bucket" aria-hidden="true"></span><h3>Dream it. Plan it. Do it.</h3><p>Build a shared Bucket List, plan budgets, and track savings together.</p></article>
+          <article><span class="icon icon-question" aria-hidden="true"></span><h3>Keep getting to know you</h3><p>Daily questions that make room for a new conversation.</p></article>
+        </div>
+      </section>
+
+      <section class="how-section section" id="how-it-works" aria-labelledby="how-heading">
+        <div class="container"><div class="center-heading reveal"><p class="eyebrow">It starts with the two of you</p><h2 id="how-heading">A small beginning.<br /><em>So much to share.</em></h2></div>
+          <ol class="steps">
+            <li class="reveal"><div class="step-illustration" aria-hidden="true"><span class="step-orbit"></span><span class="icon icon-home"></span><b>01</b></div><h3>Create your private space.</h3><p>Create an account with your name, email, and password. Choose “Start our space” and add your anniversary if you’d like.</p></li>
+            <li class="reveal"><div class="step-illustration" aria-hidden="true"><span class="step-orbit double-orbit"></span><span class="icon icon-link"></span><b>02</b></div><h3>Connect with your partner.</h3><p>Share your six-character invite code. Your partner creates their own account and enters it to join your space.</p></li>
+            <li class="reveal"><div class="step-illustration" aria-hidden="true"><span class="step-orbit"></span><span class="icon icon-heart"></span><b>03</b></div><h3>Start making memories.</h3><p>Send your first message, share a mood, or save a favourite moment. Your shared world grows from there.</p></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="preview-section section container" id="preview" aria-labelledby="preview-heading">
+        <div class="center-heading reveal"><p class="eyebrow">Make yourself at home</p><h2 id="preview-heading">A glimpse into <em>your space.</em></h2><p>Little rituals. Meaningful moments. All in one place.</p></div>
+        <div class="preview-tabs" role="tablist" aria-label="Explore USpace screens">
+          <button id="tab-timeline" type="button" role="tab" aria-selected="true" aria-controls="preview-panel" data-screen="timeline"><span class="icon icon-timeline" aria-hidden="true"></span>Timeline</button>
+          <button id="tab-home" type="button" role="tab" aria-selected="false" aria-controls="preview-panel" tabindex="-1" data-screen="home"><span class="icon icon-mood" aria-hidden="true"></span>Moods</button>
+          <button id="tab-chat" type="button" role="tab" aria-selected="false" aria-controls="preview-panel" tabindex="-1" data-screen="chat"><span class="icon icon-chat" aria-hidden="true"></span>Chat</button>
+          <button id="tab-bucket" type="button" role="tab" aria-selected="false" aria-controls="preview-panel" tabindex="-1" data-screen="bucket"><span class="icon icon-bucket" aria-hidden="true"></span>Bucket List</button>
+          <button id="tab-notes" type="button" role="tab" aria-selected="false" aria-controls="preview-panel" tabindex="-1" data-screen="notes"><span class="icon icon-note" aria-hidden="true"></span>Love Notes</button>
+          <button id="tab-capsules" type="button" role="tab" aria-selected="false" aria-controls="preview-panel" tabindex="-1" data-screen="capsules"><span class="icon icon-capsule" aria-hidden="true"></span>Time Capsules</button>
+        </div>
+        <div class="preview-stage" id="preview-panel" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0">
+          <div class="preview-copy"><p class="eyebrow" id="preview-kicker">Your shared scrapbook</p><h3 id="preview-title">Because “remember when” deserves a home.</h3><p id="preview-description">The first coffee. The spontaneous trip. An ordinary Tuesday that felt like everything. Keep the photos and the story, together.</p><ul id="preview-points"><li>Save photos, stories, locations, and tags</li><li>Arrange a corkboard that feels like yours</li><li>Revisit your favourite moments together</li></ul><a class="text-link" href="https://h1enz.github.io/USpace/" target="_blank" rel="noopener noreferrer">Try the web app<span class="sr-only"> (opens in a new tab)</span></a></div>
+          <figure class="preview-device"><span class="preview-halo" aria-hidden="true"></span><div class="phone preview-phone"><div class="phone-speaker" aria-hidden="true"></div><img id="preview-image" src="/assets/screens/timeline.webp" alt="USpace Timeline showing illustrated sample memories on a corkboard" width="620" height="1342" loading="lazy" /></div><figcaption>Actual app screenshot · Fictional sample data</figcaption></figure>
+          <span class="preview-index" aria-hidden="true"><span id="preview-number">01</span> / 06</span>
+        </div>
+        <noscript><p class="no-script-note">The Timeline preview is shown above. Enable JavaScript to edit the demo Timeline and explore all six previews.</p></noscript>
+      </section>
+
+      <section class="story-section section" id="about" aria-labelledby="story-heading"><div class="container story-grid">
+        <div class="story-art reveal" aria-hidden="true"><div class="story-ring ring-left"></div><div class="story-ring ring-right"></div><span class="story-heart">♥</span><span class="story-word word-you">you</span><span class="story-word word-me">me</span><span class="story-word word-us">us.</span><div class="story-keepsake keepsake-note"><span class="icon icon-note"></span><span>Made it home.<br /><em>Miss you already.</em></span></div><div class="story-keepsake keepsake-mood"><img src="/assets/moods/loved.webp" width="80" height="80" alt="" loading="lazy" /><span>My favourite feeling.<br /><em>Being us.</em></span></div><span class="story-art-caption">Two lives. A little universe in between.</span></div>
+        <div class="story-copy reveal"><p class="eyebrow">Why USpace exists</p><h2 id="story-heading">Love lives in<br /><em>the little things.</em></h2><p>A “made it home.” A photo only they would understand. The dream you keep talking about before you fall asleep.</p><p>Relationships are made of these moments. USpace gives them a place to stay, away from the noise of everything else.</p><p>Whether you’re across the room or across time zones, it’s a small way to keep choosing each other, every day.</p><div class="story-signoff"><span class="icon icon-heart" aria-hidden="true"></span>For the everyday kind of extraordinary.</div></div>
+      </div></section>
+
+      <section class="support-section container reveal" aria-labelledby="support-heading"><div class="support-icon"><span class="icon icon-listen" aria-hidden="true"></span></div><div><p class="eyebrow">On the harder days, too</p><h2 id="support-heading">A little room to <em>understand each other.</em></h2><p>Therabot offers AI-guided private reflection and a Couple Reflection mode. Slow down, put feelings into words, and explore a next step together.</p><p class="support-note">A reflection tool, not professional counselling. Private conversations are processed by an AI service; shared reflections use short summaries rather than private messages.</p></div></section>
+
+      <section class="privacy-section section container" id="privacy" aria-labelledby="privacy-heading"><div class="privacy-heading reveal"><div class="privacy-emblem" aria-hidden="true"><span class="icon icon-lock"></span></div><p class="eyebrow">Personal by design</p><h2 id="privacy-heading">Your relationship.<br /><em>Your shared space.</em></h2><p>A place for two people to connect, with account and couple-based access controls built into the app.</p></div><div class="privacy-points reveal">
+        <article><span class="icon icon-link" aria-hidden="true"></span><div><h3>Connected by invitation</h3><p>Each space is made for two accounts. Your partner joins using your invite code.</p></div></article>
+        <article><span class="icon icon-lock" aria-hidden="true"></span><div><h3>Access checked in the database</h3><p>Row-level security restricts shared records to the couple they belong to. Photos are stored in private storage buckets.</p></div></article>
+        <article><span class="icon icon-capsule" aria-hidden="true"></span><div><h3>Some things are worth waiting for</h3><p>Sealed Time Capsule content stays unavailable to both partners until its unlock time, enforced by the backend.</p></div></article>
+        <p class="privacy-note">USpace is an evolving project. Read the <a href="https://github.com/H1enZ/USpace/blob/main/docs/06-security-and-privacy.md" target="_blank" rel="noopener noreferrer">security and privacy notes<span class="sr-only"> (opens in a new tab)</span></a> for implementation details and known limitations.</p>
+      </div></section>
+
+      <section class="faq-section section" id="faq" aria-labelledby="faq-heading"><div class="container faq-grid"><div class="reveal"><p class="eyebrow">A few things you might wonder</p><h2 id="faq-heading">Good questions.<br /><em>Honest answers.</em></h2><p>Getting to know USpace, a little better.</p></div><div class="faq-list">
+        <details><summary>What is USpace?<span aria-hidden="true"></span></summary><div class="faq-answer"><p>USpace is a web app for two people in a relationship. It brings your conversations, memories, love notes, moods, and plans into one shared space. It works in your browser with an internet connection.</p></div></details>
+        <details><summary>How do I connect with my partner?<span aria-hidden="true"></span></summary><div class="faq-answer"><p>Create your account and choose “Start our space.” You’ll receive a six-character invite code. Your partner creates their own account, enters that code, and chooses “Join space.” Each space supports exactly two people.</p></div></details>
+        <details><summary>Can we save our memories together?<span aria-hidden="true"></span></summary><div class="faq-answer"><p>Yes. Add a story, a location, tags, and up to ten photos to a memory. Your shared Timeline turns them into a scrapbook you can arrange and revisit together. Love Notes and Time Capsules give your words a place, too.</p></div></details>
+        <details><summary>Is our information private?<span aria-hidden="true"></span></summary><div class="faq-answer"><p>The app uses signed-in accounts, database rules that restrict shared records to the couple, and private photo storage. It does not offer end-to-end encryption. Therabot processes conversations through an AI service. This is an evolving project with documented security limitations; review the <a href="https://github.com/H1enZ/USpace/blob/main/docs/06-security-and-privacy.md" target="_blank" rel="noopener noreferrer">security and privacy notes<span class="sr-only"> (opens in a new tab)</span></a> before adding sensitive information.</p></div></details>
+        <details><summary>What features are available?<span aria-hidden="true"></span></summary><div class="faq-answer"><p>Explore shared messaging, the photo Timeline, Love Notes, Time Capsules, daily mood sharing and questions, anniversary and special-day countdowns, a Bucket List with savings tracking, and Therabot’s private and couple reflection modes.</p></div></details>
+        <details><summary>How can we start using USpace?<span aria-hidden="true"></span></summary><div class="faq-answer"><p>Open the <a href="https://h1enz.github.io/USpace/" target="_blank" rel="noopener noreferrer">USpace web app<span class="sr-only"> (opens in a new tab)</span></a>, continue past the welcome screen, and choose “Create an account.” There’s no app-store download to install. The app needs an internet connection. If the demo is temporarily unavailable, try again later.</p></div></details>
+      </div></div></section>
+
+      <section class="final-cta section container" id="get-started" aria-labelledby="cta-heading"><div class="cta-orbit" aria-hidden="true"></div><span class="icon icon-heart" aria-hidden="true"></span><p class="eyebrow">Here’s to your next chapter</p><h2 id="cta-heading">Every Love Story<br />Deserves <em>Its Own Space.</em></h2><p>Start with a hello. Make a little room for us.</p><a class="button" href="https://h1enz.github.io/USpace/" target="_blank" rel="noopener noreferrer">Open USpace<span class="sr-only"> (opens in a new tab)</span></a><span class="cta-note">Available as a web app · No download needed</span></section>
+    </main>
+    <p class="sr-only" id="mood-announcement" role="status" aria-live="polite"></p>
+
+    <footer class="site-footer container"><div class="footer-top"><div><a class="wordmark" href="#home" aria-label="USpace home">USpace<span class="brand-heart" aria-hidden="true">♥</span></a><p>Your Love, Your Space.</p></div><nav aria-label="Footer navigation"><a href="#features">Features</a><a href="#how-it-works">How It Works</a><a href="#about">About</a><a href="#faq">FAQ</a><a href="#privacy">Privacy</a></nav></div><div class="footer-bottom"><span>© <span id="year">2026</span> USpace. Made with care, for two.</span><span>A project by Mikko Panergo <span aria-hidden="true">·</span> <a href="https://github.com/H1enZ/USpace" target="_blank" rel="noopener noreferrer">View project<span class="sr-only"> (opens in a new tab)</span></a></span></div></footer>
+  </body>
+</html>

@@ -1,16 +1,23 @@
-# USpace
+# USpace - a little universe, just for two
 
-[![Made with AI](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md)
+![Flutter](https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white) ![Dart](https://img.shields.io/badge/Dart-0175C2?logo=dart&logoColor=white) ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white) ![Vite](https://img.shields.io/badge/Landing_page-Vite-646CFF?logo=vite&logoColor=white) ![GitHub Pages](https://img.shields.io/badge/Deployed_on-GitHub_Pages-222222?logo=github&logoColor=white) [![Made with AI](https://img.shields.io/badge/Made_with-AI_assistance-blue)](AI-USAGE.md) [![License MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-> A private digital space that understands two people's relationship.
+> USpace is a private digital space for couples to share moods, save memories, write love notes, and seal messages for the future - a little universe, just for two.
 
-## Live demo: https://h1enz.github.io/USpace/
+| | |
+|---|---|
+| **Landing page** | [h1enz.github.io/USpace/landing/](https://h1enz.github.io/USpace/landing/) |
+| **Live app** | [h1enz.github.io/USpace/](https://h1enz.github.io/USpace/) |
+| **Live demo (sample data)** | Use the paired [tester accounts](#tester-accounts) below to explore the app in two browsers. Sign-in required. |
+| **Demo video** | [Watch on Google Drive](https://drive.google.com/drive/folders/1xLpXpmEgaxzFTsB-vuYS3_B-xGaInN48?usp=sharing) |
+| **Course** | Applications Development and Emerging Technologies (6ADET), Holy Angel University |
+| **Author** | Mikko Panergo |
 
-If the page shows an old version, press Ctrl + Shift + R or open it in a private window. Sign in with one of the [tester accounts](#tester-accounts) below.
-
-**Course:** Applications Development and Emerging Technologies (6ADET), Holy Angel University
-**Author:** Mikko Panergo
 **AI use:** Built with AI assistance (Claude Code and OpenAI Codex). What the AI wrote, what I changed, and what I wrote myself (the Bucket List) is recorded in [AI-USAGE.md](AI-USAGE.md).
+
+The landing page includes interactive mood and Timeline previews, a cinematic introduction, and a Time Capsule animation based on the Flutter app. These are sample interactions; account features live in the app. See [landing-page/README.md](landing-page/README.md) for local setup and animation details.
+
+If the live app shows an old version, press Ctrl + Shift + R or open it in a private window.
 
 ## Tester accounts
 
