@@ -269,10 +269,11 @@ test('capsule opens, reverses mid-flight, reseals repeatedly, and keeps locked c
     await control.click();
     await expect(envelope).toHaveAttribute('data-state', 'open', {timeout:8000});
     await expect(envelope.getByRole('button',{name:'Tap the letter to read it'})).toHaveCount(0);
-    await expect(envelope.locator('.capsule-interface')).toBeVisible();
-    await expect(control).toHaveAttribute('aria-expanded', 'true');
-    await expect(content.getByRole('heading', { name: 'Your Time Capsules' })).toBeVisible();
-    await expect(content.locator('img')).toHaveJSProperty('complete', true);
+    await expect(content).toBeHidden();
+    await expect(control).toHaveAttribute('aria-expanded', 'false');
+    await expect(envelope.getByRole('heading', { name: 'Your Time Capsules' })).toHaveCount(0);
+    await expect(content.locator('img')).toHaveCount(0);
+    await expect(envelope.locator('canvas')).toBeVisible();
     await control.click();
     await expect(envelope).toHaveAttribute('data-state', 'sealed', {timeout:8000});
     await expect(content).toBeHidden();

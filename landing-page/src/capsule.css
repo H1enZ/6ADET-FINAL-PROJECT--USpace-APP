@@ -21,7 +21,6 @@
   .capsule-interface .eyebrow { display: block; font-size: .625rem; }
   .capsule-interface h4 { margin: 12px 0; font: 500 1.8rem/1.2 var(--serif); color: var(--cream); }
   .capsule-interface > p { font-size: .813rem; }
-  .capsule-app-preview { height: 280px; width: auto; margin: 18px auto 12px; border: 3px solid #ad829457; border-radius: 14px; }
   .capsule-interface .capsule-content-note { font-size: .625rem; margin-top: 16px; }
   .capsule-lock { width: 38px; height: 38px; color: var(--rose); margin-block: 18px; }
   .capsule-interface .capsule-countdown { font: 500 clamp(1.3rem, 2.5vw, 2rem)/1.5 var(--serif); color: var(--rose-light); margin: 24px 0 8px; }

@@ -27,7 +27,7 @@
 | Envelope sinks / fades | 0.66–0.92 / 0.70–0.92 |
 | Top / bottom panels unfold | 0.74–0.86 / 0.82–0.94 |
 
-The sample has no attached photo, matching Flutter's `photo == null` branch. Original website app screenshots remain untouched and appear automatically when opening completes, per the requested website interaction. The original Flutter reading button is intentionally omitted.
+The sample has no attached photo, matching Flutter's `photo == null` branch. Opening ends on the unfolded sample letter. The extra app screenshot panel was removed at the user's request. The original Flutter reading button is intentionally omitted.
 
 Sealing uses the separate Dart timeline: bottom/top folds 0.06–0.16 / 0.16–0.26, ribbon 0.26–0.36, envelope 0.34–0.42, insertion 0.40–0.52, flap 0.52–0.60, candle 0.60–0.84, three drops 0.67–0.79, stamp 0.84–0.98, emboss 0.89–0.93.
 
